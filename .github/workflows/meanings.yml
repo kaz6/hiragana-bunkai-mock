@@ -8,6 +8,8 @@ on:
   schedule:
     - cron: '17 18 * * *'   # 毎日 18:17 UTC ＝ 日本時間 3:17（:00 と :30 を避けた）
   workflow_dispatch:        # GitHub の画面（Actions → この処理 → Run workflow）から手で動かす
+  push:                     # 試しの間だけ（1回目）。確かめたら外す
+    paths: ['.github/workflows/meanings.yml']
 
 permissions:
   contents: write
