@@ -30,6 +30,18 @@ button{font:inherit;color:inherit}
 #combo{position:fixed;left:50%;top:42%;transform:translate(-50%,-50%) scale(.6);pointer-events:none;z-index:50;font:900 34px/1.2 var(--f-ui);color:var(--me);text-shadow:0 2px 0 var(--bg),0 0 12px var(--bg);opacity:0;transition:opacity .18s,transform .18s;white-space:nowrap;text-align:center}
 #combo small{display:block;font:700 13px/1.4 var(--f-ui);color:var(--sub)}
 #combo.on{opacity:1;transform:translate(-50%,-50%) scale(1)}
+/* 投げた言葉の意味（HB-007）。声と同じ場所に出る。声と同時なら声の下（.low） */
+#meaning{position:fixed;left:50%;top:42%;transform:translate(-50%,-50%) scale(.85);pointer-events:none;z-index:49;opacity:0;transition:opacity .2s,transform .2s;text-align:center;max-width:92vw;padding:8px 16px;border-radius:14px;background:color-mix(in srgb,var(--bg) 88%,transparent)}
+#meaning.on{opacity:1;transform:translate(-50%,-50%) scale(1)}
+#meaning.low{transform:translate(-50%,0) scale(.85)} #meaning.low.on{transform:translate(-50%,0) scale(1)} /* top は声の下端から JS で決める */
+#meaning .mw{display:block;font:600 30px/1.2 var(--f-kana);color:var(--me)}
+#meaning.op .mw{color:var(--opp)}
+#meaning .mk{display:block;font:700 26px/1.3 var(--f-ui);color:var(--ink,inherit)}
+#meaning .mn{display:block;font:500 15px/1.4 var(--f-ui);color:var(--sub);overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.row .m{font-size:12px;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.meanSet{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.meanSet button{font:600 14px/1 var(--f-ui);padding:8px 12px;border-radius:999px;border:1px solid var(--sub);background:transparent;color:inherit}
+.meanSet button[aria-pressed="true"]{background:var(--me);border-color:var(--me);color:#fff}
 button:focus-visible{outline:2px solid var(--me);outline-offset:2px}
 
 .app{box-sizing:border-box;min-height:100%;max-width:480px;margin:0 auto;display:flex;flex-direction:column;gap:8px;
@@ -176,7 +188,7 @@ details summary{cursor:pointer;font-weight:700;padding-block:6px}
       <button class="link" id="btnSpeed" type="button"></button>
     </div>
     <div class="slots" id="oppSlots"></div>
-    <p class="say" id="oppSay"></p><div id="combo" aria-live="polite"></div>
+    <p class="say" id="oppSay"></p><div id="combo" aria-live="polite"></div><div id="meaning" aria-live="polite"></div>
   </section>
 
   <section class="log" id="log" aria-label="投げた言葉のリスト" aria-live="polite"></section>
@@ -231,6 +243,12 @@ details summary{cursor:pointer;font-weight:700;padding-block:6px}
 <div class="sheet" id="sheet" hidden>
   <div class="sheet-in">
     <div class="head"><h2>しくみ</h2><button class="link" id="btnClose" type="button">とじる</button></div>
+
+    <div>
+      <h3>意味を出す</h3>
+      <p>投げた言葉の漢字・英語を、投げた瞬間に大きく出し、リストに小さく残す</p>
+      <div class="meanSet" id="meanSet" role="group" aria-label="意味を出す"><button type="button" data-v="none">なし</button><button type="button" data-v="kanji">漢字だけ</button><button type="button" data-v="both">漢字＋英語</button></div>
+    </div>
 
     <div>
       <h3>かんじょう</h3>
@@ -288,6 +306,7 @@ details summary{cursor:pointer;font-weight:700;padding-block:6px}
         <li>落ちてくる字は袋から出る（中身は28種類）</li>
         <li>使える言葉は <span id="dictN"></span> 語。2字は手で並べたもの、3字以上はそれに IPADIC（人名だけの語と、有名でない地名だけの語は除き、形容詞の「〜く」の形を足した）を足したもの。正しい言葉でも通らないことがある</li>
         <li>辞書データの出典：mecab-ipadic-2.7.0-20070801。<details><summary>著作権表示と条件（原文）</summary><pre id="ipadicNotice" style="white-space:pre-wrap;font-size:11px;line-height:1.5;margin:6px 0 0"></pre></details></li>
+        <li>意味（漢字・英語）の出典：<span id="meaningsNotice"></span></li>
         <li>ふたりで遊ぶときは、相手は人（合言葉の部屋）。カゴや袋は各自の端末の中だけで、投げた言葉だけが相手に届く。自動の相手は、ひとりで遊ぶときだけ</li>
         <li>相手は自動。最初に手を動かすまで待っている。知っているのは手で並べた3字までの言葉だけで、長い言葉は狙わない（IPADIC の言葉は使わない）</li>
         <li>割る・回す・裏返すはボタン。「落として割る」はまだ入れていない</li>
@@ -300,6 +319,7 @@ details summary{cursor:pointer;font-weight:700;padding-block:6px}
 <script src="config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="dict-ipadic.js"></script>
+<script src="meanings.js"></script>
 <script>
 (()=>{
 'use strict';
@@ -500,6 +520,20 @@ function notesOf(ps){ const out=[]; ps.forEach(p=>{ if(p.note){ const s=`${asWor
 const COMBO=['','ナイス','グレート','エクセレント']; let comboT=null; // 作り替えた字の数で出す声（見た目だけ。仮置き 2026-11-19）
 function comboOf(ps){ return ps.filter(p=>p.note&&p.note!=='おまけ').length; }
 function showCombo(k){ const el=document.getElementById('combo'); if(!el||k<1) return; el.innerHTML=`${COMBO[Math.min(k,3)]}！<small>工夫 ${k}</small>`; el.classList.remove('on'); void el.offsetWidth; el.classList.add('on'); clearTimeout(comboT); comboT=setTimeout(()=>el.classList.remove('on'),1100); }
+/* ---- 投げた言葉の意味（HB-007, D-028）。データは meanings.js（JMdict, CC BY-SA 4.0）。意味が付かない語は何も出さない ---- */
+const MEAN=window.HB_MEANINGS||{}; const MEAN_MODES=['none','kanji','both'];
+let meanMode='both'; try{ const v=localStorage.getItem('hb.meaning'); if(MEAN_MODES.includes(v)) meanMode=v; }catch(e){}
+let meanT=null;
+function meaningOf(word){ if(meanMode==='none') return null; const m=MEAN[String(word).replace(/∘/g,'')]; if(!m) return null;
+  const k=m[0]||'', e=meanMode==='both'?(m[1]||''):''; return (k||e)?{k,e}:null; }
+const escH=t=>String(t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+/* 投げた瞬間に、声と同じ場所に「言葉／漢字／英語」を出して1.5秒ほどで消す。タップは下に通す（pointer-events:none） */
+function showMeaning(word,who){ const el=$('meaning'), m=meaningOf(word); if(!el) return; if(!m){ return; }
+  el.innerHTML=`<span class="mw">${escH(word.replace(/∘/g,'。'))}</span>${m.k?`<span class="mk">${escH(m.k)}</span>`:''}${m.e?`<span class="mn">${escH(m.e)}</span>`:''}`;
+  el.classList.toggle('op',who==='op'); const cb=$('combo'), low=cb.classList.contains('on');
+  el.classList.toggle('low',low); el.style.top=low?`${Math.round(cb.offsetTop+cb.offsetHeight/2+4)}px`:''; // 声は translate(-50%,-50%) なので、下端＝中心＋高さの半分
+  el.classList.remove('on'); void el.offsetWidth; el.classList.add('on'); clearTimeout(meanT); meanT=setTimeout(()=>el.classList.remove('on'),1500); }
+function renderMeanSet(){ document.querySelectorAll('#meanSet button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.v===meanMode))); }
 /* 投げた言葉を自分の記録に入れる（リストは後で相手と同じ形で出る） */
 function recordMyThrow(c,ps){ S.used.add(c.core); S.log.push({who:'me',word:c.word,note:notesOf(ps),k:comboOf(ps),trail:trailOf(ps)}); }
 /* 投げた札を自分のカゴから消す（消える動きつき） */
@@ -508,7 +542,7 @@ function removeMyPieces(ps){ ps.forEach(p=>{ const el=els.get(p.id); if(el){ els
 /* 投げたときのメモ（ログと、工夫の声） */
 function logMyThrow(c,ps,bonusLetter){ const nt=notesOf(ps), k=comboOf(ps);
   lg('me',`投げる「${c.word}」`+(nt?`（${nt}）`:'')+(k?` ★${COMBO[Math.min(k,3)]}（工夫${k}）`:'')+(bonusLetter?` 相手におまけ「${bonusLetter}」`:''));
-  showCombo(k); }
+  showCombo(k); showMeaning(c.word,'me'); }
 let lastTry='';
 /* 投げられない並びで「投げる」を押したら、何がだめだったかをログに残す（出来そうでできなかった言葉を後で見られるように） */
 function logFailedThrow(c){ if(!c.text||c.cls==='ok') return; const k=c.text+'|'+c.msg; if(k===lastTry) return; lastTry=k; lg('me',`投げようとした「${c.text}」（${c.msg}）`); }
@@ -541,7 +575,7 @@ function cpuAct(){ if(S.over||S.ending||sheetOpen) return;
     S.used.add(w); S.log.push({who:'op',word:w,note:notesOf(used),k:comboOf(used),trail:trailOf(used)}); S.opp=S.opp.filter(x=>!used.includes(x));
     [...w].forEach((ch,k)=>S.mine.push(mk(ch==='ー'?'一':ch,{delay:k*110}))); S.say=`「${w}」を投げてきた`;
     let bx=''; if(bonus){ const b=mk(pick(BAG),{delay:[...w].length*110,note:'おまけ'}); S.mine.push(b); bx=letterOf(b); S.say+='（＋おまけ1字）'; }
-    lg('op',`投げる「${w}」`+(bx?` 自分におまけ「${bx}」`:''));
+    lg('op',`投げる「${w}」`+(bx?` 自分におまけ「${bx}」`:'')); showMeaning(w,'op');
     if(S.mine.length>CAP) finish('lose'); }
   else { const steps=cpuSteps(); const good=steps.filter(s=>bestWord(s.res));
     if(good.length) cpuApply(pick(good));
@@ -588,7 +622,7 @@ function renderOpp(){ const n=S.opp.length; const online=isOnline();
 let logN=-1;
 function renderLog(){ const el=$('log'); if(logN===S.log.length) return; logN=S.log.length;
   if(!S.log.length){ el.innerHTML='<p class="empty">投げた言葉は、ここに二人ぶん残る。<br>相手から届いた言葉は、こっちのカゴの材料になる。</p>'; return; }
-  el.innerHTML=S.log.map(r=>`<div class="row ${r.who}" data-w="${r.word}"><span class="w">${r.word.replace(/∘/g,'。')}${r.k?`<span class="st" aria-label="工夫${r.k}">${'★'.repeat(Math.min(r.k,3))}</span>`:''}</span>${r.note?`<span class="n">${r.note}</span>`:''}</div>`).join('');
+  el.innerHTML=S.log.map(r=>`<div class="row ${r.who}" data-w="${r.word}"><span class="w">${r.word.replace(/∘/g,'。')}${r.k?`<span class="st" aria-label="工夫${r.k}">${'★'.repeat(Math.min(r.k,3))}</span>`:''}</span>${r.note?`<span class="n">${r.note}</span>`:''}${(m=>m?`<span class="m">${escH([m.k,m.e].filter(Boolean).join('　'))}</span>`:'')(meaningOf(r.word))}</div>`).join('');
   el.scrollTop=el.scrollHeight; }
 function renderControls(){ const over=!!S.over; $('controls').hidden=over; $('result').hidden=!over;
   if(over){ const mine=S.log.filter(r=>r.who==='me').length, theirs=S.log.length-mine; const b=$('resBig');
@@ -643,7 +677,7 @@ function openSheet(from){ sheetOpener=from; sheetOpen=true; clearTimeout(cpuT); 
 function closeSheet(){ if(!sheetOpen) return; sheetOpen=false; $('sheet').hidden=true; schedule(); if(sheetOpener) sheetOpener.focus(); }
 $('btnHelp').onclick=()=>openSheet($('btnHelp')); $('btnHow').onclick=()=>openSheet($('btnHow'));
 /* どこをタップしても閉じる（click は指を動かしてスクロールしたときは出ない）。折りたたみの見出しだけは開閉に使う */
-$('sheet').addEventListener('click',e=>{ if(e.target.closest('summary')) return; closeSheet(); });
+$('sheet').addEventListener('click',e=>{ if(e.target.closest('summary,.meanSet')) return; closeSheet(); }); // 意味の設定のボタンも閉じない（HB-007）
 
 /* 割れない字：袋に入る字のうち RECIPE にないもの。向きの表（ROOT・ALIAS）から添え書きを作る */
 function orientPartners(L){ const r=ROOT[L]?ROOT[L][0]:L; return (ALIAS[r]||[]).map(x=>x[0]).filter(x=>x!==L); }
@@ -654,6 +688,8 @@ function orientPartners(L){ const r=ROOT[L]?ROOT[L][0]:L; return (ALIAS[r]||[]).
   $('unsplitHard').innerHTML=hard.map(L=>`<span>${L}</span>`).join(''); }
 
 $('recipes').innerHTML=Object.entries(RECIPE).map(([k,[a,b]])=>`<span>${k} ＝ ${a} ＋ ${b}</span>`).join('');
+$('meaningsNotice').textContent=window.HB_MEANINGS_NOTICE||'（意味のデータを読み込めなかった）';
+renderMeanSet(); $('meanSet').addEventListener('click',e=>{ const b=e.target.closest('button[data-v]'); if(!b) return; meanMode=b.dataset.v; try{localStorage.setItem('hb.meaning',meanMode)}catch(_){} renderMeanSet(); logN=-1; renderLog(); });
 $('dictN').textContent=WORDS.length; $('ipadicNotice').textContent=window.HB_IPADIC_NOTICE||'（辞書データを読み込めなかった）';
 document.addEventListener('visibilitychange',()=>{ if(document.hidden) clearTimeout(cpuT); else schedule(); });
 if('ResizeObserver' in window) new ResizeObserver(()=>{ if(S) renderBasket(); }).observe(basket);
@@ -801,7 +837,7 @@ function onOpponentThrow(row){ if(!S||S.over||S.ending) return;
   S.log.push({who:'op',word:row.word,note:'',k:row.stars||0,trail:row.trail||''});
   [...row.word].forEach((ch,k)=>S.mine.push(mk(ch==='ー'?'一':ch,{delay:k*110})));
   S.say=`「${row.word.replace(/∘/g,'。')}」が届いた`;
-  lg('op',`投げる「${row.word}」`);
+  lg('op',`投げる「${row.word}」`); showMeaning(row.word,'op');
   if(S.mine.length>CAP){ sendLoseToOpponent(); finish('lose'); return; }
   render(); }
 /* 相手が「負けた」を送ってきた */
