@@ -550,8 +550,9 @@ const WORDS=[...new Set([...HAND].concat(String(window.HB_IPADIC||'').split(/\s+
 const DICT=new Set(WORDS);
 const SPECIAL=new Set(['ち∘']); // 部品を含む特別な言葉。作品名『チ。』（作者 2026-11-19）。リストでは ∘ を「。」として見せる
 // ふつう（Hard）は ゆっくり と同じ間隔で、そのかわり賢く動く（smart。HB-017, D-045）。ゆるゆる〜ゆっくりは今のまま
-const SPEEDS=[{name:'とまる',ms:0},{name:'ゆるゆる',ms:25000,max:2},{name:'のんびり',ms:11000},{name:'ゆっくり',ms:6500},{name:'ふつう',ms:6500,smart:true}];
-const SPEED_EN={'とまる':'Stop','ゆるゆる':'Very easy','のんびり':'Easy','ゆっくり':'Normal','ふつう':'Hard'}; // 速さの英語（HB-015, D-042。D-041 の強さボタンと同じ言葉）
+// つよい（Very hard）は作者向けの5段目。ふつうの賢さに2手先・守り・決め手を足し、約4秒ごとに動く（deep。HB-022, D-051）
+const SPEEDS=[{name:'とまる',ms:0},{name:'ゆるゆる',ms:25000,max:2},{name:'のんびり',ms:11000},{name:'ゆっくり',ms:6500},{name:'ふつう',ms:6500,smart:true},{name:'つよい',ms:4000,smart:true,deep:true}];
+const SPEED_EN={'とまる':'Stop','ゆるゆる':'Very easy','のんびり':'Easy','ゆっくり':'Normal','ふつう':'Hard','つよい':'Very hard'}; // 速さの英語（HB-015, D-042。D-041 の強さボタンと同じ言葉）
 const CPU_MAX=3; // 相手が知っているのは3字までの言葉だけ。長い言葉を狙わず、作れるものから適当に選ぶ
 const cpuMax=()=>SPEEDS[speed].max||CPU_MAX; // ゆるゆるは2字だけ（HB-006）
 const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -592,7 +593,7 @@ function lg(who,msg){ if(!S) return; LOG.push(`${((Date.now()-t0)/1000).toFixed(
 function logText(){ return [`ひらがな分解（仮）ログ ${new Date().toLocaleString('ja-JP')}`,
   isOnline()
     ? `ふたりで（合言葉の部屋「${NET.pass}」）　一度きり:${once?'あり':'なし'}　辞書:${WORDS.length}語　上限:${CAP}　引く:なし（${FLOOR}こまで${REFILL_MS/1000}秒後に落ちる）`
-    : `ひとりで（CPU）　速さ:${SPEEDS[speed].name}　一度きり:${once?'あり':'なし'}　辞書:${WORDS.length}語　上限:${CAP}　相手の語:${SPEEDS[speed].smart?'辞書全部（賢い。D-045）':cpuMax()+'字まで'}　引く:なし（${FLOOR}こまで${REFILL_MS/1000}秒後に落ちる）`].concat(LOG).join('\n'); }
+    : `ひとりで（CPU）　速さ:${SPEEDS[speed].name}　一度きり:${once?'あり':'なし'}　辞書:${WORDS.length}語　上限:${CAP}　相手の語:${SPEEDS[speed].deep?'辞書全部・2手先まで読む（つよい。D-051）':SPEEDS[speed].smart?'辞書全部（賢い。D-045）':cpuMax()+'字まで'}　引く:なし（${FLOOR}こまで${REFILL_MS/1000}秒後に落ちる）`].concat(LOG).join('\n'); }
 const els=new Map();
 function newGame(){
   clearTimeout(cpuT); clearTimeout(refT.me); clearTimeout(refT.op); refT={me:null,op:null}; els.forEach(el=>el.remove()); els.clear();
@@ -799,17 +800,18 @@ function doThrow(){ if(locked()) return; const c=checkSel(); if(!c.word){ logFai
 /* ---- 相手 ---- */
 function schedule(){ clearTimeout(cpuT); if(!S||S.over||S.ending||!S.started||sheetOpen||isOnline()||!SPEEDS[speed].ms) return; // 通信対戦では CPU は動かない
   cpuT=setTimeout(cpuAct, SPEEDS[speed].ms*(0.8+Math.random()*0.4)); }
-function cpuSteps(){ const L=S.opp.map(letterOf), out=[];
+function cpuSteps(){ return stepsOf(S.opp.map(letterOf)); }
+function stepsOf(L){ const out=[]; // 字の並び L からの1手（割る・回す・裏返す・くっつける）。つよい の2手先でも使う（D-051）
   L.forEach((l,i)=>{ const rest=()=>[...L.slice(0,i),...L.slice(i+1)];
     if(RECIPE[l]&&L.length<CAP) out.push({t:'split',i,res:[...rest(),...RECIPE[l]]});
     if(TURN[l]) out.push({t:'turn',i,res:[...rest(),TURN[l][0]]}); });
   for(let i=0;i<L.length;i++) for(let j=i+1;j<L.length;j++){ const m=MERGE[key(L[i],L[j])];
     if(m) m.forEach(r=>out.push({t:'merge',i,j,r,res:[...L.filter((_,k)=>k!==i&&k!==j),r]})); }
   return out; }
-function cpuApply(s){ const p=S.opp[s.i], l=letterOf(p);
+function cpuApply(s,tag){ const p=S.opp[s.i], l=letterOf(p);
   if(s.t==='split'){ S.opp.splice(s.i,1,...RECIPE[l].map(x=>mk(x,{note:`「${l}」を割った`,d:`${p.d}→${x}`}))); S.say=`「${l}」を割った`; }
   else if(s.t==='turn'){ const [to,v]=TURN[l]; S.opp.splice(s.i,1,mk(to,{note:`「${l}」を${v}`,d:`${p.d}→${to}`})); S.say=`「${l}」を${v}`; }
-  else { const q=S.opp[s.j], lq=letterOf(q); S.opp=S.opp.filter(x=>x!==p&&x!==q); S.opp.push(mk(s.r,{note:`「${l}」と「${lq}」をくっつけた`,d:joinD(p.d,q.d,s.r)})); S.say=`「${l}」と「${lq}」をくっつけた`; } lg('op',S.say); }
+  else { const q=S.opp[s.j], lq=letterOf(q); S.opp=S.opp.filter(x=>x!==p&&x!==q); S.opp.push(mk(s.r,{note:`「${l}」と「${lq}」をくっつけた`,d:joinD(p.d,q.d,s.r)})); S.say=`「${l}」と「${lq}」をくっつけた`; } lg('op',S.say+(tag?`（${tag}）`:'')); }
 /* ---- 賢い相手（ふつう だけ。HB-017, D-045）----
    知っている言葉は辞書全部（WORDS）。点数＝字数＋重い字の数×HEAVY_W。重い字＝割る作り方（RECIPE）も向きの道（TURN）もない字（字のデータから作る。いまは よ・ろ・の）。
    投げられる言葉がない、または1手（割る・回す・裏返す・くっつける）で点数がもっと高い言葉が作れるなら、その1手。読むのは1手先まで。
@@ -827,11 +829,11 @@ function smartBest(letters){ const pool={}; letters.forEach(l=>{ if(!l) return; 
   for(const x of smartList()){ if(top&&x.sc<top) break; if(ok(x)){ top=x.sc; ties.push(x); } }
   return ties.length?pick(ties):null; }
 /* 言葉の表は、ページが空いているときに先に作る（初めの1手で止まらないように） */
-(window.requestIdleCallback||(f=>setTimeout(f,1500)))(()=>{ try{ smartList(); }catch(_){} });
-function cpuThrow(w){ const used=[]; for(const ch of w){ const p=S.opp.find(x=>!used.includes(x)&&asWord(letterOf(x))===ch); used.push(p); }
+(window.requestIdleCallback||(f=>setTimeout(f,1500)))(()=>{ try{ smartList(); strongList(); }catch(_){} });
+function cpuThrow(w,tag){ const used=[]; for(const ch of w){ const p=S.opp.find(x=>!used.includes(x)&&asWord(letterOf(x))===ch); used.push(p); }
     S.used.add(w); S.log.push({who:'op',word:w,note:notesOf(used),k:comboOf(used),trail:trailOf(used)}); zkRecord(w,'op',comboOf(used),trailOf(used)); S.opp=S.opp.filter(x=>!used.includes(x));
     [...w].forEach((ch,k)=>S.mine.push(mk(ch==='ー'?'一':ch,{delay:k*110,drop:tierOf(w)}))); S.say=`「${wordShow(w)}」を投げてきた`; landFx(w);
-    lg('op',`投げる「${w}」`); showMeaning(w,'op');
+    lg('op',`投げる「${w}」`+(tag?`（${tag}）`:'')); showMeaning(w,'op');
     if(S.mine.length>CAP) finish('lose'); }
 function cpuSmart(){ const L=S.opp.map(letterOf), now=smartBest(L);
   const must=S.oppThrowNext; S.oppThrowNext=false;
@@ -846,7 +848,70 @@ function cpuSmart(){ const L=S.opp.map(letterOf), now=smartBest(L);
   const steps=all; // どの1手でも言葉にならないときは、今までの相手と同じく適当に動く（重いときの割り方は上で除いた）
   if(steps.length&&S.opp.length<=8) go(pick(steps));
   else { const m=steps.filter(s=>s.t==='merge'); if(m.length) cpuApply(pick(m)); else { S.say='手が出ない'; lg('op','手が出ない'); } } }
+/* ---- つよい相手（つよい だけ。HB-022, D-051）----
+   土台は ふつう（cpuSmart）と同じ：辞書全部・点数＝字数＋重い字×HEAVY_W・8こ以上の割り方の決まり。そこに3つ足す。
+   1. 守り：自分（相手側）のカゴが STRONG_GUARD こ以上なら、点数より字数を優先して、いちばん長い言葉をすぐ投げる
+   2. 決め手：こちら（遊び手）のカゴが STRONG_KILL こ以上なら、投げられる言葉があればすぐ投げる（点数のいちばん高いもの）
+   3. 2手先：作り替えを2手続けて、今投げる・1手で作るより点数の高い言葉ができるなら、その1手目を打つ（同じ点数なら近い方）
+   2手先は、1手目の候補をすべて見て、2手目のあとの「今の最高点より高い言葉」だけを探す（点数の高い順の表を上から見て、
+   超えられないところで打ち切る）。字の有無は 32 字ごとのビットで先にふるう。重いとき（8こ以上）は2手先を読まない */
+const STRONG_GUARD=9, STRONG_KILL=9;
+let SM=null, smN=-1;
+function strongList(){ const L=smartList(); if(SM&&smN===WORDS.length) return SM; smN=WORDS.length;
+  const idx={}; let n=0;
+  SM=L.map(x=>{ const m=[0,0,0,0]; let wide=false;
+    for(const c of x.cs){ if(!(c in idx)) idx[c]=n++; const b=idx[c]; if(b<128) m[b>>5]|=1<<(b&31); else wide=true; }
+    return {x,m,wide}; });
+  SM.idx=idx; return SM; }
+/* letters で作れて、点数が th より高い言葉のうち、いちばん点数の高いもの（なければ null） */
+function topAbove(letters,th){ const T=strongList(), idx=T.idx, pool={}, pm=[0,0,0,0]; let len=0;
+  for(const l of letters){ if(!l) continue; const c=asWord(l); pool[c]=(pool[c]||0)+1; len++; const b=idx[c]; if(b!==undefined&&b<128) pm[b>>5]|=1<<(b&31); }
+  for(const y of T){ const x=y.x; if(x.sc<=th) return null; if(x.cs.length>len) continue;
+    if(!y.wide&&((y.m[0]&~pm[0])|(y.m[1]&~pm[1])|(y.m[2]&~pm[2])|(y.m[3]&~pm[3]))) continue;
+    const need={}; let ok=true; for(const c of x.cs){ need[c]=(need[c]||0)+1; if(need[c]>(pool[c]||0)){ ok=false; break; } }
+    if(ok&&!(once&&S.used.has(x.w))) return x; }
+  return null; }
+/* いちばん長い言葉（同じ長さは点数の高い方、それも同じならランダム） */
+function longBest(letters){ const pool={}; let len=0; letters.forEach(l=>{ if(!l) return; const c=asWord(l); pool[c]=(pool[c]||0)+1; len++; });
+  let top=[], tl=0, ts=0;
+  for(const x of smartList()){ const n=x.cs.length; if(n>len||n<tl) continue;
+    const need={}; let ok=true; for(const c of x.cs){ need[c]=(need[c]||0)+1; if(need[c]>(pool[c]||0)){ ok=false; break; } }
+    if(!ok||(once&&S.used.has(x.w))) continue;
+    if(n>tl||(n===tl&&x.sc>ts)){ tl=n; ts=x.sc; top=[x]; } else if(n===tl&&x.sc===ts) top.push(x); }
+  return top.length?pick(top):null; }
+/* 2手先：base より高い点数になる1手目（同点の1手目はすべて）と、そのときの言葉。
+   1手目は1手先の点数の高い順に見る。同じ字の組になる2手目は一度だけ調べる（見つからなかった組は、しきいが上がっても見つからない）。
+   STRONG_BUDGET ms を過ぎたら、そこまでで決める（遅い端末で止まって見えないように） */
+const STRONG_BUDGET=30;
+function strongPlan(L,base,firsts1,t0){ let best=base, firsts=[], word=null; const seen=new Map();
+  for(const s1 of firsts1){ if(performance.now()-t0>STRONG_BUDGET) break;
+    for(const s2 of stepsOf(s1.res)){ const key=s2.res.map(asWord).sort().join('');
+      let x; if(seen.has(key)) x=seen.get(key); else { x=topAbove(s2.res, firsts.length?best-1:best); seen.set(key,x); }
+      if(!x) continue;
+      if(x.sc>best){ best=x.sc; firsts=[s1]; word=x.w; } else if(x.sc===best&&!firsts.includes(s1)) firsts.push(s1); } }
+  return firsts.length?{firsts,sc:best,w:word}:null; }
+let strongMs=[]; // 1回の計算時間（ms）。確かめ用。ログには出さない
+function cpuStrong(){ const t=performance.now(); try{ strongMove(t); } finally{ strongMs.push(performance.now()-t); if(strongMs.length>200) strongMs.shift(); } }
+function strongMove(t0){ const L=S.opp.map(letterOf), now=smartBest(L);
+  const must=S.oppThrowNext; S.oppThrowNext=false;
+  if(now&&must){ cpuThrow(now.w); return; }
+  const kill=S.mine.length>=STRONG_KILL;
+  if(S.opp.length>=STRONG_GUARD){ const lw=longBest(L); if(lw){ cpuThrow(lw.w, kill?'守り・決め手':'守り'); return; } }
+  if(now&&kill){ cpuThrow(now.w,'決め手'); return; }
+  const heavy=S.opp.length>=SMART_SPLIT_AT;
+  const go=(st,tag)=>{ if(heavy&&st.t==='split') S.oppThrowNext=true; cpuApply(st,tag); };
+  const all=cpuSteps(); all.forEach(st=>{ st.top=topAbove(st.res,0); }); // 1手先の点数（ふつう の smartBest と同じ最高点。ビットでふるって速くした）
+  const ok=all.filter(st=>!(heavy&&st.t==='split'&&!st.top));
+  let best=[], bs=now?now.sc:0;
+  for(const st of ok){ const b=st.top; if(!b) continue; if(b.sc>bs){ bs=b.sc; best=[st]; } else if(b.sc===bs&&best.length) best.push(st); }
+  if(!heavy){ const order=ok.slice().sort((a,b)=>(b.top?b.top.sc:0)-(a.top?a.top.sc:0)); const p=strongPlan(L,bs,order,t0); if(p){ go(pick(p.firsts),`2手先「${p.w}」${p.sc}点`); return; } }
+  if(best.length){ go(pick(best)); return; }
+  if(now){ cpuThrow(now.w); return; }
+  const steps=ok;
+  if(steps.length&&S.opp.length<=8) go(pick(steps));
+  else { const m=steps.filter(s=>s.t==='merge'); if(m.length) cpuApply(pick(m)); else { S.say='手が出ない'; lg('op','手が出ない'); } } }
 function cpuAct(){ if(S.over||S.ending||sheetOpen) return;
+  if(SPEEDS[speed].deep){ cpuStrong(); render(); schedule(); return; }
   if(SPEEDS[speed].smart){ cpuSmart(); render(); schedule(); return; }
   const L=S.opp.map(letterOf); const w=bestWord(L);
   if(w){ const used=[]; for(const ch of w){ const p=S.opp.find(x=>!used.includes(x)&&asWord(letterOf(x))===ch); used.push(p); }
@@ -1110,7 +1175,7 @@ function loadExtraWords(){
       if(error||!Array.isArray(data)) return;
       for(const r of data){ const w=r&&r.word; if(typeof w==='string'&&w[0]!=='ー'&&[...w].length>=2&&[...w].length<=16&&[...w].every(c=>c==='ー'||KANA.has(c))&&!DICT.has(w)){ DICT.add(w); WORDS.push(w); } }
       $('dictN').textContent=WORDS.length;
-      (window.requestIdleCallback||(f=>setTimeout(f,500)))(()=>{ try{ smartList(); }catch(_){} }); // 賢い相手の言葉の表も作り直しておく（D-045）
+      (window.requestIdleCallback||(f=>setTimeout(f,500)))(()=>{ try{ smartList(); strongList(); }catch(_){} }); // 賢い相手の言葉の表も作り直しておく（D-045）
     }).catch(()=>{});
   }catch(_){}
 }
@@ -1138,7 +1203,7 @@ function setLobbyText(text){ $('lobbyText').innerHTML=withEn(text,1); }
 function showMenu(){ $('menu').hidden=false; soloPickClose(); }
 /* ひとりでの相手の強さを、始める前に選ぶ（HB-014 追加, D-041）。「とまる」は出さない（右上の「速さ」からは選べる）。
    英語はいつも出す（はじめの画面では意味の設定をまだ触っていないため）。前に選んだ強さに印。選ぶとすぐ始まる */
-const SOLO_LEVELS=[['ゆるゆる','Very easy'],['のんびり','Easy'],['ゆっくり','Normal'],['ふつう','Hard']]; // 一言は英語だけ（D-041 の直し、作者 23:29）
+const SOLO_LEVELS=[['ゆるゆる','Very easy'],['のんびり','Easy'],['ゆっくり','Normal'],['ふつう','Hard'],['つよい','Very hard']]; // 一言は英語だけ（D-041 の直し、作者 23:29）
 function soloPickOpen(){ const cur=speedSaved?SPEEDS[speed].name:'';
   $('soloPick').innerHTML='<h3>相手の強さ <small lang="en" style="font-weight:500;color:var(--sub)">CPU level</small></h3>'+SOLO_LEVELS.map(([n,en])=>`<button type="button" class="lv" data-n="${n}"${n===cur?' aria-current="true"':''}><b>${n}<small lang="en">${en}</small></b>${n===cur?'<span class="mark">前回</span>':''}</button>`).join('')
     +'<button type="button" class="link" id="btnSoloBack" style="align-self:flex-start">もどる'+enTag('Back')+'</button>';
