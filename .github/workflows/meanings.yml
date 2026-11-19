@@ -1,0 +1,68 @@
+# HB-011（D-035）：足した言葉（Supabase の extra_words）の意味データ meanings.js を毎日作り直す。
+# 対象の語は ページと同じ WORDS（手選び＋dict-ipadic.js＋extra_words）。作り方は tools/build_meanings.py --repo。
+# 意味のデータ（window.HB_MEANINGS の行）が変わったときだけ main にコミットする。
+# JMdict の作成日だけが変わった（頭の注記の日付だけ違う）ときはコミットしない（毎日コミットが積もらないように）。
+name: 足した言葉の意味を更新
+
+on:
+  schedule:
+    - cron: '17 18 * * *'   # 毎日 18:17 UTC ＝ 日本時間 3:17（:00 と :30 を避けた）
+  workflow_dispatch:        # GitHub の画面（Actions → この処理 → Run workflow）から手で動かす
+
+permissions:
+  contents: write
+
+concurrency:
+  group: meanings
+  cancel-in-progress: false
+
+jobs:
+  rebuild:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: JMdict_e を EDRDG から取ってくる
+        run: |
+          for i in 1 2 3; do
+            curl -fsSL --retry 3 -o "$RUNNER_TEMP/JMdict_e.gz" https://www.edrdg.org/pub/Nihongo/JMdict_e.gz && break
+            sleep 30
+          done
+          gzip -t "$RUNNER_TEMP/JMdict_e.gz"
+          ls -l "$RUNNER_TEMP/JMdict_e.gz"
+
+      - name: meanings.js を作り直す（extra_words は config.js の公開キーで読む）
+        run: python3 tools/build_meanings.py "$RUNNER_TEMP/JMdict_e.gz" --repo "$RUNNER_TEMP/meanings.js"
+
+      - name: 意味のデータが変わったときだけコミットして push
+        run: |
+          new="$RUNNER_TEMP/meanings.js"
+          if cmp -s <(grep '^window.HB_MEANINGS=' "$new") <(grep '^window.HB_MEANINGS=' meanings.js); then
+            echo "変化なし。何もしない"
+            exit 0
+          fi
+          # 安全のため：語数が前の8割を切ったら止める（読み込みの失敗で意味がごっそり消えるのを防ぐ）
+          python3 - "$new" meanings.js <<'PY'
+          import json, re, sys
+          n = lambda f: len(json.loads(re.search(r'^window\.HB_MEANINGS=(.*);$', open(f, encoding='utf-8').read(), re.M).group(1)))
+          a, b = n(sys.argv[1]), n(sys.argv[2])
+          print('意味のある語', b, '→', a)
+          if a < b * 0.8: sys.exit('意味のある語が大きく減った。コミットしない')
+          PY
+          cp "$new" meanings.js
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add meanings.js
+          git commit -m "自動：足した言葉の意味を更新" -m "GitHub Actions（.github/workflows/meanings.yml）が JMdict_e と extra_words から作り直した"
+          for i in 1 2 3 4; do
+            git pull --rebase origin main && git push origin HEAD:main && exit 0
+            sleep $((2**i))
+          done
+          exit 1
