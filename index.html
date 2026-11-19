@@ -316,7 +316,7 @@ details summary{cursor:pointer;font-weight:700;padding-block:6px}
     <div>
       <h3>きまり</h3>
       <p>リストに出た言葉は、二人とも二度と投げられない。</p>
-      <p>作り替えた字（割った・回した・裏返した・くっつけた字）が入った言葉を投げると声が出る：1つでナイス、2つでグレート、3つ以上でエクセレント。リストにも★が残り（二人とも）、終わったら二人それぞれの★がいちばん多い言葉が「今日の一語」に出る。元の字からの道すじ（例：し→つ　は→よ　（は→｜）＋し→い）つき。どれも見た目だけで、勝ち負けには関わらない。</p>
+      <p>作り替えた字（割った・回した・裏返した・くっつけた字）が入った言葉を投げると声が出る。言葉の字それぞれの道すじにある作り替えの回数（「→」の数）を合わせて、1でナイス★、2〜3でグレート★★、4以上でエクセレント★★★。リストにも★が残り（二人とも）、終わったら二人それぞれの★がいちばん多い言葉が「今日の一語」に出る。元の字からの道すじ（例：し→つ　は→よ　（は→｜）＋し→い）つき。どれも見た目だけで、勝ち負けには関わらない。</p>
     </div>
 
     <div>
@@ -545,9 +545,14 @@ function joinD(a,b,r){ return `${wrapD(a)}＋${wrapD(b)}→${r}`; }
 function trailOf(ps){ return ps.filter(p=>p.d&&p.d.includes('→')).map(p=>p.d.replace(/→一$/,'→ー')).join('　'); } // 作り替えの道すじ（元の字から）
 function notesOf(ps){ const out=[]; ps.forEach(p=>{ if(p.note){ const s=`${asWord(letterOf(p))}←${p.note}`; if(!out.includes(s)) out.push(s); } }); return out.slice(0,3).join('　'); }
 
-const COMBO=['','ナイス','グレート','エクセレント']; let comboT=null; // 作り替えた字の数で出す声（見た目だけ。仮置き 2026-11-19）
-function comboOf(ps){ return ps.filter(p=>p.note&&p.note!=='おまけ').length; }
-function showCombo(k){ const el=document.getElementById('combo'); if(!el||k<1) return; el.innerHTML=`${COMBO[Math.min(k,3)]}！<small>工夫 ${k}</small>`; el.classList.remove('on'); void el.offsetWidth; el.classList.add('on'); clearTimeout(comboT); comboT=setTimeout(()=>el.classList.remove('on'),1100); }
+const COMBO=['','ナイス','グレート','エクセレント']; let comboT=null; // 工夫の合計で出す声（見た目だけ）
+/* ★の数え方（HB-009, D-031）：投げた言葉の各字の道すじ（D-023 の d）にある「→」の合計＝工夫の数。
+   割る・くっつける・向きで別の字になる、がそれぞれ1。字にならない向きを経由しただけの回し・裏返しは道すじに残らないので数えない。
+   STAR_AT[i] 以上で ★i+1 個（1＝ナイス、2〜3＝グレート、4以上＝エクセレント）。数値を変えるときはここだけ */
+const STAR_AT=[1,2,4];
+function comboOf(ps){ return ps.reduce((n,p)=>n+((p.d||'').match(/→/g)||[]).length,0); }
+const starsOf=k=>STAR_AT.filter(t=>(k||0)>=t).length;
+function showCombo(k){ const el=document.getElementById('combo'); if(!el||starsOf(k)<1) return; el.innerHTML=`${COMBO[starsOf(k)]}！<small>工夫 ${k}</small>`; el.classList.remove('on'); void el.offsetWidth; el.classList.add('on'); clearTimeout(comboT); comboT=setTimeout(()=>el.classList.remove('on'),1100); }
 /* ---- 投げた言葉の意味（HB-007, D-028）。データは meanings.js（JMdict, CC BY-SA 4.0）。意味が付かない語は何も出さない ---- */
 const MEAN=window.HB_MEANINGS||{}; const MEAN_MODES=['none','kanji','both'];
 let meanMode='both'; try{ const v=localStorage.getItem('hb.meaning'); if(MEAN_MODES.includes(v)) meanMode=v; }catch(e){}
@@ -584,7 +589,7 @@ function renderZukan(){ const ws=Object.keys(ZK.words).sort((a,b)=>zkColl?zkColl
   $('zukanN').innerHTML=`${WORDS.length}語中 <b>${ws.length}</b>語`;
   $('zukanNote').textContent='自分が投げた言葉と、相手から届いた言葉が載っていく。'+(zkStore?'この端末のブラウザだけに残る。':'いまはブラウザに保存できないので、ページを閉じると消える。');
   $('zukanList').innerHTML=ws.length?ws.map(w=>{ const e=ZK.words[w], m=meaningOf(w);
-    return `<button type="button" class="zk-row" aria-expanded="false"><span class="zw${e.made?' made':''}">${escH(zkShow(w))}</span>${e.made?'<span class="zmade">作った</span>':''}${e.k?`<span class="st" aria-label="工夫${e.k}">${'★'.repeat(Math.min(e.k,3))}</span>`:''}`
+    return `<button type="button" class="zk-row" aria-expanded="false"><span class="zw${e.made?' made':''}">${escH(zkShow(w))}</span>${e.made?'<span class="zmade">作った</span>':''}${e.k?`<span class="st" aria-label="工夫${e.k}">${'★'.repeat(starsOf(e.k))}</span>`:''}`
       +(m?`<span class="zm">${escH([m.k,m.e].filter(Boolean).join('　'))}</span>`:'')
       +(e.trail?`<span class="ztr">${escH(e.trail)}</span>`:'')
       +`<span class="zd">${e.trail?`<span class="ztrf"><b>道すじ</b>${escH(e.trail)}</span><br>`:''}<b>最初に開いた日</b>${escH(e.first)}<br><b>投げられた回数</b>${e.n}回<br><b>出会い</b>${[e.made?'自分で作った':'',e.seen?'相手から見た':''].filter(Boolean).join('・')}</span></button>`; }).join('')
@@ -596,7 +601,7 @@ function removeMyPieces(ps){ ps.forEach(p=>{ const el=els.get(p.id); if(el){ els
   S.mine=S.mine.filter(p=>!ps.includes(p)); S.sel=[]; S.choose=null; }
 /* 投げたときのメモ（ログと、工夫の声） */
 function logMyThrow(c,ps,bonusLetter){ const nt=notesOf(ps), k=comboOf(ps);
-  lg('me',`投げる「${c.word}」`+(nt?`（${nt}）`:'')+(k?` ★${COMBO[Math.min(k,3)]}（工夫${k}）`:'')+(bonusLetter?` 相手におまけ「${bonusLetter}」`:''));
+  lg('me',`投げる「${c.word}」`+(nt?`（${nt}）`:'')+(k?` ★${COMBO[starsOf(k)]}（工夫${k}）`:'')+(bonusLetter?` 相手におまけ「${bonusLetter}」`:''));
   showCombo(k); showMeaning(c.word,'me'); }
 let lastTry='';
 /* 投げられない並びで「投げる」を押したら、何がだめだったかをログに残す（出来そうでできなかった言葉を後で見られるように） */
@@ -677,14 +682,14 @@ function renderOpp(){ const n=S.opp.length; const online=isOnline();
 let logN=-1;
 function renderLog(){ const el=$('log'); if(logN===S.log.length) return; logN=S.log.length;
   if(!S.log.length){ el.innerHTML='<p class="empty">投げた言葉は、ここに二人ぶん残る。<br>相手から届いた言葉は、こっちのカゴの材料になる。</p>'; return; }
-  el.innerHTML=S.log.map(r=>`<div class="row ${r.who}" data-w="${r.word}"><span class="w">${r.word.replace(/∘/g,'。')}${r.k?`<span class="st" aria-label="工夫${r.k}">${'★'.repeat(Math.min(r.k,3))}</span>`:''}</span>${r.note?`<span class="n">${r.note}</span>`:''}${(m=>m?`<span class="m">${escH([m.k,m.e].filter(Boolean).join('　'))}</span>`:'')(meaningOf(r.word))}</div>`).join('');
+  el.innerHTML=S.log.map(r=>`<div class="row ${r.who}" data-w="${r.word}"><span class="w">${r.word.replace(/∘/g,'。')}${r.k?`<span class="st" aria-label="工夫${r.k}">${'★'.repeat(starsOf(r.k))}</span>`:''}</span>${r.note?`<span class="n">${r.note}</span>`:''}${(m=>m?`<span class="m">${escH([m.k,m.e].filter(Boolean).join('　'))}</span>`:'')(meaningOf(r.word))}</div>`).join('');
   el.scrollTop=el.scrollHeight; }
 function renderControls(){ const over=!!S.over; $('controls').hidden=over; $('result').hidden=!over;
   if(over){ const mine=S.log.filter(r=>r.who==='me').length, theirs=S.log.length-mine; const b=$('resBig');
     b.textContent=RESULT_TITLE[S.over]; b.className='big '+S.over;
     $('resSub').textContent=`投げた言葉　あなた ${mine}　あいて ${theirs}`;
     { const bestOf=who=>S.log.filter(r=>r.who===who&&r.k).reduce((a,r)=>(!a||r.k>a.k||(r.k===a.k&&[...r.word].length>[...a.word].length))?r:a,null);
-      const card=(who,label)=>{ const b=bestOf(who); return b?`<div class="best ${who}"><span class="lb">${label}の今日の一語</span><b>${b.word.replace(/∘/g,'。')}</b><span class="st">${'★'.repeat(Math.min(b.k,3))}</span>${b.trail?`<span class="tr">${b.trail}</span>`:''}</div>`:''; };
+      const card=(who,label)=>{ const b=bestOf(who); return b?`<div class="best ${who}"><span class="lb">${label}の今日の一語</span><b>${b.word.replace(/∘/g,'。')}</b><span class="st">${'★'.repeat(starsOf(b.k))}</span>${b.trail?`<span class="tr">${b.trail}</span>`:''}</div>`:''; };
       $('resBest').innerHTML=card('me','あなた')+card('op','あいて'); } $('logText').value=logText(); return; }
   const c=checkSel(), ps=selPieces(), p=ps.length===1?ps[0]:null, L=p&&letterOf(p);
   { const logEl=$('log'), hitW=(c.msg&&c.msg.startsWith('もうリストに出た言葉'))?c.text:'';
