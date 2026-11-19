@@ -749,7 +749,7 @@ function render(){ refill(); renderOpp(); renderLog(); renderBasket(); renderCon
    吹き出しはタップを下に通し（pointer-events:none）、どこかを押すと消える（押した操作もそのまま効く）。
    見たかどうかは localStorage の hb.guide（'done'）。保存が使えなければ毎回出る */
 const GUIDE_KEY='hb.guide';
-const GUIDE_TEXT={1:'札をタップして選ぶ',2:'順に並べると言葉。『投げる』で相手のカゴへ',3:'12こをこえたら勝ち。自分のがこえたら負け',4:'割る・回す・裏返す・くっつけるで、別の字に作り替えられる',5:'次見たかったらここ見て！'};
+const GUIDE_TEXT={1:'札をタップして選ぶ',2:'順に並べると言葉。『投げる』で相手のカゴへ',3:'12こをこえたら勝ち。自分のがこえたら負け',4:'この棒は、回すと ー、ほかの字とくっつけると別の字になる',5:'次見たかったらここ見て！'};
 const G={active:false,shown:new Set(),cur:0,thrown:false};
 function guideDone(){ try{ return localStorage.getItem(GUIDE_KEY)==='done'; }catch(e){ return false; } }
 function guideMarkDone(){ try{ localStorage.setItem(GUIDE_KEY,'done'); }catch(e){} }
