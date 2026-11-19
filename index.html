@@ -11,6 +11,8 @@
   --f-kana:"Klee One","Hiragino Maru Gothic ProN","Yu Mincho","Noto Serif CJK JP",serif;
   --f-ui:"Zen Kaku Gothic New","Hiragino Kaku Gothic ProN","Yu Gothic","Noto Sans CJK JP",sans-serif;
   --s:52px;
+  /* 字の大きさ（HB-018, D-046）。画面の字はすべて「px × --fz」。札（カゴ・相手の行・しくみの図の札）は掛けない。値は JS が hb.textSize から入れる */
+  --fz:1;
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
@@ -25,22 +27,22 @@
   --me:#7DB2E2; --me-ink:#0E1820; --opp:#EC8A72; --line:#445663; color-scheme:dark;
 }
 html,body{height:100%}
-body{background:var(--bg);color:var(--ink);font:500 14px/1.5 var(--f-ui);-webkit-tap-highlight-color:transparent}
+body{background:var(--bg);color:var(--ink);font:500 calc(14px*var(--fz))/1.5 var(--f-ui);-webkit-tap-highlight-color:transparent}
 button{font:inherit;color:inherit}
-#combo{position:fixed;left:50%;top:42%;transform:translate(-50%,-50%) scale(.6);pointer-events:none;z-index:50;font:900 34px/1.2 var(--f-ui);color:var(--me);text-shadow:0 2px 0 var(--bg),0 0 12px var(--bg);opacity:0;transition:opacity .18s,transform .18s;white-space:nowrap;text-align:center}
-#combo small{display:block;font:700 13px/1.4 var(--f-ui);color:var(--sub)}
+#combo{position:fixed;left:50%;top:42%;transform:translate(-50%,-50%) scale(.6);pointer-events:none;z-index:50;font:900 calc(34px*var(--fz))/1.2 var(--f-ui);color:var(--me);text-shadow:0 2px 0 var(--bg),0 0 12px var(--bg);opacity:0;transition:opacity .18s,transform .18s;white-space:nowrap;text-align:center}
+#combo small{display:block;font:700 calc(13px*var(--fz))/1.4 var(--f-ui);color:var(--sub)}
 #combo.on{opacity:1;transform:translate(-50%,-50%) scale(1)}
 /* 投げた言葉の意味（HB-007）。声と同じ場所に出る。声と同時なら声の下（.low） */
 #meaning{position:fixed;left:50%;top:42%;transform:translate(-50%,-50%) scale(.85);pointer-events:none;z-index:49;opacity:0;transition:opacity .2s,transform .2s;text-align:center;max-width:92vw;padding:8px 16px;border-radius:14px;background:color-mix(in srgb,var(--bg) 88%,transparent)}
 #meaning.on{opacity:1;transform:translate(-50%,-50%) scale(1)}
 #meaning.low{transform:translate(-50%,0) scale(.85)} #meaning.low.on{transform:translate(-50%,0) scale(1)} /* top は声の下端から JS で決める */
-#meaning .mw{display:block;font:600 30px/1.2 var(--f-kana);color:var(--me)}
+#meaning .mw{display:block;font:600 calc(30px*var(--fz))/1.2 var(--f-kana);color:var(--me)}
 #meaning.op .mw{color:var(--opp)}
-#meaning .mk{display:block;font:700 26px/1.3 var(--f-ui);color:var(--ink,inherit)}
-#meaning .mn{display:block;font:500 15px/1.4 var(--f-ui);color:var(--sub);overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
-.row .m{font-size:12px;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+#meaning .mk{display:block;font:700 calc(26px*var(--fz))/1.3 var(--f-ui);color:var(--ink,inherit)}
+#meaning .mn{display:block;font:500 calc(15px*var(--fz))/1.4 var(--f-ui);color:var(--sub);overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.row .m{font-size:calc(12px*var(--fz));color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 .meanSet{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
-.meanSet button{font:600 14px/1 var(--f-ui);padding:8px 12px;border-radius:999px;border:1px solid var(--sub);background:transparent;color:inherit}
+.meanSet button{font:600 calc(14px*var(--fz))/1 var(--f-ui);padding:8px 12px;border-radius:999px;border:1px solid var(--sub);background:transparent;color:inherit}
 .meanSet button[aria-pressed="true"]{background:var(--me);border-color:var(--me);color:#fff}
 button:focus-visible{outline:2px solid var(--me);outline-offset:2px}
 
@@ -48,17 +50,20 @@ button:focus-visible{outline:2px solid var(--me);outline-offset:2px}
   padding-block:8px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 
 .top{display:flex;align-items:baseline;gap:12px}
-.top h1{margin:0;font:700 16px/1.3 var(--f-ui);flex:1;min-width:0;white-space:nowrap}
-.top h1 small{font-weight:500;font-size:12px;color:var(--sub);margin-left:4px}
-.how{align-self:flex-start;display:inline-flex;align-items:center;gap:4px;min-height:36px;margin-top:-2px;padding:4px 14px;border:1px solid var(--me);border-radius:18px;background:none;color:var(--me);font-size:14px;font-weight:700;cursor:pointer}
-.link{background:none;border:0;padding:6px 2px;font-size:13px;font-weight:700;color:var(--me);cursor:pointer}
+.top h1{margin:0;font:700 calc(16px*var(--fz))/1.3 var(--f-ui);flex:1;min-width:0;white-space:nowrap}
+.top h1 small{font-weight:500;font-size:calc(12px*var(--fz));color:var(--sub);margin-left:4px}
+.how{align-self:flex-start;display:inline-flex;align-items:center;gap:4px;min-height:36px;margin-top:-2px;padding:4px 14px;border:1px solid var(--me);border-radius:18px;background:none;color:var(--me);font-size:calc(14px*var(--fz));font-weight:700;cursor:pointer}
+.link{background:none;border:0;padding:6px 2px;font-size:calc(13px*var(--fz));font-weight:700;color:var(--me);cursor:pointer}
 
 /* 相手 */
 .opp-head{display:flex;align-items:baseline;gap:8px}
 .opp-head .who{font-weight:700;color:var(--opp)}
-.opp-head .num{font-variant-numeric:tabular-nums;color:var(--sub);font-size:13px}
+.opp-head .num{font-variant-numeric:tabular-nums;color:var(--sub);font-size:calc(13px*var(--fz))}
 .opp-head .num{flex:1}
-.opp .say{margin:4px 0 0;font-size:13px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* 字の大きさ（HB-018, D-046）で窮屈になるところ。標準・小さくでは並びは今のまま */
+.opp-head{flex-wrap:wrap} .opp-head .num{white-space:nowrap} /* 入りきらないと「速さ」が次の行へ */
+.fz-l .top{flex-wrap:wrap;row-gap:0} .fz-l .top h1{flex:1 0 100%} .fz-l .top h1+.link{margin-left:auto} /* 大きく：題名を1行目、しくみ・ログ・やりなおしを2行目の右に */
+.opp .say{margin:4px 0 0;font-size:calc(13px*var(--fz));color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .slots{display:flex;gap:2px;margin-top:4px}
 .slots span{flex:1 1 0;max-width:26px;height:28px;display:grid;place-items:center;font:600 18px/1 var(--f-kana);
   background:var(--field);border-radius:4px;color:var(--ink)}
@@ -68,17 +73,17 @@ button:focus-visible{outline:2px solid var(--me);outline-offset:2px}
 
 /* リスト */
 .log{flex:1 1 88px;min-height:88px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;padding-block:4px}
-.log .empty{margin:auto 0;color:var(--sub);font-size:13px;line-height:1.7}
+.log .empty{margin:auto 0;color:var(--sub);font-size:calc(13px*var(--fz));line-height:1.7}
 .row{display:flex;flex-direction:column;max-width:86%}
-.row .w{font:600 24px/1.25 var(--f-kana)}
-.row .st{font:700 14px/1 var(--f-ui);color:#D9A21B;margin:0 4px;letter-spacing:1px}
+.row .w{font:600 calc(24px*var(--fz))/1.25 var(--f-kana)}
+.row .st{font:700 calc(14px*var(--fz))/1 var(--f-ui);color:#D9A21B;margin:0 4px;letter-spacing:1px}
 #resBest .best{margin:6px 0;font-weight:700}
-#resBest .lb{font-size:12px;color:var(--sub);margin-right:4px}
-#resBest b{font:600 22px/1.3 var(--f-kana);color:var(--me);margin:0 4px}
+#resBest .lb{font-size:calc(12px*var(--fz));color:var(--sub);margin-right:4px}
+#resBest b{font:600 calc(22px*var(--fz))/1.3 var(--f-kana);color:var(--me);margin:0 4px}
 #resBest .op b{color:var(--opp)}
 #resBest .st{color:#D9A21B}
-#resBest .tr{display:block;font:500 13px/1.6 var(--f-kana);color:var(--sub)}
-.row .n{font-size:12px;color:var(--sub)}
+#resBest .tr{display:block;font:500 calc(13px*var(--fz))/1.6 var(--f-kana);color:var(--sub)}
+.row .n{font-size:calc(12px*var(--fz));color:var(--sub)}
 .row.me{align-self:flex-end;text-align:right}
 .row.me .w{color:var(--me)}
 .row.op{align-self:flex-start}
@@ -90,8 +95,8 @@ button:focus-visible{outline:2px solid var(--me);outline-offset:2px}
 .basket{position:relative;background:var(--field);border-radius:0 0 10px 10px;
   border:2px solid var(--line);border-top:0;flex:none}
 .rim{position:absolute;left:0;right:0;height:0;border-top:2px dashed var(--line);pointer-events:none}
-.rim span{position:absolute;right:6px;bottom:3px;font-size:12px;color:var(--sub)}
-.count{position:absolute;left:8px;top:4px;font:700 14px/1 var(--f-ui);font-variant-numeric:tabular-nums;color:var(--sub);pointer-events:none}
+.rim span{position:absolute;right:6px;bottom:3px;font-size:calc(12px*var(--fz));color:var(--sub)}
+.count{position:absolute;left:8px;top:4px;font:700 calc(14px*var(--fz))/1 var(--f-ui);font-variant-numeric:tabular-nums;color:var(--sub);pointer-events:none}
 .count.full{color:var(--opp)}
 .tile{position:absolute;left:0;top:0;width:var(--s);height:var(--s);padding:0;border:0;background:none;cursor:pointer;
   touch-action:manipulation;transition:transform .34s cubic-bezier(.34,1.3,.6,1),opacity .22s}
@@ -109,102 +114,103 @@ button:focus-visible{outline:2px solid var(--me);outline-offset:2px}
 
 /* 台 */
 .tray{display:flex;align-items:center;gap:10px;min-height:44px}
-.tray .word{font:600 26px/1.2 var(--f-kana);white-space:nowrap}
-.tray .stat{flex:1;min-width:0;font-size:13px;color:var(--sub)}
+.tray .word{font:600 calc(26px*var(--fz))/1.2 var(--f-kana);white-space:nowrap}
+.tray .stat{flex:1;min-width:0;font-size:calc(13px*var(--fz));color:var(--sub)}
 .tray .stat.ok{color:var(--me);font-weight:700}
 .tray .stat.ng{color:var(--opp)}
 .pick{display:flex;gap:6px;align-items:center;flex:1}
-.pick button{font:600 22px/1 var(--f-kana);width:44px;height:40px;border:0;border-radius:6px;background:var(--me);color:var(--me-ink);cursor:pointer}
+.pick button{font:600 calc(22px*var(--fz))/1 var(--f-kana);width:44px;height:40px;border:0;border-radius:6px;background:var(--me);color:var(--me-ink);cursor:pointer}
 
 /* 手 */
 .acts{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
-.act{border:0;border-radius:6px;background:var(--tile);color:var(--ink);height:46px;font-weight:700;font-size:14px;cursor:pointer;
+.act{border:0;border-radius:6px;background:var(--tile);color:var(--ink);height:46px;font-weight:700;font-size:calc(14px*var(--fz));cursor:pointer;
   display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.15;touch-action:manipulation}
-.act small{font-weight:500;font-size:12px;color:var(--sub);font-variant-numeric:tabular-nums}
+.act small{font-weight:500;font-size:calc(12px*var(--fz));color:var(--sub);font-variant-numeric:tabular-nums}
+.fz-l .act{height:auto;min-height:46px} /* 大きく：字が増えた分だけボタンをのばす（標準・小さくは今の高さのまま） */
 .act:disabled,.act.off{opacity:.38;cursor:default}
 .act.draw{grid-column:span 1}
-.act.throw{grid-column:span 4;background:var(--me);color:var(--me-ink);font-size:16px}
+.act.throw{grid-column:span 4;background:var(--me);color:var(--me-ink);font-size:calc(16px*var(--fz))}
 .act.throw small{color:var(--me-ink)}
 
 .result{display:flex;flex-direction:column;gap:8px;padding-block:6px}
 .result p{margin:0}
-.result .big{font:700 20px/1.3 var(--f-ui)}
+.result .big{font:700 calc(20px*var(--fz))/1.3 var(--f-ui)}
 .result .big.lose{color:var(--opp)}
 .result .big.win{color:var(--me)}
-.result .act{height:48px;background:var(--me);color:var(--me-ink);font-size:16px}
+.result .act{height:48px;background:var(--me);color:var(--me-ink);font-size:calc(16px*var(--fz))}
 .result .act.sub{background:var(--tile);color:var(--ink)}
-.result textarea{width:100%;height:180px;box-sizing:border-box;font:12px/1.5 ui-monospace,Menlo,monospace;background:var(--field);color:var(--ink);border:0;border-radius:6px;padding:8px}
+.result textarea{width:100%;height:180px;box-sizing:border-box;font:calc(12px*var(--fz))/1.5 ui-monospace,Menlo,monospace;background:var(--field);color:var(--ink);border:0;border-radius:6px;padding:8px}
 
 /* しくみ */
 .sheet{position:fixed;inset:0;background:var(--bg);overflow-y:auto;z-index:20;
   padding-top:calc(12px + env(safe-area-inset-top,0px));padding-bottom:calc(24px + env(safe-area-inset-bottom,0px));
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 .sheet-in{max-width:448px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
-.sheet h2{margin:0;font:700 18px/1.3 var(--f-ui);flex:1}
-.sheet h3{margin:0 0 6px;font:700 14px/1.4 var(--f-ui)}
-.sheet p,.sheet li{margin:0;font-size:14px;line-height:1.7}
+.sheet h2{margin:0;font:700 calc(18px*var(--fz))/1.3 var(--f-ui);flex:1}
+.sheet h3{margin:0 0 6px;font:700 calc(14px*var(--fz))/1.4 var(--f-ui)}
+.sheet p,.sheet li{margin:0;font-size:calc(14px*var(--fz));line-height:1.7;overflow-wrap:anywhere} /* 出典の長い URL も折り返す */
 .sheet ul{margin:0;padding-left:1.2em}
 .sheet .head{display:flex;align-items:baseline}
-.stuck{display:flex;flex-wrap:wrap;gap:6px 14px;font:600 20px/1.5 var(--f-kana)}
-.stuck small{font:500 14px/1.4 var(--f-ui);color:var(--sub);margin-left:2px}
+.stuck{display:flex;flex-wrap:wrap;gap:6px 14px;font:600 calc(20px*var(--fz))/1.5 var(--f-kana)}
+.stuck small{font:500 calc(14px*var(--fz))/1.4 var(--f-ui);color:var(--sub);margin-left:2px}
 .stuck-hard{margin-top:10px;padding:10px 12px;border:2px solid var(--opp);border-radius:8px}
-.stuck-hard .stuck{font-size:28px;font-weight:700}
+.stuck-hard .stuck{font-size:calc(28px*var(--fz));font-weight:700}
 .stuck-hard p{margin-top:4px}
 .kanjo{display:grid;grid-template-columns:auto 1fr;gap:2px 16px;font-variant-numeric:tabular-nums}
 .kanjo b{font-weight:700}
-.recipes{display:grid;grid-template-columns:repeat(2,1fr);gap:4px 16px;font:600 20px/1.5 var(--f-kana)}
+.recipes{display:grid;grid-template-columns:repeat(2,1fr);gap:4px 16px;font:600 calc(20px*var(--fz))/1.5 var(--f-kana)}
 .opt{display:flex;align-items:center;gap:10px;min-height:44px;cursor:pointer}
 .opt input{width:20px;height:20px;accent-color:var(--me)}
 details summary{cursor:pointer;font-weight:700;padding-block:6px}
 /* しくみの図（HB-014, D-039）。札はカゴの札と同じ色・字体（部品は黄色） */
 .dg{display:flex;flex-direction:column;gap:8px}
 .dg-f{background:var(--field);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:8px}
-.dg-h{display:flex;align-items:baseline;gap:8px;font:700 15px/1.3 var(--f-ui)}
-.dg-h .dg-n{font:700 15px/1 var(--f-ui);font-variant-numeric:tabular-nums;color:var(--me);background:var(--tile);border-radius:999px;padding:3px 9px}
+.dg-h{display:flex;align-items:baseline;gap:8px;font:700 calc(15px*var(--fz))/1.3 var(--f-ui)}
+.dg-h .dg-n{font:700 calc(15px*var(--fz))/1 var(--f-ui);font-variant-numeric:tabular-nums;color:var(--me);background:var(--tile);border-radius:999px;padding:3px 9px}
 .dg-ex{display:flex;flex-wrap:wrap;gap:8px 18px}
 .dg-e{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
-.dg-op{font:700 18px/1 var(--f-ui);color:var(--sub);min-width:14px;text-align:center}
+.dg-op{font:700 calc(18px*var(--fz))/1 var(--f-ui);color:var(--sub);min-width:14px;text-align:center}
 .mt{width:36px;height:36px;border-radius:6px;background:var(--tile);color:var(--ink);display:inline-grid;place-items:center;font:600 22px/1 var(--f-kana);flex:none}
 .mt.off{background:var(--off);color:var(--off-ink)}
 .mt .g{display:block}
-.dg-t{margin:0;font-size:13px;line-height:1.5}
-.dg-en{margin:-4px 0 0;font:500 11px/1.4 var(--f-ui);color:var(--sub)}
+.dg-t{margin:0;font-size:calc(13px*var(--fz));line-height:1.5}
+.dg-en{margin:-4px 0 0;font:500 calc(11px*var(--fz))/1.4 var(--f-ui);color:var(--sub)}
 /* 画面の言葉に添える英語（HB-015, D-042）。意味の設定が「漢字＋英語」のときだけ（html に no-en が付くと消える）。形は D-041 の強さボタンにそろえる */
-small.en{font:500 11px/1.3 var(--f-ui);color:var(--sub);margin-left:4px;letter-spacing:0;font-variant-numeric:tabular-nums}
+small.en{font:500 calc(11px*var(--fz))/1.3 var(--f-ui);color:var(--sub);margin-left:4px;letter-spacing:0;font-variant-numeric:tabular-nums}
 small.en.b{display:block;margin-left:0}
 .no-en small.en,.no-en .dg-en{display:none!important}
-.top .link small.en{display:block;margin:0;font-size:10px;line-height:1.2}
-.act small.en{margin:0 3px 0 0;font-size:11px}
+.top .link small.en{display:block;margin:0;font-size:calc(10px*var(--fz));line-height:1.2}
+.act small.en{margin:0 3px 0 0;font-size:calc(11px*var(--fz))}
 .act.throw small.en,.guide small.en{color:inherit;opacity:.75}
-.guide small.en{display:block;margin:2px 0 0;font-size:12px;font-weight:500}
+.guide small.en{display:block;margin:2px 0 0;font-size:calc(12px*var(--fz));font-weight:500}
 .result .act small.en,.menu .act small.en{margin:0}
-#combo small.en{display:block;margin:0;font-size:12px}
+#combo small.en{display:block;margin:0;font-size:calc(12px*var(--fz))}
 .meanSet button[aria-pressed="true"] small.en{color:inherit;opacity:.8}
 #oppSayEn small.en{margin-left:0}
-.dg-opp{font:700 15px/1 var(--f-ui);color:var(--opp)}
+.dg-opp{font:700 calc(15px*var(--fz))/1 var(--f-ui);color:var(--opp)}
 .dg-bk{display:flex;align-items:flex-end;gap:2px;position:relative;padding-top:14px}
 .dg-bk .mt{width:21px;height:26px;font-size:15px;border-radius:4px}
 .dg-bk .mt.out{background:var(--opp);color:var(--me-ink)}
 .dg-bk .dg-line{align-self:stretch;width:0;border-left:2px dashed var(--opp);margin:0 2px;position:relative}
-.dg-bk .dg-line span{position:absolute;top:-14px;left:50%;transform:translateX(-50%);font:700 11px/1 var(--f-ui);color:var(--opp)}
+.dg-bk .dg-line span{position:absolute;top:-14px;left:50%;transform:translateX(-50%);font:700 calc(11px*var(--fz))/1 var(--f-ui);color:var(--opp)}
 .result .bests{display:flex;flex-wrap:wrap;gap:4px 16px}
 .result .bests .best{flex:1 1 140px;min-width:0}
-#resBest .len{font-size:12px;color:var(--sub);margin:0 4px}
+#resBest .len{font-size:calc(12px*var(--fz));color:var(--sub);margin:0 4px}
 
 /* ゲーム内辞書（HB-008, D-029）。投げた・届いた言葉が載っていく */
 .hows{display:flex;gap:8px;align-self:flex-start}
-.zk-n{margin:0;font:700 15px/1.4 var(--f-ui);font-variant-numeric:tabular-nums}
-.zk-n b{font-size:22px;color:var(--me)}
-.zk-note{margin:0;font-size:12px;line-height:1.6;color:var(--sub)}
+.zk-n{margin:0;font:700 calc(15px*var(--fz))/1.4 var(--f-ui);font-variant-numeric:tabular-nums}
+.zk-n b{font-size:calc(22px*var(--fz));color:var(--me)}
+.zk-note{margin:0;font-size:calc(12px*var(--fz));line-height:1.6;color:var(--sub)}
 .zk-list{display:flex;flex-direction:column}
 .zk-row{display:block;width:100%;text-align:left;background:none;border:0;border-bottom:1px solid var(--line);padding:8px 2px;cursor:pointer}
-.zk-row .zw{font:600 22px/1.3 var(--f-kana)}
+.zk-row .zw{font:600 calc(22px*var(--fz))/1.3 var(--f-kana)}
 .zk-row .zw.made{color:var(--me)}
-.zk-row .zmade{display:inline-block;margin-left:6px;padding:1px 6px;border-radius:4px;background:var(--me);color:var(--me-ink);font:700 11px/1.5 var(--f-ui);vertical-align:3px}
-.zk-row .st{font:700 14px/1 var(--f-ui);color:#D9A21B;margin-left:6px;letter-spacing:1px}
-.zk-row .zm,.zk-row .ztr{display:block;font-size:12px;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.zk-row .zmade{display:inline-block;margin-left:6px;padding:1px 6px;border-radius:4px;background:var(--me);color:var(--me-ink);font:700 calc(11px*var(--fz))/1.5 var(--f-ui);vertical-align:3px}
+.zk-row .st{font:700 calc(14px*var(--fz))/1 var(--f-ui);color:#D9A21B;margin-left:6px;letter-spacing:1px}
+.zk-row .zm,.zk-row .ztr{display:block;font-size:calc(12px*var(--fz));color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .zk-row .ztr{font-family:var(--f-kana)}
-.zk-row .zd{display:none;margin-top:6px;padding:8px 10px;border-radius:6px;background:var(--field);font-size:13px;line-height:1.7}
+.zk-row .zd{display:none;margin-top:6px;padding:8px 10px;border-radius:6px;background:var(--field);font-size:calc(13px*var(--fz));line-height:1.7}
 .zk-row[aria-expanded="true"] .zd{display:block}
 .zk-row[aria-expanded="true"] .ztr{display:none}
 .zk-row .zd .ztrf{font-family:var(--f-kana);white-space:normal}
@@ -215,32 +221,32 @@ small.en.b{display:block;margin-left:0}
   padding-top:calc(24px + env(safe-area-inset-top,0px));padding-bottom:calc(24px + env(safe-area-inset-bottom,0px));
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 .menu-in{max-width:448px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
-.menu h2{margin:0;font:700 18px/1.3 var(--f-ui)}
-.menu-solo{height:52px;font-size:16px}
+.menu h2{margin:0;font:700 calc(18px*var(--fz))/1.3 var(--f-ui)}
+.menu-solo{height:52px;font-size:calc(16px*var(--fz))}
 .menu-online{display:flex;flex-direction:column;gap:8px}
 .solo-pick{display:flex;flex-direction:column;gap:8px}
-.solo-pick h3{margin:0;font:700 15px/1.4 var(--f-ui)}
+.solo-pick h3{margin:0;font:700 calc(15px*var(--fz))/1.4 var(--f-ui)}
 .solo-pick .lv{display:flex;align-items:center;gap:10px;min-height:56px;padding:6px 14px;border:2px solid transparent;border-radius:8px;background:var(--tile);color:var(--ink);text-align:left;cursor:pointer;touch-action:manipulation}
-.solo-pick .lv b{font:700 17px/1.2 var(--f-ui);flex:1}
-.solo-pick .lv b small{display:block;font:500 12px/1.3 var(--f-ui);color:var(--sub)}
+.solo-pick .lv b{font:700 calc(17px*var(--fz))/1.2 var(--f-ui);flex:1}
+.solo-pick .lv b small{display:block;font:500 calc(12px*var(--fz))/1.3 var(--f-ui);color:var(--sub)}
 .solo-pick .lv[aria-current="true"]{border-color:var(--me)}
-.solo-pick .lv .mark{font:700 12px/1 var(--f-ui);color:var(--me-ink);background:var(--me);border-radius:999px;padding:4px 8px}
-.menu-note{margin:0;font-size:13px;line-height:1.6;color:var(--sub)}
+.solo-pick .lv .mark{font:700 calc(12px*var(--fz))/1 var(--f-ui);color:var(--me-ink);background:var(--me);border-radius:999px;padding:4px 8px}
+.menu-note{margin:0;font-size:calc(13px*var(--fz));line-height:1.6;color:var(--sub)}
 .menu-row{display:flex;gap:8px}
-.menu-row input{flex:1;min-width:0;font:16px var(--f-ui);padding:10px;border:0;border-radius:6px;background:var(--tile);color:var(--ink)}
+.menu-row input{flex:1;min-width:0;font:calc(16px*var(--fz)) var(--f-ui);padding:10px;border:0;border-radius:6px;background:var(--tile);color:var(--ink)}
 .menu-row .act{width:96px;height:auto;min-height:44px}
 
 /* 最初の1戦の案内（HB-010, D-032）。タップは下に通す（pointer-events:none）。どこかを押すと消える */
-.guide{position:fixed;z-index:28;left:8px;top:0;max-width:min(300px,calc(100vw - 16px));box-sizing:border-box;padding:8px 12px;border-radius:10px;background:var(--ink);color:var(--bg);font:700 14px/1.5 var(--f-ui);pointer-events:none;box-shadow:0 4px 14px rgba(0,0,0,.18);opacity:0;transition:opacity .2s}
+.guide{position:fixed;z-index:28;left:8px;top:0;max-width:min(300px,calc(100vw - 16px));box-sizing:border-box;padding:8px 12px;border-radius:10px;background:var(--ink);color:var(--bg);font:700 calc(14px*var(--fz))/1.5 var(--f-ui);pointer-events:none;box-shadow:0 4px 14px rgba(0,0,0,.18);opacity:0;transition:opacity .2s}
 .guide.on{opacity:1}
 .guide::after{content:"";position:absolute;left:var(--ax,24px);width:0;height:0;border:8px solid transparent;transform:translateX(-50%)}
 .guide.below::after{bottom:100%;border-bottom-color:var(--ink)}
 .guide.above::after{top:100%;border-top-color:var(--ink)}
-.guide .ga{display:inline-block;margin-right:6px;font-size:18px;line-height:1}
+.guide .ga{display:inline-block;margin-right:6px;font-size:calc(18px*var(--fz));line-height:1}
 .guide.bob{animation:gbob 1s ease-in-out infinite}
 @keyframes gbob{0%,100%{translate:0 0}50%{translate:0 -5px}}
 .guide.above.bob{animation-name:gbob2} @keyframes gbob2{0%,100%{translate:0 0}50%{translate:0 5px}}
-.guideSet button{font:600 14px/1 var(--f-ui);padding:8px 12px;border-radius:999px;border:1px solid var(--sub);background:transparent;color:inherit;margin-top:6px}
+.guideSet button{font:600 calc(14px*var(--fz))/1 var(--f-ui);padding:8px 12px;border-radius:999px;border:1px solid var(--sub);background:transparent;color:inherit;margin-top:6px}
 @media (prefers-reduced-motion: reduce){ .tile,.g{transition:none} .tile.crack .face{animation:none} .guide.bob{animation:none} }
 </style>
 
@@ -330,6 +336,11 @@ small.en.b{display:block;margin-left:0}
     </div>
 
     <div>
+      <h3>字の大きさ<small class="en" lang="en">Text size</small></h3>
+      <div class="meanSet" id="sizeSet" role="group" aria-label="字の大きさ"><button type="button" data-v="s">小さく<small class="en" lang="en">Small</small></button><button type="button" data-v="m">標準<small class="en" lang="en">Standard</small></button><button type="button" data-v="l">大きく<small class="en" lang="en">Large</small></button></div>
+    </div>
+
+    <div>
       <h3>案内<small class="en" lang="en">Guide</small></h3>
       <p>はじめての1戦では、触る場所の横に一言ずつ案内が出る。</p>
       <div class="guideSet"><button type="button" id="btnGuideAgain">案内をもう一度<small class="en" lang="en">Show the guide again</small></button></div>
@@ -381,7 +392,7 @@ small.en.b{display:block;margin-left:0}
       <ul>
         <li>落ちてくる字は袋から出る（中身は28種類。濁音・半濁音の字は入れていない）</li>
         <li>使える言葉は <span id="dictN"></span> 語。2字は手で並べたもの、3字以上はそれに IPADIC（固有名詞としてしか載っていない語は有名な地名のほかは除き、形容詞の「〜く」の形を足した。tools/build_dict.js で作る）を足したもの。正しい言葉でも通らないことがある</li>
-        <li>辞書データの出典：mecab-ipadic-2.7.0-20070801。<details><summary>著作権表示と条件（原文）</summary><pre id="ipadicNotice" style="white-space:pre-wrap;font-size:11px;line-height:1.5;margin:6px 0 0"></pre></details></li>
+        <li>辞書データの出典：mecab-ipadic-2.7.0-20070801。<details><summary>著作権表示と条件（原文）</summary><pre id="ipadicNotice" style="white-space:pre-wrap;font-size:calc(11px*var(--fz));line-height:1.5;margin:6px 0 0"></pre></details></li>
         <li>意味（漢字・英語）の出典：<span id="meaningsNotice"></span></li>
         <li>ふたりで遊ぶときは、相手は人（合言葉の部屋）。カゴや袋は各自の端末の中で動き、投げた言葉と、カゴの札の並び（「あいて」の行に出る）が相手に届く。自動の相手は、ひとりで遊ぶときだけ</li>
         <li>相手は自動。最初に手を動かすまで待っている。知っているのは手で並べた3字までの言葉だけで、長い言葉は狙わない（IPADIC の言葉は使わない）</li>
@@ -978,6 +989,11 @@ function buildDiagram(){ const F=[];
 buildDiagram();
 $('meaningsNotice').textContent=window.HB_MEANINGS_NOTICE||'（意味のデータを読み込めなかった）';
 renderMeanSet(); $('meanSet').addEventListener('click',e=>{ const b=e.target.closest('button[data-v]'); if(!b) return; meanMode=b.dataset.v; try{localStorage.setItem('hb.meaning',meanMode)}catch(_){} renderMeanSet(); logN=-1; renderLog(); });
+/* 字の大きさ（HB-018, D-046）。小さく 0.85／標準 1／大きく 1.2。この端末のブラウザ（hb.textSize）に覚える。初めは標準 */
+const FZ={s:0.85,m:1,l:1.2}; let fzMode='m'; try{ const v=localStorage.getItem('hb.textSize'); if(FZ[v]) fzMode=v; }catch(e){}
+function renderSize(){ const r=document.documentElement; r.style.setProperty('--fz',String(FZ[fzMode])); r.classList.toggle('fz-l',fzMode==='l');
+  document.querySelectorAll('#sizeSet button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.v===fzMode))); }
+renderSize(); $('sizeSet').addEventListener('click',e=>{ const b=e.target.closest('button[data-v]'); if(!b) return; fzMode=b.dataset.v; try{localStorage.setItem('hb.textSize',fzMode)}catch(_){} renderSize(); if(S) render(); });
 $('dictN').textContent=WORDS.length; $('ipadicNotice').textContent=window.HB_IPADIC_NOTICE||'（辞書データを読み込めなかった）';
 document.addEventListener('visibilitychange',()=>{ if(document.hidden) clearTimeout(cpuT); else schedule(); });
 if('ResizeObserver' in window) new ResizeObserver(()=>{ if(S) renderBasket(); }).observe(basket);
