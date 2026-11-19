@@ -525,7 +525,8 @@ const HAND=new Set(`
 const WORDS=[...new Set([...HAND].concat(String(window.HB_IPADIC||'').split(/\s+/)))].filter(w=>w && w[0]!=='ー' && [...w].length>=2 && [...w].every(c=>c==='ー'||KANA.has(c)));
 const DICT=new Set(WORDS);
 const SPECIAL=new Set(['ち∘']); // 部品を含む特別な言葉。作品名『チ。』（作者 2026-11-19）。リストでは ∘ を「。」として見せる
-const SPEEDS=[{name:'とまる',ms:0},{name:'ゆるゆる',ms:25000,max:2},{name:'のんびり',ms:11000},{name:'ゆっくり',ms:6500},{name:'ふつう',ms:4000}];
+// ふつう（Hard）は ゆっくり と同じ間隔で、そのかわり賢く動く（smart。HB-017, D-045）。ゆるゆる〜ゆっくりは今のまま
+const SPEEDS=[{name:'とまる',ms:0},{name:'ゆるゆる',ms:25000,max:2},{name:'のんびり',ms:11000},{name:'ゆっくり',ms:6500},{name:'ふつう',ms:6500,smart:true}];
 const SPEED_EN={'とまる':'Stop','ゆるゆる':'Very easy','のんびり':'Easy','ゆっくり':'Normal','ふつう':'Hard'}; // 速さの英語（HB-015, D-042。D-041 の強さボタンと同じ言葉）
 const CPU_MAX=3; // 相手が知っているのは3字までの言葉だけ。長い言葉を狙わず、作れるものから適当に選ぶ
 const cpuMax=()=>SPEEDS[speed].max||CPU_MAX; // ゆるゆるは2字だけ（HB-006）
@@ -566,7 +567,7 @@ function lg(who,msg){ if(!S) return; LOG.push(`${((Date.now()-t0)/1000).toFixed(
 function logText(){ return [`ひらがな分解（仮）ログ ${new Date().toLocaleString('ja-JP')}`,
   isOnline()
     ? `ふたりで（合言葉の部屋「${NET.pass}」）　一度きり:${once?'あり':'なし'}　辞書:${WORDS.length}語　上限:${CAP}　引く:なし（${FLOOR}こまで${REFILL_MS/1000}秒後に落ちる）`
-    : `ひとりで（CPU）　速さ:${SPEEDS[speed].name}　一度きり:${once?'あり':'なし'}　辞書:${WORDS.length}語　上限:${CAP}　相手の語:${cpuMax()}字まで　引く:なし（${FLOOR}こまで${REFILL_MS/1000}秒後に落ちる）`].concat(LOG).join('\n'); }
+    : `ひとりで（CPU）　速さ:${SPEEDS[speed].name}　一度きり:${once?'あり':'なし'}　辞書:${WORDS.length}語　上限:${CAP}　相手の語:${SPEEDS[speed].smart?'辞書全部（賢い。D-045）':cpuMax()+'字まで'}　引く:なし（${FLOOR}こまで${REFILL_MS/1000}秒後に落ちる）`].concat(LOG).join('\n'); }
 const els=new Map();
 function newGame(){
   clearTimeout(cpuT); clearTimeout(refT.me); clearTimeout(refT.op); refT={me:null,op:null}; els.forEach(el=>el.remove()); els.clear();
@@ -761,7 +762,38 @@ function cpuApply(s){ const p=S.opp[s.i], l=letterOf(p);
   if(s.t==='split'){ S.opp.splice(s.i,1,...RECIPE[l].map(x=>mk(x,{note:`「${l}」を割った`,d:`${p.d}→${x}`}))); S.say=`「${l}」を割った`; }
   else if(s.t==='turn'){ const [to,v]=TURN[l]; S.opp.splice(s.i,1,mk(to,{note:`「${l}」を${v}`,d:`${p.d}→${to}`})); S.say=`「${l}」を${v}`; }
   else { const q=S.opp[s.j], lq=letterOf(q); S.opp=S.opp.filter(x=>x!==p&&x!==q); S.opp.push(mk(s.r,{note:`「${l}」と「${lq}」をくっつけた`,d:joinD(p.d,q.d,s.r)})); S.say=`「${l}」と「${lq}」をくっつけた`; } lg('op',S.say); }
+/* ---- 賢い相手（ふつう だけ。HB-017, D-045）----
+   知っている言葉は辞書全部（WORDS）。点数＝字数＋重い字の数×HEAVY_W。重い字＝割る作り方（RECIPE）も向きの道（TURN）もない字（字のデータから作る。いまは よ・ろ・の）。
+   投げられる言葉がない、または1手（割る・回す・裏返す・くっつける）で点数がもっと高い言葉が作れるなら、その1手。読むのは1手先まで。
+   カゴが SMART_RUSH こ以上なら、投げられる言葉があればすぐ投げる。同じ点数は、投げる＞作り替え、作り替えどうしはランダム */
+const HEAVY=new Set([...KANA].filter(L=>!RECIPE[L]&&!TURN[L])); const HEAVY_W=2, SMART_RUSH=10;
+let SMART=null, smartN=-1;
+function smartList(){ if(SMART&&smartN===WORDS.length) return SMART; smartN=WORDS.length; // extra_words が後から足されたら作り直す
+  SMART=WORDS.map(w=>{ const cs=[...w]; return {w,cs,sc:cs.length+HEAVY_W*cs.filter(c=>HEAVY.has(c)).length}; }).sort((a,b)=>b.sc-a.sc); return SMART; }
+/* 作れるいちばん点数の高い言葉（点数の高い順に見て、最初に作れたもの。同点はその中からランダム） */
+function smartBest(letters){ const pool={}; letters.forEach(l=>{ if(!l) return; const c=asWord(l); pool[c]=(pool[c]||0)+1; });
+  const ok=x=>{ if(x.cs.length>letters.length) return false; const need={}; for(const c of x.cs){ need[c]=(need[c]||0)+1; if(need[c]>(pool[c]||0)) return false; } return !(once&&S.used.has(x.w)); };
+  let top=null; const ties=[];
+  for(const x of smartList()){ if(top&&x.sc<top) break; if(ok(x)){ top=x.sc; ties.push(x); } }
+  return ties.length?pick(ties):null; }
+/* 言葉の表は、ページが空いているときに先に作る（初めの1手で止まらないように） */
+(window.requestIdleCallback||(f=>setTimeout(f,1500)))(()=>{ try{ smartList(); }catch(_){} });
+function cpuThrow(w){ const used=[]; for(const ch of w){ const p=S.opp.find(x=>!used.includes(x)&&asWord(letterOf(x))===ch); used.push(p); }
+    S.used.add(w); S.log.push({who:'op',word:w,note:notesOf(used),k:comboOf(used),trail:trailOf(used)}); zkRecord(w,'op',comboOf(used),trailOf(used)); S.opp=S.opp.filter(x=>!used.includes(x));
+    [...w].forEach((ch,k)=>S.mine.push(mk(ch==='ー'?'一':ch,{delay:k*110}))); S.say=`「${wordShow(w)}」を投げてきた`;
+    lg('op',`投げる「${w}」`); showMeaning(w,'op');
+    if(S.mine.length>CAP) finish('lose'); }
+function cpuSmart(){ const L=S.opp.map(letterOf), now=smartBest(L);
+  if(now&&S.opp.length>=SMART_RUSH){ cpuThrow(now.w); return; }
+  let best=[], bs=now?now.sc:0;
+  for(const st of cpuSteps()){ const b=smartBest(st.res); if(!b) continue; if(b.sc>bs){ bs=b.sc; best=[st]; } else if(b.sc===bs&&best.length) best.push(st); }
+  if(best.length){ cpuApply(pick(best)); return; }
+  if(now){ cpuThrow(now.w); return; }
+  const steps=cpuSteps(); // どの1手でも言葉にならないときは、今までの相手と同じく適当に動く
+  if(steps.length&&S.opp.length<=8) cpuApply(pick(steps));
+  else { const m=steps.filter(s=>s.t==='merge'); if(m.length) cpuApply(pick(m)); else { S.say='手が出ない'; lg('op','手が出ない'); } } }
 function cpuAct(){ if(S.over||S.ending||sheetOpen) return;
+  if(SPEEDS[speed].smart){ cpuSmart(); render(); schedule(); return; }
   const L=S.opp.map(letterOf); const w=bestWord(L);
   if(w){ const used=[]; for(const ch of w){ const p=S.opp.find(x=>!used.includes(x)&&asWord(letterOf(x))===ch); used.push(p); }
     S.used.add(w); S.log.push({who:'op',word:w,note:notesOf(used),k:comboOf(used),trail:trailOf(used)}); zkRecord(w,'op',comboOf(used),trailOf(used)); S.opp=S.opp.filter(x=>!used.includes(x));
@@ -1022,6 +1054,7 @@ function loadExtraWords(){
       if(error||!Array.isArray(data)) return;
       for(const r of data){ const w=r&&r.word; if(typeof w==='string'&&w[0]!=='ー'&&[...w].length>=2&&[...w].length<=16&&[...w].every(c=>c==='ー'||KANA.has(c))&&!DICT.has(w)){ DICT.add(w); WORDS.push(w); } }
       $('dictN').textContent=WORDS.length;
+      (window.requestIdleCallback||(f=>setTimeout(f,500)))(()=>{ try{ smartList(); }catch(_){} }); // 賢い相手の言葉の表も作り直しておく（D-045）
     }).catch(()=>{});
   }catch(_){}
 }
