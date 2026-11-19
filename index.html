@@ -407,7 +407,7 @@ small.en.b{display:block;margin-left:0}
       <h3>きまり<small class="en" lang="en">Rules</small></h3>
       <p>リストに出た言葉は、二人とも二度と投げられない。</p>
       <p>字は自分では引けない。カゴが 2こ以下になって 5秒たつと、3こになるまで落ちてくる（二人とも）。12こ のときは割れない。</p>
-      <p>作り替えた字（割った・回した・裏返した・くっつけた字）が入った言葉を投げると声が出る。言葉の字それぞれの道すじにある作り替えの回数（「→」の数）を合わせて、1でナイス★、2〜3でグレート★★、4以上でエクセレント★★★。リストにも★が残り（二人とも）、終わったら二人それぞれの★がいちばん多い言葉が「今日の一語」に出る。元の字からの道すじ（例：し→つ　は→よ　（は→｜）＋し→い）つき。どれも見た目だけで、勝ち負けには関わらない。</p>
+      <p>作り替えた字（割った・回した・裏返した・くっつけた字）が入った言葉を投げると声が出る。言葉の字それぞれの道すじにある作り替えの回数（「→」の数）を合わせて、1で<span data-combo="1"></span>★、2〜3で<span data-combo="2"></span>★★、4以上で<span data-combo="3"></span>★★★。リストにも★が残り（二人とも）、終わったら二人それぞれの★がいちばん多い言葉が「今日の一語」に出る。元の字からの道すじ（例：し→つ　は→よ　（は→｜）＋し→い）つき。どれも見た目だけで、勝ち負けには関わらない。</p>
     </div>
 
     <div>
@@ -668,10 +668,11 @@ function joinD(a,b,r){ return `${wrapD(a)}＋${wrapD(b)}→${r}`; }
 function trailOf(ps){ return shown(ps.filter(p=>p.d&&p.d.includes('→')).map(p=>p.d.replace(/→一$/,'→ー')).join('　')); } // 作り替えの道すじ（元の字から）
 function notesOf(ps){ const out=[]; ps.forEach(p=>{ if(p.note){ const s=`${asWord(letterOf(p))}←${p.note}`; if(!out.includes(s)) out.push(s); } }); return shown(out.slice(0,3).join('　')); }
 
-const COMBO=['','ナイス','グレート','エクセレント'], COMBO_EN=['','Nice','Great','Excellent']; let comboT=null; // 工夫の合計で出す声（見た目だけ）
+// 工夫の合計で出す声（見た目だけ）。日本語の声＋下に小さく英語（D-050。言葉は編集の仮置き。変えるときはこの2つの表だけ）
+const COMBO=['','いいね','すごい','すばらしい'], COMBO_EN=['','Nice','Great','Excellent']; let comboT=null;
 /* ★の数え方（HB-009, D-031）：投げた言葉の各字の道すじ（D-023 の d）にある「→」の合計＝工夫の数。
    割る・くっつける・向きで別の字になる、がそれぞれ1。字にならない向きを経由しただけの回し・裏返しは道すじに残らないので数えない。
-   STAR_AT[i] 以上で ★i+1 個（1＝ナイス、2〜3＝グレート、4以上＝エクセレント）。数値を変えるときはここだけ */
+   STAR_AT[i] 以上で ★i+1 個（1＝いいね、2〜3＝すごい、4以上＝すばらしい。D-050）。数値を変えるときはここだけ */
 const STAR_AT=[1,2,4];
 function comboOf(ps){ return ps.reduce((n,p)=>n+((p.d||'').match(/→/g)||[]).length,0); }
 const starsOf=k=>STAR_AT.filter(t=>(k||0)>=t).length;
@@ -714,6 +715,7 @@ const EN_PAT=[
   [/^そろった。(\d+)$/,m=>`Ready. ${m[1]}`]];
 function enOf(jp){ if(!jp) return ''; if(EN_FIX[jp]) return EN_FIX[jp]; for(const [re,f] of EN_PAT){ const m=String(jp).match(re); if(m) return f(m); } return ''; }
 const enTag=(t,b)=>t?`<small class="en${b?' b':''}" lang="en">${escH(t)}</small>`:'';
+document.querySelectorAll('[data-combo]').forEach(el=>{ const i=+el.dataset.combo; el.innerHTML=COMBO[i]+enTag(COMBO_EN[i]); }); // しくみの説明の声も同じ表から
 const withEn=(jp,b)=>escH(jp)+enTag(enOf(jp),b);
 /* 投げた瞬間に、声と同じ場所に「言葉／漢字／英語」を出して1.5秒ほどで消す。タップは下に通す（pointer-events:none） */
 /* 字数の段（HB-019, D-047）：3字 1（小）・4字 2（中）・5字以上 3（大）。2字以下は 0（今のまま）。「ー」も1字、∘・゛は言葉の字としてだけ（言葉の長さと同じ数え方） */
