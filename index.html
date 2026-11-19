@@ -138,6 +138,19 @@ button:focus-visible{outline:2px solid var(--me);outline-offset:2px}
 .opt input{width:20px;height:20px;accent-color:var(--me)}
 details summary{cursor:pointer;font-weight:700;padding-block:6px}
 
+/* はじめの画面（ひとりで / ふたりで） */
+.menu{position:fixed;inset:0;background:var(--bg);overflow-y:auto;z-index:30;
+  padding-top:calc(24px + env(safe-area-inset-top,0px));padding-bottom:calc(24px + env(safe-area-inset-bottom,0px));
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.menu-in{max-width:448px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+.menu h2{margin:0;font:700 18px/1.3 var(--f-ui)}
+.menu-solo{height:52px;font-size:16px}
+.menu-online{display:flex;flex-direction:column;gap:8px}
+.menu-note{margin:0;font-size:13px;line-height:1.6;color:var(--sub)}
+.menu-row{display:flex;gap:8px}
+.menu-row input{flex:1;min-width:0;font:16px var(--f-ui);padding:10px;border:0;border-radius:6px;background:var(--tile);color:var(--ink)}
+.menu-row .act{width:96px;height:auto;min-height:44px}
+
 @media (prefers-reduced-motion: reduce){ .tile,.g{transition:none} .tile.crack .face{animation:none} }
 </style>
 
@@ -189,6 +202,22 @@ details summary{cursor:pointer;font-weight:700;padding-block:6px}
     <button class="act" id="btnAgain" type="button">もう一回</button>
     <button class="act sub" id="btnCopy" type="button">ログをコピー</button>
     <details><summary>ログを見る（コピーできないときはここから）</summary><textarea id="logText" readonly></textarea></details>
+  </div>
+</div>
+
+<div class="menu" id="menu">
+  <div class="menu-in">
+    <h2>ひらがな分解（仮）</h2>
+    <button class="act menu-solo" id="btnSolo" type="button">ひとりで（CPU）</button>
+    <div class="menu-online">
+      <p class="menu-note">ふたりで：同じ合言葉を入れた二人がそろうと、3秒後に同時に始まる。</p>
+      <div class="menu-row">
+        <input id="roomInput" type="text" maxlength="20" placeholder="合言葉" autocomplete="off">
+        <button class="act" id="btnJoin" type="button">入室</button>
+      </div>
+      <p class="menu-note" id="lobbyText"></p>
+      <button class="link" id="btnLeave" type="button" hidden>退室</button>
+    </div>
   </div>
 </div>
 
@@ -245,6 +274,7 @@ details summary{cursor:pointer;font-weight:700;padding-block:6px}
         <li>落ちてくる字は袋から出る（中身は28種類）</li>
         <li>使える言葉は <span id="dictN"></span> 語。2字は手で並べたもの、3字以上はそれに IPADIC（人名だけの語と、有名でない地名だけの語は除き、形容詞の「〜く」の形を足した）を足したもの。正しい言葉でも通らないことがある</li>
         <li>辞書データの出典：mecab-ipadic-2.7.0-20070801。<details><summary>著作権表示と条件（原文）</summary><pre id="ipadicNotice" style="white-space:pre-wrap;font-size:11px;line-height:1.5;margin:6px 0 0"></pre></details></li>
+        <li>ふたりで遊ぶときは、相手は人（合言葉の部屋）。カゴや袋は各自の端末の中だけで、投げた言葉だけが相手に届く。自動の相手は、ひとりで遊ぶときだけ</li>
         <li>相手は自動。最初に手を動かすまで待っている。知っているのは手で並べた3字までの言葉だけで、長い言葉は狙わない（IPADIC の言葉は使わない）</li>
         <li>割る・回す・裏返すはボタン。「落として割る」はまだ入れていない</li>
         <li>いくつか選んでいるときの回す・裏返すは、最後に選んだ札（ふちどり）にかかる。選んだままなので、そのまま投げられる</li>
@@ -253,6 +283,8 @@ details summary{cursor:pointer;font-weight:700;padding-block:6px}
   </div>
 </div>
 
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="dict-ipadic.js"></script>
 <script>
 (()=>{
@@ -450,18 +482,26 @@ function notesOf(ps){ const out=[]; ps.forEach(p=>{ if(p.note){ const s=`${asWor
 const COMBO=['','ナイス','グレート','エクセレント']; let comboT=null; // 作り替えた字の数で出す声（見た目だけ。仮置き 2026-11-19）
 function comboOf(ps){ return ps.filter(p=>p.note&&p.note!=='おまけ').length; }
 function showCombo(k){ const el=document.getElementById('combo'); if(!el||k<1) return; el.innerHTML=`${COMBO[Math.min(k,3)]}！<small>工夫 ${k}</small>`; el.classList.remove('on'); void el.offsetWidth; el.classList.add('on'); clearTimeout(comboT); comboT=setTimeout(()=>el.classList.remove('on'),1100); }
+/* 投げた言葉を自分の記録に入れる（リストは後で相手と同じ形で出る） */
+function recordMyThrow(c,ps){ S.used.add(c.core); S.log.push({who:'me',word:c.word,note:notesOf(ps),k:comboOf(ps),trail:trailOf(ps)}); }
+/* 投げた札を自分のカゴから消す（消える動きつき） */
+function removeMyPieces(ps){ ps.forEach(p=>{ const el=els.get(p.id); if(el){ els.delete(p.id); el.style.transitionDelay='0ms'; el.style.transform=`translate(${p.x}px,-90px)`; el.style.opacity='0'; setTimeout(()=>el.remove(),280);} });
+  S.mine=S.mine.filter(p=>!ps.includes(p)); S.sel=[]; S.choose=null; }
+/* 投げたときのメモ（ログと、工夫の声） */
+function logMyThrow(c,ps,bonusLetter){ const nt=notesOf(ps), k=comboOf(ps);
+  lg('me',`投げる「${c.word}」`+(nt?`（${nt}）`:'')+(k?` ★${COMBO[Math.min(k,3)]}（工夫${k}）`:'')+(bonusLetter?` 相手におまけ「${bonusLetter}」`:''));
+  showCombo(k); }
 function doThrow(){ if(locked()) return; const c=checkSel(); if(!c.word) return; begin();
-  const ps=selPieces(); S.used.add(c.core); S.log.push({who:'me',word:c.word,note:notesOf(ps),k:comboOf(ps),trail:trailOf(ps)});
-  ps.forEach(p=>{ const el=els.get(p.id); if(el){ els.delete(p.id); el.style.transitionDelay='0ms'; el.style.transform=`translate(${p.x}px,-90px)`; el.style.opacity='0'; setTimeout(()=>el.remove(),280);} });
-  S.mine=S.mine.filter(p=>!ps.includes(p)); S.sel=[]; S.choose=null;
+  if(isOnline()){ throwOnline(c); return; }
+  const ps=selPieces(); recordMyThrow(c,ps); removeMyPieces(ps);
   [...c.word].forEach(ch=>S.opp.push(mk(ch==='ー'?'一':ch)));
   let bx=''; if(bonus){ const b=mk(pick(BAG)); S.opp.push(b); bx=letterOf(b); }
-  { const nt=notesOf(ps), k=comboOf(ps); lg('me',`投げる「${c.word}」`+(nt?`（${nt}）`:'')+(k?` ★${COMBO[Math.min(k,3)]}（工夫${k}）`:'')+(bx?` 相手におまけ「${bx}」`:'')); showCombo(k); }
+  logMyThrow(c,ps,bx);
   if(S.opp.length>CAP) finish('win');
   render(); }
 
 /* ---- 相手 ---- */
-function schedule(){ clearTimeout(cpuT); if(!S||S.over||S.ending||!S.started||sheetOpen||!SPEEDS[speed].ms) return;
+function schedule(){ clearTimeout(cpuT); if(!S||S.over||S.ending||!S.started||sheetOpen||isOnline()||!SPEEDS[speed].ms) return; // 通信対戦では CPU は動かない
   cpuT=setTimeout(cpuAct, SPEEDS[speed].ms*(0.8+Math.random()*0.4)); }
 function cpuSteps(){ const L=S.opp.map(letterOf), out=[];
   L.forEach((l,i)=>{ const rest=()=>[...L.slice(0,i),...L.slice(i+1)];
@@ -487,7 +527,7 @@ function cpuAct(){ if(S.over||S.ending||sheetOpen) return;
     else if(steps.length&&S.opp.length<=8){ cpuApply(pick(steps)); }
     else { const m=steps.filter(s=>s.t==='merge'); if(m.length) cpuApply(pick(m)); else { S.say='手が出ない'; lg('op','手が出ない'); } } }
   render(); schedule(); }
-function finish(kind){ LOG.push(`結果：${kind==='win'?'勝ち（相手のカゴがあふれた）':'負け（自分のカゴがあふれた）'}`); S.ending=true; clearTimeout(cpuT); setTimeout(()=>{ S.over=kind; render(); }, reduced?0:900); }
+function finish(kind){ LOG.push(`結果：${RESULT_LABEL[kind]}`); S.ending=true; clearTimeout(cpuT); setTimeout(()=>{ S.over=kind; render(); }, reduced?0:900); }
 
 /* ---- 描画 ---- */
 const basket=$('basket');
@@ -516,7 +556,10 @@ function renderBasket(){ const {W,H}=measure(); const sel=S.sel;
   });
   const live=new Set(S.mine.map(p=>p.id)); els.forEach((el,id)=>{ if(!live.has(id)){ el.remove(); els.delete(id); } });
   const n=$('myNum'); n.textContent=`${S.mine.length} / ${CAP}`+(refT.me?'　まもなく落ちてくる':''); n.className='count'+(S.mine.length>=CAP?' full':''); }
-function renderOpp(){ const n=S.opp.length; $('oppNum').textContent=`${n} / ${CAP}`; $('oppSay').textContent=S.say;
+function renderOpp(){ const n=S.opp.length; const online=isOnline();
+  // 通信対戦では相手のカゴは見えない（各自の端末の中だけ）ので、数と速さの表示を隠す
+  $('oppNum').textContent=online?'':`${n} / ${CAP}`; $('oppSay').textContent=S.say;
+  $('btnSpeed').hidden=online; $('oppSlots').hidden=online;
   $('btnSpeed').textContent='速さ：'+SPEEDS[speed].name;
   let h=''; for(let i=0;i<Math.max(CAP,n);i++){ const p=S.opp[i]; if(!p){ h+='<span></span>'; continue; }
     const l=letterOf(p); h+=`<span class="${i>=CAP?'out':(PARTS.has(l)&&l!=='一')?'part':'fill'}">${l}</span>`; }
@@ -528,7 +571,7 @@ function renderLog(){ const el=$('log'); if(logN===S.log.length) return; logN=S.
   el.scrollTop=el.scrollHeight; }
 function renderControls(){ const over=!!S.over; $('controls').hidden=over; $('result').hidden=!over;
   if(over){ const mine=S.log.filter(r=>r.who==='me').length, theirs=S.log.length-mine; const b=$('resBig');
-    b.textContent=S.over==='lose'?'カゴがあふれた。負け':'相手のカゴがあふれた。勝ち'; b.className='big '+S.over;
+    b.textContent=RESULT_TITLE[S.over]; b.className='big '+S.over;
     $('resSub').textContent=`投げた言葉　あなた ${mine}　あいて ${theirs}`;
     { const bestOf=who=>S.log.filter(r=>r.who===who&&r.k).reduce((a,r)=>(!a||r.k>a.k||(r.k===a.k&&[...r.word].length>[...a.word].length))?r:a,null);
       const card=(who,label)=>{ const b=bestOf(who); return b?`<div class="best ${who}"><span class="lb">${label}の今日の一語</span><b>${b.word.replace(/∘/g,'。')}</b><span class="st">${'★'.repeat(Math.min(b.k,3))}</span>${b.trail?`<span class="tr">${b.trail}</span>`:''}</div>`:''; };
@@ -571,7 +614,7 @@ function copyLog(btn){ const t=logText(), o=btn.textContent; const done=m=>{ btn
   if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(()=>done('コピーした'),no); else no(); }
 $('btnLog').onclick=()=>copyLog($('btnLog')); $('btnCopy').onclick=()=>copyLog($('btnCopy'));
 $('btnClear').onclick=()=>{ if(locked()) return; S.sel=[]; S.choose=null; render(); };
-$('btnReset').onclick=()=>{ logN=-1; newGame(); }; $('btnAgain').onclick=()=>{ logN=-1; newGame(); };
+$('btnReset').onclick=()=>{ if(isOnline()) return leaveOnline(); logN=-1; newGame(); }; $('btnAgain').onclick=()=>{ if(isOnline()) return leaveOnline(); logN=-1; newGame(); };
 $('btnSpeed').onclick=()=>{ speed=(speed+1)%SPEEDS.length; try{localStorage.setItem('hb.speed',speed)}catch(e){} renderOpp(); schedule(); };
 $('btnHelp').onclick=()=>{ sheetOpen=true; clearTimeout(cpuT); $('sheet').hidden=false; $('btnClose').focus(); };
 $('btnClose').onclick=()=>{ sheetOpen=false; $('sheet').hidden=true; schedule(); $('btnHelp').focus(); };
@@ -580,7 +623,135 @@ $('recipes').innerHTML=Object.entries(RECIPE).map(([k,[a,b]])=>`<span>${k} ＝ $
 $('dictN').textContent=WORDS.length; $('ipadicNotice').textContent=window.HB_IPADIC_NOTICE||'（辞書データを読み込めなかった）';
 document.addEventListener('visibilitychange',()=>{ if(document.hidden) clearTimeout(cpuT); else schedule(); });
 if('ResizeObserver' in window) new ResizeObserver(()=>{ if(S) renderBasket(); }).observe(basket);
+
+/* ---- 通信対戦（HB-002）----
+   同じ合言葉の二人が「入室」（lobby の channel）し、二人そろったら3秒数えて始める。
+   一戦ごとに matchId を作り、その中で投げた言葉だけを表 throws に入れて相手に届ける。
+   カゴ・袋・自動で落ちてくる字は、各自の端末の中だけ。 */
+const ROOM_CAP=2;      // 通信対戦は二人まで
+const COUNTDOWN_SEC=3; // そろってから始めるまでの秒数
+const RESULT_LABEL={win:'勝ち（相手のカゴがあふれた）',lose:'負け（自分のカゴがあふれた）',gone:'相手がいなくなった（途中で抜けた）'};
+const RESULT_TITLE={win:'相手のカゴがあふれた。勝ち',lose:'カゴがあふれた。負け',gone:'相手がいなくなった。ここで終わり'};
+const NET={mode:'cpu',client:null,lobby:null,match:null,matchId:'',roomKey:'',playerId:'',starting:false};
+
+function isOnline(){ return NET.mode==='online'; }
+/* 自分を区別する短い番号（タブごとに変わる） */
+function makePlayerId(){ return Math.random().toString(36).slice(2,10); }
+/* 合言葉を、channel 名や条件式に安全に使える8けたの16進数にする（FNV-1a という単純なハッシュ） */
+function roomKeyOf(pass){ let h=0x811c9dc5; for(const byte of new TextEncoder().encode(pass)){ h^=byte; h=Math.imul(h,0x01000193)>>>0; } return h.toString(16).padStart(8,'0'); }
+/* Supabase の接続を一度だけ作って使い回す。config.js か supabase-js が読めなければ null */
+function getClient(){ if(NET.client) return NET.client; if(!window.supabase||!window.HB_SUPABASE) return null;
+  NET.client=window.supabase.createClient(HB_SUPABASE.url,HB_SUPABASE.key); return NET.client; }
+function setLobbyText(text){ $('lobbyText').textContent=text; }
+function showMenu(){ $('menu').hidden=false; }
+function hideMenu(){ $('menu').hidden=true; }
+function presentIds(){ return Object.keys(NET.lobby.presenceState()).sort(); }
+function presentCount(){ return NET.lobby?presentIds().length:0; }
+
+/* 通信の接続をすべて閉じて、ひとりの状態に戻す */
+function closeNet(){ const client=NET.client;
+  if(client){ if(NET.lobby) client.removeChannel(NET.lobby); if(NET.match) client.removeChannel(NET.match); }
+  NET.lobby=null; NET.match=null; NET.starting=false; NET.mode='cpu'; $('btnLeave').hidden=true; }
+function leaveOnline(){ closeNet(); setLobbyText(''); showMenu(); }
+function startSolo(){ closeNet(); hideMenu(); newGame(); }
+
+/* 合言葉で入室。lobby の channel に入って、相手がいるかは presence（在室）で見る */
+function joinRoom(){ const pass=$('roomInput').value.trim();
+  if(!pass){ setLobbyText('合言葉を入れてください'); return; }
+  const client=getClient();
+  if(!client){ setLobbyText('通信の準備ができない。ネットにつながっているか確かめてください'); return; }
+  closeNet(); NET.playerId=makePlayerId(); NET.roomKey=roomKeyOf(pass);
+  NET.lobby=client.channel(`hb-lobby-${NET.roomKey}`,{config:{presence:{key:NET.playerId}}})
+    .on('presence',{event:'sync'},onLobbyPresence)
+    .on('broadcast',{event:'start'},({payload})=>onStartMessage(payload))
+    .subscribe(status=>onLobbySubscribed(status));
+  $('btnLeave').hidden=false; setLobbyText('入室している…'); }
+function onLobbySubscribed(status){
+  if(status==='SUBSCRIBED'){ NET.lobby.track({joinedAt:Date.now()}); setLobbyText('相手を待っている…'); }
+  else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'){ setLobbyText('つながらなかった。もう一度入室してください'); } }
+
+/* 在室の人数が変わるたびに呼ばれる。そろったら、ひとりだけが開始の合図を出す */
+function onLobbyPresence(){ const count=presentCount();
+  if(count>ROOM_CAP){ setLobbyText('この合言葉は二人までです。別の合言葉にしてください'); return; }
+  if(count<ROOM_CAP){ onPartnerLeft(); return; }
+  if(NET.starting) return; // 開始の合図は一度だけ
+  if(presentIds()[0]===NET.playerId) startAsLeader();
+  else setLobbyText('相手がそろった。始まるのを待っている…'); }
+/* 相手が抜けたとき：対局中なら「いなくなった」で終える。待ち中なら待ちに戻す */
+function onPartnerLeft(){
+  if(isOnline()){ if(S&&!S.over&&!S.ending) finish('gone'); return; }
+  NET.starting=false; setLobbyText('相手を待っている…'); }
+
+/* 合図を出す側：matchId を作って相手に伝え、自分も数え始める */
+function startAsLeader(){ NET.starting=true;
+  const matchId=`${NET.roomKey}-${makePlayerId()}`; // 合言葉の番号＋始めた側が作る乱数
+  NET.lobby.send({type:'broadcast',event:'start',payload:{matchId}});
+  startCountdown(matchId); }
+/* 合図を受ける側（合図を出した側以外） */
+function onStartMessage(payload){ if(NET.starting||!payload||!payload.matchId) return;
+  NET.starting=true; startCountdown(payload.matchId); }
+
+/* 3秒数えてから対局を始める（画面の文字で数える） */
+function startCountdown(matchId){ let left=COUNTDOWN_SEC; setLobbyText(`そろった。${left}`);
+  const tick=setInterval(()=>{ left--; if(!NET.starting){ clearInterval(tick); return; }
+    if(left>0) setLobbyText(`そろった。${left}`); else clearInterval(tick); }, 1000);
+  setTimeout(()=>beginOnlineGame(matchId), COUNTDOWN_SEC*1000); }
+
+/* 対局を始める。数えている間に相手が抜けていたら始めない */
+function beginOnlineGame(matchId){ if(!NET.lobby||!NET.starting) return;
+  if(presentCount()<ROOM_CAP){ NET.starting=false; setLobbyText('相手がいなくなった。もう一度入室してください'); return; }
+  NET.mode='online'; NET.matchId=matchId;
+  hideMenu(); newGame(); S.busy=true; S.say='相手の準備を待っている…'; // 二人がつながるまで投げさせない（つながる前の投げは届かないため）
+  openMatchChannel(matchId); render(); }
+
+/* 対局の channel：相手の投げ（表 throws への追加）と「負けた」を受け取る。
+   二人とも在室（presence）になったら、対局を始められる */
+function openMatchChannel(matchId){ const client=getClient();
+  NET.match=client.channel(`hb-match-${matchId}`,{config:{broadcast:{self:false},presence:{key:NET.playerId}}})
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'throws',filter:`room=eq.${matchId}`},({new:row})=>onOpponentThrow(row))
+    .on('broadcast',{event:'lose'},()=>onOpponentLost())
+    .on('presence',{event:'sync'},onMatchPresence)
+    .subscribe(status=>{ if(status==='SUBSCRIBED') NET.match.track({joinedAt:Date.now()}); }); }
+/* 二人とも在室になったら、投げられるようにする */
+function onMatchPresence(){ if(!S||!isOnline()||!S.busy||S.over||S.ending) return;
+  if(Object.keys(NET.match.presenceState()).length<ROOM_CAP) return;
+  S.busy=false; S.say='相手と同時に始まった。投げた言葉は相手のカゴに届く'; render(); }
+function sendLoseToOpponent(){ if(NET.match) NET.match.send({type:'broadcast',event:'lose',payload:{}}); }
+
+/* 表 throws に入れる。成功 → 'ok'、同じ言葉が先に入っていた（主キーの重複 23505）→ 'dup' */
+async function insertThrow(c,ps){
+  const row={room:NET.matchId,word:c.core,player:NET.playerId,stars:Math.min(comboOf(ps),9),trail:trailOf(ps)};
+  const {error}=await getClient().from('throws').insert(row);
+  if(!error) return 'ok';
+  if(error.code==='23505') return 'dup';
+  return 'error'; }
+/* 通信対戦で投げる。入ったことを確かめてから、手元の札を消す（D-013：先着は表が決める） */
+async function throwOnline(c){ const ps=selPieces(); S.busy=true; render();
+  const result=await insertThrow(c,ps);
+  S.busy=false;
+  if(S.over||S.ending){ render(); return; } // 投げている間に対局が終わった
+  if(result==='ok'){ recordMyThrow(c,ps); removeMyPieces(ps); logMyThrow(c,ps,''); }
+  else if(result==='dup'){ S.used.add(c.core); S.say='もうリストに出た言葉。札は手元に残した'; }
+  else { S.say='送れなかった。つながりを確かめて、もう一度投げてください'; }
+  render(); }
+
+/* 相手が投げた言葉を、自分のカゴの材料として受け取る（ー は棒として届く） */
+function onOpponentThrow(row){ if(!S||S.over||S.ending) return;
+  if(row.player===NET.playerId) return; // 自分の投げは投げたときに済んでいる
+  S.used.add(row.word);
+  S.log.push({who:'op',word:row.word,note:'',k:row.stars||0,trail:row.trail||''});
+  [...row.word].forEach((ch,k)=>S.mine.push(mk(ch==='ー'?'一':ch,{delay:k*110})));
+  S.say=`「${row.word.replace(/∘/g,'。')}」が届いた`;
+  lg('op',`投げる「${row.word}」`);
+  if(S.mine.length>CAP){ sendLoseToOpponent(); finish('lose'); return; }
+  render(); }
+/* 相手が「負けた」を送ってきた */
+function onOpponentLost(){ if(!S||S.over||S.ending) return; finish('win'); }
+
 newGame();
+showMenu();
+$('btnSolo').onclick=startSolo; $('btnJoin').onclick=joinRoom; $('btnLeave').onclick=leaveOnline;
+$('roomInput').addEventListener('keydown',e=>{ if(e.key==='Enter') joinRoom(); });
 })();
 </script>
 
