@@ -447,21 +447,22 @@ const CAP=12, START=5, START_PART='｜'; // 最初の手は START 枚（うち1�
 // （tools/build_meanings.py がこの行をそのまま読むので、書き方を変えないこと）
 const KANA=new Set([...'はよほにこいくへさちきめぬろるつしうねわたけすなまのあもばぱぼぽごぐべぺざぢぎづじだげず']);
 // 部品。「∘」は見た目を半濁点「゜」にした（HB-013, D-038。中の名前は ∘ のまま＝「ち∘」の記録と合わせるため）。「゛」は濁点（∘＋∘）
-const PARTS=new Set(['｜','一','∘','十','゛']); // 部品「・」はなくした（HB-012, D-036）
+const PARTS=new Set(['｜','一','∘','十','゛','⊂']); // 部品「・」はなくした（HB-012, D-036）。「⊂」は つ を裏返した向き（HB-020, D-049）
 const SHOW_PART={'∘':'゜'}; // 画面に出すときの見た目だけ変える部品
 const shown=s=>String(s).replace(/∘/g,SHOW_PART['∘']); // 画面・ログに出す文字列の ∘ を ゜ にする
 const SYMS=new Set([]); // D-011 記号（？！）はなし
 // 向き：字 = R^r F^f [root]
 // 濁音の字は、もとの字どうしが向きで入れ替わる組だけ同じ向きの関係を引き継ぐ（ぐ⇄べ、じ⇄づ、ざ⇄ぢ。編集の仮置き）。
 // ほかの濁音・半濁音の字は向きで別の字にならない（回すと黄色い札になる。は と同じ）
-const ROOT={'へ':['く',1,0],'こ':['い',1,0],'一':['｜',1,0],'ち':['さ',0,1],'つ':['し',3,1],
+// 「⊂」は し を1回回した向き＝つ を裏返した向き（し,1,0）。一 が ｜ を回した向きであるのと同じ扱いの部品（HB-020, D-049）
+const ROOT={'へ':['く',1,0],'こ':['い',1,0],'一':['｜',1,0],'ち':['さ',0,1],'つ':['し',3,1],'⊂':['し',1,0],
   'べ':['ぐ',1,0],'ぢ':['ざ',0,1],'づ':['じ',3,1]};
 const ALIAS={'く':[['く',0,0],['へ',1,0]],'い':[['い',0,0],['こ',1,0]],'｜':[['｜',0,0],['一',1,0]],
-  'さ':[['さ',0,0],['ち',0,1]],'し':[['し',0,0],['つ',3,1]],
+  'さ':[['さ',0,0],['ち',0,1]],'し':[['し',0,0],['つ',3,1],['⊂',1,0]],
   'ぐ':[['ぐ',0,0],['べ',1,0]],'ざ':[['ざ',0,0],['ぢ',0,1]],'じ':[['じ',0,0],['づ',3,1]]};
 // 「゛」は回しても裏返しても変わらない（full）。ぐ は く と同じ形の対称を引き継ぐ
 const SYMM={'く':'axis','い':'half','｜':'half','∘':'full','十':'full','゛':'full','ぐ':'axis'};
-const RECIPE={'は':['｜','よ'],'ほ':['は','一'],'に':['｜','こ'],'き':['さ','一'],'ぬ':['め','∘'],'る':['ろ','∘'],'ね':['｜','る'],'わ':['｜','ろ'],'十':['｜','一'],'た':['十','こ'],'け':['｜','十'],'す':['十','∘'],'な':['十','よ'],'ま':['一','よ'],'め':['｜','の'],'あ':['十','の'],'も':['し','こ'],'ち':['十','つ'],
+const RECIPE={'は':['｜','よ'],'ほ':['は','一'],'に':['｜','こ'],'き':['さ','一'],'ぬ':['め','∘'],'る':['ろ','∘'],'ね':['｜','る'],'わ':['｜','ろ'],'十':['｜','一'],'た':['十','こ'],'け':['｜','十'],'す':['十','∘'],'な':['十','よ'],'ま':['一','よ'],'め':['｜','の'],'あ':['十','の'],'も':['し','こ'],'ち':['十','つ'],'さ':['十','⊂'], // さ＝十＋⊂（HB-020, D-049）
   'い':['｜','｜'],'こ':['一','一'],'う':['一','つ'], // う＝一＋つ（HB-012, D-036。もとは ・＋つ）
   // 濁点・半濁点（HB-013, D-037）。゜＋゜→゛、字＋゛→濁音、字＋゜→半濁音。割ると元に戻る
   '゛':['∘','∘'],
@@ -476,7 +477,7 @@ for(const [k,[a,b]] of Object.entries(RECIPE)){ (MERGE[key(a,b)] ||= []).push(k)
 (MERGE[key('に','一')] ||= []).push('た'); (MERGE[key('い','一')] ||= []).push('け'); // に＋一でも「た」、い＋一でも「け」（仮置き。割ると十が出る）
 // し＋｜でも「い」になる（仮置き。割ると｜＋｜）。一＋つ→う は割り方（RECIPE）から作られる
 const TURN={'く':['へ','回した'],'へ':['く','回した'],'い':['こ','回した'],'こ':['い','回した'],'｜':['一','回した'],'一':['｜','回した'],
-  'さ':['ち','裏返した'],'ち':['さ','裏返した'],'し':['つ','回して裏返した'],'つ':['し','回して裏返した'],
+  'さ':['ち','裏返した'],'ち':['さ','裏返した'],'⊂':['つ','裏返した'],'し':['つ','回して裏返した'],'つ':['し','回して裏返した'],
   // 濁音で向きの関係を引き継ぐ組（ROOT・ALIAS と同じ。CPU が使う）
   'ぐ':['べ','回した'],'べ':['ぐ','回した'],'ざ':['ぢ','裏返した'],'ぢ':['ざ','裏返した'],'じ':['づ','回して裏返した'],'づ':['じ','回して裏返した']};
 const BAG=[...'はははほほににこいいくくへささちききめぬろろるるつつしししううよねわたけすなまのあも'];
@@ -576,6 +577,7 @@ function view(p){ const al=ALIAS[p.root]||[[p.root,0,0]];
   else if((a=al.find(a=>a[2]===p.f))) v={g:a[0],rot:(p.r-a[1]+4)%4,flip:0};
   else v={g:p.root,rot:p.r,flip:1};
   if(v.g==='｜'){ v.g='一'; v.rot=(v.rot+1)%4; }   // 棒は同じ字形を寝かせ起こしして見せる
+  if(v.g==='⊂'){ v.g='つ'; v.flip=1; }            // ⊂ は「つ」の字形を裏返して見せる（D-049）
   if(SHOW_PART[v.g]) v.g=SHOW_PART[v.g];          // ∘ は半濁点「゜」の見た目で出す（D-038）
   return v; }
 const isMark=g=>g==='゜'||g==='゛'; // 濁点・半濁点の札（字を大きく見せる）
@@ -618,7 +620,7 @@ function checkSel(){
   const ps=selPieces(); const ls=ps.map(letterOf);
   const text=ls.map((l,i)=>!l?'〓':(i>0?asWord(l):l)).join('');
   if(ps.length===0) return {text:'',msg:'札をタップして選ぶ。順にならべると言葉になる',cls:''};
-  if(ps.length===1) return {text,msg: !ls[0]?'向きが違う。まだ字になっていない':KANA.has(ls[0])?'':SYMS.has(ls[0])?'記号。言葉の最後に付けられる':ls[0]==='一'?'のばす音。言葉の中に置ける':'部品。まだ字になっていない',cls:''};
+  if(ps.length===1) return {text,msg: !ls[0]?'向きが違う。まだ字になっていない':KANA.has(ls[0])?'1字では投げられない':SYMS.has(ls[0])?'記号。言葉の最後に付けられる':ls[0]==='一'?'のばす音。言葉の中に置ける':'部品。まだ字になっていない',cls:''};
   if(ls.some(l=>!l)) return {text,msg:'向きの違う札がまじっている',cls:'ng'};
   const merge=ps.length===2?(MERGE[key(ls[0],ls[1])]||null):null;
   const ng=msg=>merge?{text,msg:'くっつけられる',cls:'ok',merge}:{text,msg,cls:'ng'};
@@ -695,7 +697,7 @@ const EN_FIX={
   '札をタップして選ぶ。順にならべると言葉になる':'Tap tiles in order to make a word',
   '向きが違う。まだ字になっていない':'Wrong way round. Not a letter yet','記号。言葉の最後に付けられる':'Symbol. Can go at the end of a word',
   'のばす音。言葉の中に置ける':'Long sound. Can go inside a word','部品。まだ字になっていない':'A part. Not a letter yet',
-  '向きの違う札がまじっている':'A tile is the wrong way round','くっつけられる':'Can join','投げられる':'Ready to throw',
+  '向きの違う札がまじっている':'A tile is the wrong way round','1字では投げられない':'One letter can’t be thrown','くっつけられる':'Can join','投げられる':'Ready to throw',
   'もうリストに出た言葉（リストで光っている）':'Already used (lit up in the list)','二字から':'Two letters or more',
   'のばす音は頭に置けない':'Long sound can’t go first','ことばの表にない':'Not in the word list',
   '相手のカゴがあふれた。勝ち':'Their basket overflowed. You win','カゴがあふれた。負け':'Your basket overflowed. You lose','相手がいなくなった。ここで終わり':'Opponent left. Game over',
@@ -809,8 +811,10 @@ function cpuApply(s){ const p=S.opp[s.i], l=letterOf(p);
 /* ---- 賢い相手（ふつう だけ。HB-017, D-045）----
    知っている言葉は辞書全部（WORDS）。点数＝字数＋重い字の数×HEAVY_W。重い字＝割る作り方（RECIPE）も向きの道（TURN）もない字（字のデータから作る。いまは よ・ろ・の）。
    投げられる言葉がない、または1手（割る・回す・裏返す・くっつける）で点数がもっと高い言葉が作れるなら、その1手。読むのは1手先まで。
-   カゴが SMART_RUSH こ以上なら、投げられる言葉があればすぐ投げる。同じ点数は、投げる＞作り替え、作り替えどうしはランダム */
-const HEAVY=new Set([...KANA].filter(L=>!RECIPE[L]&&!TURN[L])); const HEAVY_W=2, SMART_RUSH=10;
+   カゴが SMART_RUSH こ以上なら、投げられる言葉があればすぐ投げる。同じ点数は、投げる＞作り替え、作り替えどうしはランダム
+   カゴが SMART_SPLIT_AT こ以上のときは、割ったすぐ次の手で投げられる（＝カゴが減る）ときだけ割り、割ったら次の手は必ず投げる（D-045 の直し。HB-020）
+   根拠：8〜10こで割って自分を重くし、あふれて負けた一戦（作者 2026-11-20 02:13） */
+const HEAVY=new Set([...KANA].filter(L=>!RECIPE[L]&&!TURN[L])); const HEAVY_W=2, SMART_RUSH=10, SMART_SPLIT_AT=8;
 let SMART=null, smartN=-1;
 function smartList(){ if(SMART&&smartN===WORDS.length) return SMART; smartN=WORDS.length; // extra_words が後から足されたら作り直す
   SMART=WORDS.map(w=>{ const cs=[...w]; return {w,cs,sc:cs.length+HEAVY_W*cs.filter(c=>HEAVY.has(c)).length}; }).sort((a,b)=>b.sc-a.sc); return SMART; }
@@ -828,13 +832,17 @@ function cpuThrow(w){ const used=[]; for(const ch of w){ const p=S.opp.find(x=>!
     lg('op',`投げる「${w}」`); showMeaning(w,'op');
     if(S.mine.length>CAP) finish('lose'); }
 function cpuSmart(){ const L=S.opp.map(letterOf), now=smartBest(L);
-  if(now&&S.opp.length>=SMART_RUSH){ cpuThrow(now.w); return; }
+  const must=S.oppThrowNext; S.oppThrowNext=false;
+  if(now&&(must||S.opp.length>=SMART_RUSH)){ cpuThrow(now.w); return; }
+  const heavy=S.opp.length>=SMART_SPLIT_AT;
+  const go=st=>{ if(heavy&&st.t==='split') S.oppThrowNext=true; cpuApply(st); };
+  const all=cpuSteps().filter(st=>!(heavy&&st.t==='split'&&!smartBest(st.res))); // 重いときは、割ってすぐ投げられない割り方はしない
   let best=[], bs=now?now.sc:0;
-  for(const st of cpuSteps()){ const b=smartBest(st.res); if(!b) continue; if(b.sc>bs){ bs=b.sc; best=[st]; } else if(b.sc===bs&&best.length) best.push(st); }
-  if(best.length){ cpuApply(pick(best)); return; }
+  for(const st of all){ const b=smartBest(st.res); if(!b) continue; if(b.sc>bs){ bs=b.sc; best=[st]; } else if(b.sc===bs&&best.length) best.push(st); }
+  if(best.length){ go(pick(best)); return; }
   if(now){ cpuThrow(now.w); return; }
-  const steps=cpuSteps(); // どの1手でも言葉にならないときは、今までの相手と同じく適当に動く
-  if(steps.length&&S.opp.length<=8) cpuApply(pick(steps));
+  const steps=all; // どの1手でも言葉にならないときは、今までの相手と同じく適当に動く（重いときの割り方は上で除いた）
+  if(steps.length&&S.opp.length<=8) go(pick(steps));
   else { const m=steps.filter(s=>s.t==='merge'); if(m.length) cpuApply(pick(m)); else { S.say='手が出ない'; lg('op','手が出ない'); } } }
 function cpuAct(){ if(S.over||S.ending||sheetOpen) return;
   if(SPEEDS[speed].smart){ cpuSmart(); render(); schedule(); return; }
