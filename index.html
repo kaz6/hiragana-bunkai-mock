@@ -388,15 +388,18 @@ const HAND=new Set(`
 const WORDS=[...new Set([...HAND].concat(String(window.HB_IPADIC||'').split(/\s+/)))].filter(w=>w && w[0]!=='ー' && [...w].length>=2 && [...w].every(c=>c==='ー'||KANA.has(c)));
 const DICT=new Set(WORDS);
 const SPECIAL=new Set(['ち∘']); // 部品を含む特別な言葉。作品名『チ。』（作者 2026-11-19）。リストでは ∘ を「。」として見せる
-const SPEEDS=[{name:'とまる',ms:0},{name:'のんびり',ms:11000},{name:'ゆっくり',ms:6500},{name:'ふつう',ms:4000}];
+const SPEEDS=[{name:'とまる',ms:0},{name:'ゆるゆる',ms:25000,max:2},{name:'のんびり',ms:11000},{name:'ゆっくり',ms:6500},{name:'ふつう',ms:4000}];
 const CPU_MAX=3; // 相手が知っているのは3字までの言葉だけ。長い言葉を狙わず、作れるものから適当に選ぶ
+const cpuMax=()=>SPEEDS[speed].max||CPU_MAX; // ゆるゆるは2字だけ（HB-006）
 const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
 const rnd=n=>Math.floor(Math.random()*n);
 const pick=a=>a[rnd(a.length)];
 const $=id=>document.getElementById(id);
 
-let speed=1; const once=true; /* D-013 確定 */ const bonus=false; // D-009 届くときのおまけはやめた
-try{ const s=localStorage.getItem('hb.speed'); if(s!==null) speed=Math.min(SPEEDS.length-1,Math.max(0,+s||0)); }catch(e){}
+let speed=SPEEDS.findIndex(x=>x.name==='のんびり'); const once=true; /* D-013 確定 */ const bonus=false; // D-009 届くときのおまけはやめた
+/* 速さは名前で覚える（hb.speedName）。前の版は番号（hb.speed）で覚えていたので、ゆるゆるを足す前の並びで読み替える */
+try{ let n=localStorage.getItem('hb.speedName'); if(n===null){ const s=localStorage.getItem('hb.speed'); if(s!==null) n=['とまる','のんびり','ゆっくり','ふつう'][+s]; }
+  const i=SPEEDS.findIndex(x=>x.name===n); if(i>=0) speed=i; }catch(e){}
 
 /* ---- 札 ---- */
 let uid=0;
@@ -420,7 +423,7 @@ let S, cpuT=null, sheetOpen=false, games=0;
 let LOG=[], t0=0, lastNg='', tried=new Set(), sentRejects=new Set();
 function lg(who,msg){ if(!S) return; LOG.push(`${((Date.now()-t0)/1000).toFixed(1)}s ${who==='me'?'自分':'相手'}｜${msg}　［自分${S.mine.length}・相手${S.opp.length}］`); }
 function logText(){ return [`ひらがな分解（仮）ログ ${new Date().toLocaleString('ja-JP')}`,
-  `速さ:${SPEEDS[speed].name}　一度きり:${once?'あり':'なし'}　辞書:${WORDS.length}語　上限:${CAP}　相手の語:${CPU_MAX}字まで　引く:なし（${FLOOR}こまで${REFILL_MS/1000}秒後に落ちる）`].concat(LOG).join('\n'); }
+  `速さ:${SPEEDS[speed].name}　一度きり:${once?'あり':'なし'}　辞書:${WORDS.length}語　上限:${CAP}　相手の語:${cpuMax()}字まで　引く:なし（${FLOOR}こまで${REFILL_MS/1000}秒後に落ちる）`].concat(LOG).join('\n'); }
 const els=new Map();
 function newGame(){
   clearTimeout(cpuT); clearTimeout(refT.me); clearTimeout(refT.op); refT={me:null,op:null}; els.forEach(el=>el.remove()); els.clear();
@@ -440,7 +443,7 @@ const asWord=l=>l==='一'?'ー':l;
 function canMake(word,letters){ const pool=letters.map(asWord); for(const ch of word){ const i=pool.indexOf(ch); if(i<0) return false; pool.splice(i,1);} return true; }
 function candidates(letters){ return WORDS.filter(w=>!(once&&S.used.has(w))&&canMake(w,letters)); }
 let CPU_WORDS=null;
-function bestWord(letters){ CPU_WORDS ||= WORDS.filter(w=>[...w].length<=CPU_MAX&&HAND.has(w)); const c=CPU_WORDS.filter(w=>!(once&&S.used.has(w))&&canMake(w,letters)); if(!c.length) return null; return pick(c); }
+function bestWord(letters){ CPU_WORDS ||= WORDS.filter(w=>[...w].length<=CPU_MAX&&HAND.has(w)); const mx=cpuMax(); const c=CPU_WORDS.filter(w=>[...w].length<=mx&&!(once&&S.used.has(w))&&canMake(w,letters)); if(!c.length) return null; return pick(c); }
 function selPieces(){ return S.sel.map(id=>S.mine.find(p=>p.id===id)).filter(Boolean); }
 function checkSel(){
   const ps=selPieces(); const ls=ps.map(letterOf);
@@ -634,7 +637,7 @@ function copyLog(btn){ const t=logText(), o=btn.textContent; const done=m=>{ btn
 $('btnLog').onclick=()=>copyLog($('btnLog')); $('btnCopy').onclick=()=>copyLog($('btnCopy'));
 $('btnClear').onclick=()=>{ if(locked()) return; S.sel=[]; S.choose=null; render(); };
 $('btnReset').onclick=()=>{ if(isOnline()) return leaveOnline(); logN=-1; newGame(); }; $('btnAgain').onclick=()=>{ if(isOnline()) return leaveOnline(); logN=-1; newGame(); };
-$('btnSpeed').onclick=()=>{ speed=(speed+1)%SPEEDS.length; try{localStorage.setItem('hb.speed',speed)}catch(e){} renderOpp(); schedule(); };
+$('btnSpeed').onclick=()=>{ speed=(speed+1)%SPEEDS.length; try{localStorage.setItem('hb.speedName',SPEEDS[speed].name)}catch(e){} renderOpp(); schedule(); };
 let sheetOpener=null;
 function openSheet(from){ sheetOpener=from; sheetOpen=true; clearTimeout(cpuT); $('sheet').hidden=false; $('sheet').scrollTop=0; $('btnClose').focus(); }
 function closeSheet(){ if(!sheetOpen) return; sheetOpen=false; $('sheet').hidden=true; schedule(); if(sheetOpener) sheetOpener.focus(); }
