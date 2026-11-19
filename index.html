@@ -156,6 +156,25 @@ button:focus-visible{outline:2px solid var(--me);outline-offset:2px}
 .opt input{width:20px;height:20px;accent-color:var(--me)}
 details summary{cursor:pointer;font-weight:700;padding-block:6px}
 
+/* ゲーム内辞書（HB-008, D-029）。投げた・届いた言葉が載っていく */
+.hows{display:flex;gap:8px;align-self:flex-start}
+.zk-n{margin:0;font:700 15px/1.4 var(--f-ui);font-variant-numeric:tabular-nums}
+.zk-n b{font-size:22px;color:var(--me)}
+.zk-note{margin:0;font-size:12px;line-height:1.6;color:var(--sub)}
+.zk-list{display:flex;flex-direction:column}
+.zk-row{display:block;width:100%;text-align:left;background:none;border:0;border-bottom:1px solid var(--line);padding:8px 2px;cursor:pointer}
+.zk-row .zw{font:600 22px/1.3 var(--f-kana)}
+.zk-row .zw.made{color:var(--me)}
+.zk-row .zmade{display:inline-block;margin-left:6px;padding:1px 6px;border-radius:4px;background:var(--me);color:var(--me-ink);font:700 11px/1.5 var(--f-ui);vertical-align:3px}
+.zk-row .st{font:700 14px/1 var(--f-ui);color:#D9A21B;margin-left:6px;letter-spacing:1px}
+.zk-row .zm,.zk-row .ztr{display:block;font-size:12px;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.zk-row .ztr{font-family:var(--f-kana)}
+.zk-row .zd{display:none;margin-top:6px;padding:8px 10px;border-radius:6px;background:var(--field);font-size:13px;line-height:1.7}
+.zk-row[aria-expanded="true"] .zd{display:block}
+.zk-row[aria-expanded="true"] .ztr{display:none}
+.zk-row .zd .ztrf{font-family:var(--f-kana);white-space:normal}
+.zk-row .zd b{font-weight:700;color:var(--sub);margin-right:6px}
+
 /* はじめの画面（ひとりで / ふたりで） */
 .menu{position:fixed;inset:0;background:var(--bg);overflow-y:auto;z-index:30;
   padding-top:calc(24px + env(safe-area-inset-top,0px));padding-bottom:calc(24px + env(safe-area-inset-bottom,0px));
@@ -179,7 +198,7 @@ details summary{cursor:pointer;font-weight:700;padding-block:6px}
     <button class="link" id="btnLog" type="button">ログ</button>
     <button class="link" id="btnReset" type="button">やりなおし</button>
   </header>
-  <button class="how" id="btnHow" type="button">？ 遊び方</button>
+  <div class="hows"><button class="how" id="btnHow" type="button">？ 遊び方</button><button class="how" id="btnZukan" type="button">辞書</button></div>
 
   <section class="opp" aria-label="相手のカゴ">
     <div class="opp-head">
@@ -313,6 +332,15 @@ details summary{cursor:pointer;font-weight:700;padding-block:6px}
         <li>いくつか選んでいるときの回す・裏返すは、最後に選んだ札（ふちどり）にかかる。選んだままなので、そのまま投げられる</li>
       </ul>
     </div>
+  </div>
+</div>
+
+<div class="sheet" id="zukan" hidden>
+  <div class="sheet-in">
+    <div class="head"><h2>辞書</h2><button class="link" id="btnZukanClose" type="button">とじる</button></div>
+    <p class="zk-n" id="zukanN"></p>
+    <p class="zk-note" id="zukanNote">自分が投げた言葉と、相手から届いた言葉が載っていく。この端末のブラウザだけに残る。</p>
+    <div class="zk-list" id="zukanList"></div>
   </div>
 </div>
 
@@ -534,8 +562,35 @@ function showMeaning(word,who){ const el=$('meaning'), m=meaningOf(word); if(!el
   el.classList.toggle('low',low); el.style.top=low?`${Math.round(cb.offsetTop+cb.offsetHeight/2+4)}px`:''; // 声は translate(-50%,-50%) なので、下端＝中心＋高さの半分
   el.classList.remove('on'); void el.offsetWidth; el.classList.add('on'); clearTimeout(meanT); meanT=setTimeout(()=>el.classList.remove('on'),1500); }
 function renderMeanSet(){ document.querySelectorAll('#meanSet button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.v===meanMode))); }
+
+/* ---- ゲーム内辞書（HB-008, D-029）。遊ぶと開いていく型 ----
+   投げた言葉・相手から届いた言葉（ひとりで・ふたりでとも）を、この端末のブラウザ（localStorage の hb.zukan）に残す。
+   形：{version:1, words:{言葉:{made 自分で作ったことがある, seen 相手から見たことがある, k いちばん多かった★, trail その回の道すじ（D-023）, first 最初に開いた日, n 投げられた回数}}}
+   version は、あとで端末をまたぐ仕組みに移すときの目印。保存が使えないときは、このページを開いている間だけ覚える（遊びは止めない） */
+const ZK_KEY='hb.zukan', ZK_VERSION=1;
+let ZK={version:ZK_VERSION,words:{}}, zkStore=true;
+try{ const raw=localStorage.getItem(ZK_KEY); if(raw){ const d=JSON.parse(raw); if(d&&d.version===ZK_VERSION&&d.words&&typeof d.words==='object') ZK=d; } }catch(e){ zkStore=false; }
+function zkSave(){ if(!zkStore) return; try{ localStorage.setItem(ZK_KEY,JSON.stringify(ZK)); }catch(e){ zkStore=false; } }
+const zkToday=()=>{ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
+/* who: 'me'＝自分で作った / 'op'＝相手から見た。k・trail はその回の★と道すじ */
+function zkRecord(word,who,k,trail){ try{ if(!word) return;
+  const e=ZK.words[word] ||= {made:false,seen:false,k:0,trail:'',first:zkToday(),n:0};
+  e.n++; if(who==='me') e.made=true; else e.seen=true;
+  k=k||0; if(k>e.k||(!e.trail&&trail&&k>=e.k)){ e.k=k; e.trail=trail||''; }
+  zkSave(); }catch(_){} }
+const zkColl=(()=>{ try{ return new Intl.Collator('ja'); }catch(e){ return null; } })();
+const zkShow=w=>w.replace(/∘/g,'。');
+function renderZukan(){ const ws=Object.keys(ZK.words).sort((a,b)=>zkColl?zkColl.compare(a,b):(a<b?-1:a>b?1:0));
+  $('zukanN').innerHTML=`${WORDS.length}語中 <b>${ws.length}</b>語`;
+  $('zukanNote').textContent='自分が投げた言葉と、相手から届いた言葉が載っていく。'+(zkStore?'この端末のブラウザだけに残る。':'いまはブラウザに保存できないので、ページを閉じると消える。');
+  $('zukanList').innerHTML=ws.length?ws.map(w=>{ const e=ZK.words[w], m=meaningOf(w);
+    return `<button type="button" class="zk-row" aria-expanded="false"><span class="zw${e.made?' made':''}">${escH(zkShow(w))}</span>${e.made?'<span class="zmade">作った</span>':''}${e.k?`<span class="st" aria-label="工夫${e.k}">${'★'.repeat(Math.min(e.k,3))}</span>`:''}`
+      +(m?`<span class="zm">${escH([m.k,m.e].filter(Boolean).join('　'))}</span>`:'')
+      +(e.trail?`<span class="ztr">${escH(e.trail)}</span>`:'')
+      +`<span class="zd">${e.trail?`<span class="ztrf"><b>道すじ</b>${escH(e.trail)}</span><br>`:''}<b>最初に開いた日</b>${escH(e.first)}<br><b>投げられた回数</b>${e.n}回<br><b>出会い</b>${[e.made?'自分で作った':'',e.seen?'相手から見た':''].filter(Boolean).join('・')}</span></button>`; }).join('')
+    :'<p class="zk-note">まだ何も載っていない。言葉を投げるか、相手から届くと載る。</p>'; }
 /* 投げた言葉を自分の記録に入れる（リストは後で相手と同じ形で出る） */
-function recordMyThrow(c,ps){ S.used.add(c.core); S.log.push({who:'me',word:c.word,note:notesOf(ps),k:comboOf(ps),trail:trailOf(ps)}); }
+function recordMyThrow(c,ps){ S.used.add(c.core); S.log.push({who:'me',word:c.word,note:notesOf(ps),k:comboOf(ps),trail:trailOf(ps)}); zkRecord(c.core,'me',comboOf(ps),trailOf(ps)); }
 /* 投げた札を自分のカゴから消す（消える動きつき） */
 function removeMyPieces(ps){ ps.forEach(p=>{ const el=els.get(p.id); if(el){ els.delete(p.id); el.style.transitionDelay='0ms'; el.style.transform=`translate(${p.x}px,-90px)`; el.style.opacity='0'; setTimeout(()=>el.remove(),280);} });
   S.mine=S.mine.filter(p=>!ps.includes(p)); S.sel=[]; S.choose=null; }
@@ -572,7 +627,7 @@ function cpuApply(s){ const p=S.opp[s.i], l=letterOf(p);
 function cpuAct(){ if(S.over||S.ending||sheetOpen) return;
   const L=S.opp.map(letterOf); const w=bestWord(L);
   if(w){ const used=[]; for(const ch of w){ const p=S.opp.find(x=>!used.includes(x)&&asWord(letterOf(x))===ch); used.push(p); }
-    S.used.add(w); S.log.push({who:'op',word:w,note:notesOf(used),k:comboOf(used),trail:trailOf(used)}); S.opp=S.opp.filter(x=>!used.includes(x));
+    S.used.add(w); S.log.push({who:'op',word:w,note:notesOf(used),k:comboOf(used),trail:trailOf(used)}); zkRecord(w,'op',comboOf(used),trailOf(used)); S.opp=S.opp.filter(x=>!used.includes(x));
     [...w].forEach((ch,k)=>S.mine.push(mk(ch==='ー'?'一':ch,{delay:k*110}))); S.say=`「${w}」を投げてきた`;
     let bx=''; if(bonus){ const b=mk(pick(BAG),{delay:[...w].length*110,note:'おまけ'}); S.mine.push(b); bx=letterOf(b); S.say+='（＋おまけ1字）'; }
     lg('op',`投げる「${w}」`+(bx?` 自分におまけ「${bx}」`:'')); showMeaning(w,'op');
@@ -672,12 +727,16 @@ $('btnLog').onclick=()=>copyLog($('btnLog')); $('btnCopy').onclick=()=>copyLog($
 $('btnClear').onclick=()=>{ if(locked()) return; S.sel=[]; S.choose=null; render(); };
 $('btnReset').onclick=()=>{ if(isOnline()) return leaveOnline(); logN=-1; newGame(); }; $('btnAgain').onclick=()=>{ if(isOnline()) return leaveOnline(); logN=-1; newGame(); };
 $('btnSpeed').onclick=()=>{ speed=(speed+1)%SPEEDS.length; try{localStorage.setItem('hb.speedName',SPEEDS[speed].name)}catch(e){} renderOpp(); schedule(); };
-let sheetOpener=null;
-function openSheet(from){ sheetOpener=from; sheetOpen=true; clearTimeout(cpuT); $('sheet').hidden=false; $('sheet').scrollTop=0; $('btnClose').focus(); }
-function closeSheet(){ if(!sheetOpen) return; sheetOpen=false; $('sheet').hidden=true; schedule(); if(sheetOpener) sheetOpener.focus(); }
+let sheetOpener=null, sheetEl=null;
+/* シート（しくみ・辞書）を開く。開いている間は CPU が止まる */
+function openSheet(from,id='sheet',closeBtn='btnClose'){ sheetOpener=from; sheetOpen=true; clearTimeout(cpuT); sheetEl=$(id); sheetEl.hidden=false; sheetEl.scrollTop=0; $(closeBtn).focus(); }
+function closeSheet(){ if(!sheetOpen) return; sheetOpen=false; if(sheetEl) sheetEl.hidden=true; schedule(); if(sheetOpener) sheetOpener.focus(); }
 $('btnHelp').onclick=()=>openSheet($('btnHelp')); $('btnHow').onclick=()=>openSheet($('btnHow'));
+$('btnZukan').onclick=()=>{ renderZukan(); openSheet($('btnZukan'),'zukan','btnZukanClose'); };
 /* どこをタップしても閉じる（click は指を動かしてスクロールしたときは出ない）。折りたたみの見出しだけは開閉に使う */
 $('sheet').addEventListener('click',e=>{ if(e.target.closest('summary,.meanSet')) return; closeSheet(); }); // 意味の設定のボタンも閉じない（HB-007）
+/* 辞書も同じ。語のタップは閉じずに、その語の詳しい欄を開け閉めする */
+$('zukan').addEventListener('click',e=>{ const r=e.target.closest('.zk-row'); if(r){ r.setAttribute('aria-expanded',String(r.getAttribute('aria-expanded')!=='true')); return; } closeSheet(); });
 
 /* 割れない字：袋に入る字のうち RECIPE にないもの。向きの表（ROOT・ALIAS）から添え書きを作る */
 function orientPartners(L){ const r=ROOT[L]?ROOT[L][0]:L; return (ALIAS[r]||[]).map(x=>x[0]).filter(x=>x!==L); }
@@ -834,7 +893,7 @@ async function throwOnline(c){ const ps=selPieces(); S.busy=true; render();
 function onOpponentThrow(row){ if(!S||S.over||S.ending) return;
   if(row.player===NET.playerId) return; // 自分の投げは投げたときに済んでいる
   S.used.add(row.word);
-  S.log.push({who:'op',word:row.word,note:'',k:row.stars||0,trail:row.trail||''});
+  S.log.push({who:'op',word:row.word,note:'',k:row.stars||0,trail:row.trail||''}); zkRecord(row.word,'op',row.stars||0,row.trail||'');
   [...row.word].forEach((ch,k)=>S.mine.push(mk(ch==='ー'?'一':ch,{delay:k*110})));
   S.say=`「${row.word.replace(/∘/g,'。')}」が届いた`;
   lg('op',`投げる「${row.word}」`); showMeaning(row.word,'op');
