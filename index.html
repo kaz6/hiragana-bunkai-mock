@@ -155,6 +155,28 @@ button:focus-visible{outline:2px solid var(--me);outline-offset:2px}
 .opt{display:flex;align-items:center;gap:10px;min-height:44px;cursor:pointer}
 .opt input{width:20px;height:20px;accent-color:var(--me)}
 details summary{cursor:pointer;font-weight:700;padding-block:6px}
+/* しくみの図（HB-014, D-039）。札はカゴの札と同じ色・字体（部品は黄色） */
+.dg{display:flex;flex-direction:column;gap:8px}
+.dg-f{background:var(--field);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+.dg-h{display:flex;align-items:baseline;gap:8px;font:700 15px/1.3 var(--f-ui)}
+.dg-h .dg-n{font:700 15px/1 var(--f-ui);font-variant-numeric:tabular-nums;color:var(--me);background:var(--tile);border-radius:999px;padding:3px 9px}
+.dg-ex{display:flex;flex-wrap:wrap;gap:8px 18px}
+.dg-e{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+.dg-op{font:700 18px/1 var(--f-ui);color:var(--sub);min-width:14px;text-align:center}
+.mt{width:36px;height:36px;border-radius:6px;background:var(--tile);color:var(--ink);display:inline-grid;place-items:center;font:600 22px/1 var(--f-kana);flex:none}
+.mt.off{background:var(--off);color:var(--off-ink)}
+.mt .g{display:block}
+.dg-t{margin:0;font-size:13px;line-height:1.5}
+.dg-en{margin:-4px 0 0;font:500 11px/1.4 var(--f-ui);color:var(--sub)}
+.dg-opp{font:700 15px/1 var(--f-ui);color:var(--opp)}
+.dg-bk{display:flex;align-items:flex-end;gap:2px;position:relative;padding-top:14px}
+.dg-bk .mt{width:21px;height:26px;font-size:15px;border-radius:4px}
+.dg-bk .mt.out{background:var(--opp);color:var(--me-ink)}
+.dg-bk .dg-line{align-self:stretch;width:0;border-left:2px dashed var(--opp);margin:0 2px;position:relative}
+.dg-bk .dg-line span{position:absolute;top:-14px;left:50%;transform:translateX(-50%);font:700 11px/1 var(--f-ui);color:var(--opp)}
+.result .bests{display:flex;flex-wrap:wrap;gap:4px 16px}
+.result .bests .best{flex:1 1 140px;min-width:0}
+#resBest .len{font-size:12px;color:var(--sub);margin:0 4px}
 
 /* ゲーム内辞書（HB-008, D-029）。投げた・届いた言葉が載っていく */
 .hows{display:flex;gap:8px;align-self:flex-start}
@@ -247,7 +269,7 @@ details summary{cursor:pointer;font-weight:700;padding-block:6px}
 
   <div class="result" id="result" hidden>
     <p class="big" id="resBig"></p>
-    <p id="resSub"></p><p id="resBest"></p>
+    <p id="resSub"></p><div id="resBest"></div>
     <button class="act" id="btnAgain" type="button">もう一回</button>
     <button class="act sub" id="btnCopy" type="button">ログをコピー</button>
     <details><summary>ログを見る（コピーできないときはここから）</summary><textarea id="logText" readonly></textarea></details>
@@ -276,6 +298,9 @@ details summary{cursor:pointer;font-weight:700;padding-block:6px}
   <div class="sheet-in">
     <div class="head"><h2>しくみ</h2><button class="link" id="btnClose" type="button">とじる</button></div>
 
+    <!-- しくみの図（HB-014, D-039）。札の例は RECIPE・MERGE・TURN・DICT から JS で作る。手で書いた例は置かない -->
+    <div class="dg" id="diagram" aria-label="しくみの図"></div>
+
     <div>
       <h3>意味を出す</h3>
       <p>投げた言葉の漢字・英語を、投げた瞬間に大きく出し、リストに小さく残す</p>
@@ -286,19 +311,6 @@ details summary{cursor:pointer;font-weight:700;padding-block:6px}
       <h3>案内</h3>
       <p>はじめての1戦では、触る場所の横に一言ずつ案内が出る。</p>
       <div class="guideSet"><button type="button" id="btnGuideAgain">案内をもう一度</button></div>
-    </div>
-
-    <div>
-      <h3>かんじょう</h3>
-      <div class="kanjo">
-        <b>落ちてくる</b><span>カゴが 2こ以下になって 5秒たつと、3こになるまで（二人とも）</span>
-        <b>割る</b><span>+1（1こが2こになる）</span>
-        <b>くっつける</b><span>−1</span>
-        <b>回す・裏返す</b><span>±0</span>
-        <b>投げる</b><span>−字数（相手のカゴに +字数）</span>
-        <b>届く</b><span>+字数</span>
-      </div>
-      <p>カゴが 12こ をこえたら負け。山の形は見た目だけで、数えるのは個数。字は自分では引けない。12こ のときは割れない。あふれるのは、相手の言葉が届いたときだけ。</p>
     </div>
 
     <div>
@@ -335,6 +347,7 @@ details summary{cursor:pointer;font-weight:700;padding-block:6px}
     <div>
       <h3>きまり</h3>
       <p>リストに出た言葉は、二人とも二度と投げられない。</p>
+      <p>字は自分では引けない。カゴが 2こ以下になって 5秒たつと、3こになるまで落ちてくる（二人とも）。12こ のときは割れない。</p>
       <p>作り替えた字（割った・回した・裏返した・くっつけた字）が入った言葉を投げると声が出る。言葉の字それぞれの道すじにある作り替えの回数（「→」の数）を合わせて、1でナイス★、2〜3でグレート★★、4以上でエクセレント★★★。リストにも★が残り（二人とも）、終わったら二人それぞれの★がいちばん多い言葉が「今日の一語」に出る。元の字からの道すじ（例：し→つ　は→よ　（は→｜）＋し→い）つき。どれも見た目だけで、勝ち負けには関わらない。</p>
     </div>
 
@@ -590,7 +603,8 @@ function showMeaning(word,who){ const el=$('meaning'), m=meaningOf(word); if(!el
   el.classList.toggle('op',who==='op'); const cb=$('combo'), low=cb.classList.contains('on');
   el.classList.toggle('low',low); el.style.top=low?`${Math.round(cb.offsetTop+cb.offsetHeight/2+4)}px`:''; // 声は translate(-50%,-50%) なので、下端＝中心＋高さの半分
   el.classList.remove('on'); void el.offsetWidth; el.classList.add('on'); clearTimeout(meanT); meanT=setTimeout(()=>el.classList.remove('on'),1500); }
-function renderMeanSet(){ document.querySelectorAll('#meanSet button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.v===meanMode))); }
+function renderMeanSet(){ document.querySelectorAll('#meanSet button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.v===meanMode)));
+  document.querySelectorAll('.dg-en').forEach(e=>{ e.hidden=meanMode!=='both'; }); } // しくみの図の英語は「漢字＋英語」のときだけ（D-039）
 
 /* ---- ゲーム内辞書（HB-008, D-029）。遊ぶと開いていく型 ----
    投げた言葉・相手から届いた言葉（ひとりで・ふたりでとも）を、この端末のブラウザ（localStorage の hb.zukan）に残す。
@@ -714,7 +728,14 @@ function renderControls(){ const over=!!S.over; $('controls').hidden=over; $('re
     b.textContent=RESULT_TITLE[S.over]; b.className='big '+S.over;
     $('resSub').textContent=`投げた言葉　あなた ${mine}　あいて ${theirs}`;
     { const bestOf=who=>S.log.filter(r=>r.who===who&&r.k).reduce((a,r)=>(!a||r.k>a.k||(r.k===a.k&&[...r.word].length>[...a.word].length))?r:a,null);
-      const card=(who,label)=>{ const b=bestOf(who); return b?`<div class="best ${who}"><span class="lb">${label}の今日の一語</span><b>${b.word.replace(/∘/g,'。')}</b><span class="st">${'★'.repeat(starsOf(b.k))}</span>${b.trail?`<span class="tr">${b.trail}</span>`:''}</div>`:''; };
+      /* いちばん長い言葉（HB-014, D-040）。字数がいちばん多いもの。同じ長さなら先に投げた方（S.log は投げた順）。
+         ふたりででも、相手の分は届いた言葉（S.log の op）から作る。見た目だけ（D-022） */
+      const longOf=who=>S.log.filter(r=>r.who===who).reduce((a,r)=>(!a||[...r.word].length>[...a.word].length)?r:a,null);
+      const show=w=>escH(w.replace(/∘/g,'。'));
+      const card=(who,label)=>{ const b=bestOf(who), l=longOf(who); if(!b&&!l) return '';
+        const best=b?`<div class="best ${who}"><span class="lb">${label}の${b===l?'いちばん長くて、いちばん★':'今日の一語'}</span><b>${show(b.word)}</b><span class="st">${'★'.repeat(starsOf(b.k))}</span>${b===l?`<span class="len">${[...b.word].length}字</span>`:''}${b.trail?`<span class="tr">${b.trail}</span>`:''}</div>`:'';
+        const long=l&&l!==b?`<div class="best long ${who}"><span class="lb">${label}のいちばん長い言葉</span><b>${show(l.word)}</b><span class="len">${[...l.word].length}字</span>${l.k?`<span class="st">${'★'.repeat(starsOf(l.k))}</span>`:''}</div>`:'';
+        return `<div class="bests">${best}${long}</div>`; };
       $('resBest').innerHTML=card('me','あなた')+card('op','あいて'); } $('logText').value=logText(); return; }
   const c=checkSel(), ps=selPieces(), p=ps.length===1?ps[0]:null, L=p&&letterOf(p);
   { const logEl=$('log'), hitW=(c.msg&&c.msg.startsWith('もうリストに出た言葉'))?c.text:'';
@@ -835,6 +856,44 @@ function orientPartners(L){ const r=ROOT[L]?ROOT[L][0]:L; return (ALIAS[r]||[]).
   $('unsplitHard').innerHTML=hard.map(L=>`<span>${L}</span>`).join(''); }
 
 $('recipes').innerHTML=Object.entries(RECIPE).map(([k,[a,b]])=>`<span>${k} ＝ ${a} ＋ ${b}</span>`).join('');
+
+/* ---- しくみの図（HB-014, D-039）----
+   枠ごとに「操作の名前／増える・減る数／札の例」だけ。札の例は RECIPE（割る）・MERGE（くっつける）・TURN（回す・裏返す）・DICT（投げる）から引く。
+   データに無い例は出さない（例が1つも無い枠は出さない。゜と゛の枠は濁点・半濁点のデータが入ると出る）。
+   札はカゴと同じ見た目（view() で向きを決め、部品は黄色）。英語の一言は意味の設定が「漢字＋英語」のときだけ（renderMeanSet） */
+function miniTile(L,cls=''){ const p=mk(L); norm(p); const v=view(p), l=letterOf(p);
+  const off=!l||(PARTS.has(l)&&l!=='一')||!KANA.has(l)&&l!=='一';
+  return `<span class="mt${off?' off':''}${cls?' '+cls:''}" aria-label="${escH(L)}"><span class="g" style="transform:${tfG(v)}">${escH(v.g)}</span></span>`; }
+const dgOp=s=>`<span class="dg-op" aria-hidden="true">${s}</span>`;
+const dgEx=(...xs)=>`<span class="dg-e">${xs.join('')}</span>`;
+const mergeTo=(a,b)=>(MERGE[key(a,b)]||[])[0];
+function buildDiagram(){ const F=[];
+  const frame=(name,n,body,en)=>F.push(`<div class="dg-f"><div class="dg-h"><span>${name}</span>${n?`<span class="dg-n">${n}</span>`:''}</div>${body}${en?`<p class="dg-en" lang="en">${en}</p>`:''}</div>`);
+  // 1 カゴ：12 をこえたら負け。袋の字を13枚並べ、12枚目のあとに線を引く
+  { const ls=[...new Set(BAG)].slice(0,CAP+1); let h='';
+    ls.forEach((L,i)=>{ if(i===CAP) h+=`<span class="dg-line"><span>${CAP}</span></span>`; h+=miniTile(L,i>=CAP?'out':''); });
+    frame(`カゴが ${CAP} をこえたら負け`,'',`<div class="dg-bk" aria-label="${CAP}をこえたら負け">${h}</div><p class="dg-t">言葉を投げると相手のカゴにたまる</p>`,`Throw words to fill their basket. Over ${CAP} = lose.`); }
+  // 2 割る ＋1：は → ｜ よ
+  { const ex=['は'].filter(L=>RECIPE[L]).map(L=>dgEx(miniTile(L),dgOp('→'),...RECIPE[L].map(x=>miniTile(x))));
+    if(ex.length) frame('割る','＋1',`<div class="dg-ex">${ex.join('')}</div>`,'Split'); }
+  // 3 くっつける −1：｜ ＋ し → い
+  { const ex=[['｜','し']].filter(([a,b])=>mergeTo(a,b)).map(([a,b])=>dgEx(miniTile(a),dgOp('＋'),miniTile(b),dgOp('→'),miniTile(mergeTo(a,b))));
+    if(ex.length) frame('くっつける','−1',`<div class="dg-ex">${ex.join('')}</div>`,'Join'); }
+  // 4 回す・裏返す ±0：く ⟳ へ、さ ⇄ ち、｜ ⟳ ー
+  { const sym=v=>v==='裏返した'?'⇄':'⟳';
+    const ex=['く','さ','｜'].filter(L=>TURN[L]).map(L=>dgEx(miniTile(L),dgOp(sym(TURN[L][1])),miniTile(TURN[L][0])));
+    if(ex.length) frame('回す・裏返す','±0',`<div class="dg-ex">${ex.join('')}</div>`,'Rotate・Flip'); }
+  // 5 ゜と゛：は ＋ ゜ → ぱ、゜ ＋ ゜ → ゛、は ＋ ゛ → ば（半濁点の部品は ゜ か、いまの ∘）
+  { const P=['゜','∘'].find(p=>PARTS.has(p)&&(mergeTo('は',p)||mergeTo(p,p))), D='゛'; const ex=[];
+    if(P){ if(mergeTo('は',P)) ex.push(dgEx(miniTile('は'),dgOp('＋'),miniTile(P),dgOp('→'),miniTile(mergeTo('は',P))));
+      if(mergeTo(P,P)) ex.push(dgEx(miniTile(P),dgOp('＋'),miniTile(P),dgOp('→'),miniTile(mergeTo(P,P)))); }
+    if(mergeTo('は',D)) ex.push(dgEx(miniTile('は'),dgOp('＋'),miniTile(D),dgOp('→'),miniTile(mergeTo('は',D))));
+    if(ex.length) frame('゜と゛','−1',`<div class="dg-ex">${ex.join('')}</div>`,'Dakuten marks'); }
+  // 6 投げる −字数：は し → あいて ＋2
+  { const w='はし'; if(DICT.has(w)){ const n=[...w].length;
+    frame('投げる','−字数',`<div class="dg-ex">${dgEx(...[...w].map(c=>miniTile(c)),dgOp('→'),`<span class="dg-opp">あいて ＋${n}</span>`)}</div><p class="dg-t">同じ言葉は二度と投げられない</p>`,'No repeats.'); } }
+  $('diagram').innerHTML=F.join(''); }
+buildDiagram();
 $('meaningsNotice').textContent=window.HB_MEANINGS_NOTICE||'（意味のデータを読み込めなかった）';
 renderMeanSet(); $('meanSet').addEventListener('click',e=>{ const b=e.target.closest('button[data-v]'); if(!b) return; meanMode=b.dataset.v; try{localStorage.setItem('hb.meaning',meanMode)}catch(_){} renderMeanSet(); logN=-1; renderLog(); });
 $('dictN').textContent=WORDS.length; $('ipadicNotice').textContent=window.HB_IPADIC_NOTICE||'（辞書データを読み込めなかった）';
