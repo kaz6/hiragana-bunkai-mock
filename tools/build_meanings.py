@@ -33,6 +33,13 @@ def repo_words(root='.'):
 
 src, wordsf, out = sys.argv[1:4]
 words = repo_words() if wordsf == '--repo' else set(json.load(open(wordsf, encoding='utf-8')))
+# 小さい字の言葉（HB-016, D-043）：辞書には大きい字の形（ちよこ）で入り、見せる形（ちょこ）は dict-ipadic.js の HB_SMALL
+_ipa = open('dict-ipadic.js', encoding='utf-8').read()
+_m = re.search(r'window\.HB_SMALL=(\{.*?\});', _ipa)
+SMALL_SHOW = json.loads(_m.group(1)) if _m else {}
+SMALLK = 'ぁぃぅぇぉっゃゅょゎ'
+def big(s): return ''.join(chr(ord(c) + 1) if c in SMALLK else c for c in s)
+def shown(w): return SMALL_SHOW.get(w, w)
 words.discard('るう')  # HB-005 の試し語（extra_words から消す予定）
 COMMON = {'news1', 'ichi1', 'spec1', 'spec2', 'gai1'}  # jmdict-simplified の common と同じ定め
 SKIP_K = {'sK', 'rK', 'iK', 'oK', 'ik'}               # 検索用・まれ・不規則な書き方は出さない
@@ -54,8 +61,9 @@ for e in root.iter('entry'):
         if inf & SKIP_K: continue
         kebs.append((k.findtext('keb'), any(p.text in COMMON for p in k.findall('ke_pri'))))
     for r in e.findall('r_ele'):
-        reb = r.findtext('reb'); w = hira(reb)
+        reb = r.findtext('reb'); rh = hira(reb); w = big(rh)
         if w not in words: continue
+        if rh != shown(w): continue   # 読みが見せる形と同じ項目だけ（しよう は 使用、ちよこ は ちょこ。しょう・ちよこ違いを混ぜない）
         if {x.text for x in r.findall('re_inf')} & SKIP_K: continue
         pri = [p.text for p in r.findall('re_pri')]
         rcommon = any(p in COMMON for p in pri)   # よく使うかは、この読みに付いた印だけで見る（嘴の印は「くちばし」の読みのもの）
@@ -65,7 +73,7 @@ for e in root.iter('entry'):
         else: ks = [k for k in kebs if not restr or k[0] in restr]
         ks.sort(key=lambda k: not k[1])
         kanji = [k[0] for k in ks]
-        if not kanji and reb != w: kanji = [reb]   # かなだけの語でカタカナの書き方があれば出す（ヨーヨー）
+        if not kanji and reb != rh: kanji = [reb]   # かなだけの語でカタカナの書き方があれば出す（ヨーヨー）
         senses = []
         for s in e.findall('sense'):
             stagr = {x.text for x in s.findall('stagr')}
@@ -104,5 +112,6 @@ src_js = notice + 'window.HB_MEANINGS_NOTICE=' + json.dumps('意味（漢字・�
 src_js += 'window.HB_MEANINGS=' + json.dumps(dict(sorted(out_map.items())), ensure_ascii=False, separators=(',', ':')) + ';\n'
 open(out, 'w', encoding='utf-8').write(src_js)
 print('words', len(words), 'with', len(out_map), 'without', len(words) - len(out_map))
-for t in ['はし', 'よーよー', 'つよい', 'すこ', 'あほ', 'すめし', 'いき', 'はこね', 'めーる', 'しし']:
+print('small words with meaning', sum(1 for w in out_map if w in SMALL_SHOW), 'of', len(SMALL_SHOW))
+for t in ['ちよこ', 'しよう', 'すつぱい', 'もつたいない', 'まつくろい', 'はし', 'よーよー', 'つよい', 'すこ', 'あほ', 'すめし', 'いき', 'はこね', 'めーる', 'しし']:
     print(t, out_map.get(t))

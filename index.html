@@ -656,6 +656,10 @@ let meanMode='both'; try{ const v=localStorage.getItem('hb.meaning'); if(MEAN_MO
 let meanT=null;
 function meaningOf(word){ if(meanMode==='none') return null; const m=MEAN[String(word).replace(/∘/g,'')]; if(!m) return null;
   const k=m[0]||'', e=meanMode==='both'?(m[1]||''):''; return (k||e)?{k,e}:null; }
+/* 言葉を見せる形（HB-016, D-043）。中で持つ言葉（throws・辞書の保存・使った言葉）は大きい字の形（ちよこ）のまま。
+   見せるとき（リスト・声・辞書・終わった画面・相手の一言）だけ、HB_SMALL で小さい字の形（ちょこ）にし、「ち∘」は「ち。」にする */
+const SMALL_SHOW=window.HB_SMALL||{};
+const wordShow=w=>{ w=String(w); return (SMALL_SHOW[w]||w).replace(/∘/g,'。'); };
 const escH=t=>String(t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 /* ---- 画面の言葉に添える英語（HB-015, D-042）----
    日本語は変えず、<small class="en" lang="en"> を後ろに足すだけ。出す・消すは html の no-en（renderMeanSet。意味の設定が「漢字＋英語」のときだけ出る）。
@@ -687,7 +691,7 @@ const enTag=(t,b)=>t?`<small class="en${b?' b':''}" lang="en">${escH(t)}</small>
 const withEn=(jp,b)=>escH(jp)+enTag(enOf(jp),b);
 /* 投げた瞬間に、声と同じ場所に「言葉／漢字／英語」を出して1.5秒ほどで消す。タップは下に通す（pointer-events:none） */
 function showMeaning(word,who){ const el=$('meaning'), m=meaningOf(word); if(!el) return; if(!m){ return; }
-  el.innerHTML=`<span class="mw">${escH(word.replace(/∘/g,'。'))}</span>${m.k?`<span class="mk">${escH(m.k)}</span>`:''}${m.e?`<span class="mn">${escH(m.e)}</span>`:''}`;
+  el.innerHTML=`<span class="mw">${escH(wordShow(word))}</span>${m.k?`<span class="mk">${escH(m.k)}</span>`:''}${m.e?`<span class="mn">${escH(m.e)}</span>`:''}`;
   el.classList.toggle('op',who==='op'); const cb=$('combo'), low=cb.classList.contains('on');
   el.classList.toggle('low',low); el.style.top=low?`${Math.round(cb.offsetTop+cb.offsetHeight/2+4)}px`:''; // 声は translate(-50%,-50%) なので、下端＝中心＋高さの半分
   el.classList.remove('on'); void el.offsetWidth; el.classList.add('on'); clearTimeout(meanT); meanT=setTimeout(()=>el.classList.remove('on'),1500); }
@@ -712,7 +716,7 @@ function zkRecord(word,who,k,trail){ try{ if(!word) return;
   k=k||0; if(k>e.k||(!e.trail&&trail&&k>=e.k)){ e.k=k; e.trail=trail||''; }
   zkSave(); }catch(_){} }
 const zkColl=(()=>{ try{ return new Intl.Collator('ja'); }catch(e){ return null; } })();
-const zkShow=w=>w.replace(/∘/g,'。');
+const zkShow=wordShow; // 見せる形は1つの関数で（D-043）
 function renderZukan(){ const ws=Object.keys(ZK.words).sort((a,b)=>zkColl?zkColl.compare(a,b):(a<b?-1:a>b?1:0));
   $('zukanN').innerHTML=`${WORDS.length}語中 <b>${ws.length}</b>語`+enTag(`${ws.length} of ${WORDS.length} words`);
   $('zukanNote').textContent='自分が投げた言葉と、相手から届いた言葉が載っていく。'+(zkStore?'この端末のブラウザだけに残る。':'いまはブラウザに保存できないので、ページを閉じると消える。');
@@ -761,7 +765,7 @@ function cpuAct(){ if(S.over||S.ending||sheetOpen) return;
   const L=S.opp.map(letterOf); const w=bestWord(L);
   if(w){ const used=[]; for(const ch of w){ const p=S.opp.find(x=>!used.includes(x)&&asWord(letterOf(x))===ch); used.push(p); }
     S.used.add(w); S.log.push({who:'op',word:w,note:notesOf(used),k:comboOf(used),trail:trailOf(used)}); zkRecord(w,'op',comboOf(used),trailOf(used)); S.opp=S.opp.filter(x=>!used.includes(x));
-    [...w].forEach((ch,k)=>S.mine.push(mk(ch==='ー'?'一':ch,{delay:k*110}))); S.say=`「${w}」を投げてきた`;
+    [...w].forEach((ch,k)=>S.mine.push(mk(ch==='ー'?'一':ch,{delay:k*110}))); S.say=`「${wordShow(w)}」を投げてきた`;
     let bx=''; if(bonus){ const b=mk(pick(BAG),{delay:[...w].length*110,note:'おまけ'}); S.mine.push(b); bx=letterOf(b); S.say+='（＋おまけ1字）'; }
     lg('op',`投げる「${w}」`+(bx?` 自分におまけ「${bx}」`:'')); showMeaning(w,'op');
     if(S.mine.length>CAP) finish('lose'); }
@@ -811,7 +815,7 @@ function renderOpp(){ const online=isOnline();
 let logN=-1;
 function renderLog(){ const el=$('log'); if(logN===S.log.length) return; logN=S.log.length;
   if(!S.log.length){ el.innerHTML='<p class="empty">投げた言葉は、ここに二人ぶん残る。'+enTag('Words you both throw stay here.',1)+'相手から届いた言葉は、こっちのカゴの材料になる。'+enTag('Words you receive become tiles in your basket.',1)+'</p>'; return; }
-  el.innerHTML=S.log.map(r=>`<div class="row ${r.who}" data-w="${r.word}"><span class="w">${r.word.replace(/∘/g,'。')}${r.k?`<span class="st" aria-label="工夫${r.k}">${'★'.repeat(starsOf(r.k))}</span>`:''}</span>${r.note?`<span class="n">${r.note}</span>`:''}${(m=>m?`<span class="m">${escH([m.k,m.e].filter(Boolean).join('　'))}</span>`:'')(meaningOf(r.word))}</div>`).join('');
+  el.innerHTML=S.log.map(r=>`<div class="row ${r.who}" data-w="${r.word}"><span class="w">${escH(wordShow(r.word))}${r.k?`<span class="st" aria-label="工夫${r.k}">${'★'.repeat(starsOf(r.k))}</span>`:''}</span>${r.note?`<span class="n">${r.note}</span>`:''}${(m=>m?`<span class="m">${escH([m.k,m.e].filter(Boolean).join('　'))}</span>`:'')(meaningOf(r.word))}</div>`).join('');
   el.scrollTop=el.scrollHeight; }
 function renderControls(){ const over=!!S.over; $('controls').hidden=over; $('result').hidden=!over;
   if(over){ const mine=S.log.filter(r=>r.who==='me').length, theirs=S.log.length-mine; const b=$('resBig');
@@ -821,7 +825,7 @@ function renderControls(){ const over=!!S.over; $('controls').hidden=over; $('re
       /* いちばん長い言葉（HB-014, D-040）。字数がいちばん多いもの。同じ長さなら先に投げた方（S.log は投げた順）。
          ふたりででも、相手の分は届いた言葉（S.log の op）から作る。見た目だけ（D-022） */
       const longOf=who=>S.log.filter(r=>r.who===who).reduce((a,r)=>(!a||[...r.word].length>[...a.word].length)?r:a,null);
-      const show=w=>escH(w.replace(/∘/g,'。'));
+      const show=w=>escH(wordShow(w));
       const card=(who,label)=>{ const b=bestOf(who), l=longOf(who); if(!b&&!l) return '';
         const W=who==='me'?'Your':'Opponent’s'; // 見出しの英語（D-042）
         const best=b?`<div class="best ${who}"><span class="lb">${label}の${b===l?'いちばん長くて、いちばん★':'今日の一語'}${enTag(b===l?`${W} longest, most ★ word`:`${W} word of the day`)}</span><b>${show(b.word)}</b><span class="st">${'★'.repeat(starsOf(b.k))}</span>${b===l?`<span class="len">${[...b.word].length}字</span>`:''}${b.trail?`<span class="tr">${b.trail}</span>`:''}</div>`:'';
@@ -1151,7 +1155,7 @@ function onOpponentThrow(row){ if(!S||S.over||S.ending) return;
   S.used.add(row.word);
   S.log.push({who:'op',word:row.word,note:'',k:row.stars||0,trail:row.trail||''}); zkRecord(row.word,'op',row.stars||0,row.trail||'');
   [...row.word].forEach((ch,k)=>S.mine.push(mk(ch==='ー'?'一':ch,{delay:k*110})));
-  S.say=`「${row.word.replace(/∘/g,'。')}」が届いた`;
+  S.say=`「${wordShow(row.word)}」が届いた`;
   lg('op',`投げる「${row.word}」`); showMeaning(row.word,'op');
   if(S.mine.length>CAP){ sendLoseToOpponent(); finish('lose'); return; }
   render(); }
