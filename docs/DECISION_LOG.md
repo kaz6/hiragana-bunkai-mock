@@ -162,6 +162,21 @@
 - 確認（Playwright）：う を割ると 一 と つ。その 一 を回すと ｜、もう一度で 一。め＋一＋る が「めーる」で投げられる。一＋つ で う（選択肢は1つ）。しくみの表・ログに部品の「・」が出ない。ひとりで（CPU）・ふたりで（2つのブラウザ）は今までどおり
 - 根拠：Notion の DECISION_LOG の D-036
 
+## D-035 足した言葉の意味データは GitHub Actions が毎日作り直す（技術の判断は編集。作者 2026-11-19 22:18「自動化したいと思ったのは、追加した単語の辞書の更新だ」）
+
+- 決めたこと（Notion の要点）：GitHub Actions が毎日1回（と手動のボタン）、Supabase の extra_words を読み、tools/build_meanings.py で meanings.js を作り直し、変わっていればコミットする。AI は使わない。足す言葉を決めるのは今までどおり作者（D-027）
+- 却下：受け箱の係（毎時起きる AI）でやる（決まった手順の繰り返しなので AI は要らない）
+- 実装（HB-011）
+  - 処理：.github/workflows/meanings.yml、名前「足した言葉の意味を更新」。毎日 18:17 UTC＝日本時間 3:17（:00 と :30 を避けた）と workflow_dispatch
+  - 手順：JMdict_e を www.edrdg.org から取る（答えなければ ftp.edrdg.org。1回4分まで、3周）→ python3 tools/build_meanings.py JMdict_e.gz --repo 出力 → window.HB_MEANINGS の行が今の meanings.js と違うときだけ、main にコミット「自動：足した言葉の意味を更新」して push（push の前に pull --rebase、4回まで）
+  - build_meanings.py に --repo を足した：index.html の HAND と KANA、dict-ipadic.js の HB_IPADIC、extra_words（config.js の URL と公開キーで REST の select）から、ページと同じ決まりで WORDS を作る。前の使い方（words.json を渡す）も残した。出力の形は同じ（手元で作り直すと今の meanings.js とバイト単位で一致）
+  - extra_words を読めなければ止まる（読めないまま作ると、足した言葉の意味が消えるため）。意味のある語が前の8割を切ったら、コミットせずに止まる（取り込みの失敗で意味がごっそり消えるのを防ぐ）
+  - JMdict の作成日（頭の注記）だけが変わったときはコミットしない。JMdict は毎日作り直されるので、日付まで比べると毎日コミットが積もる。代わりに、注記の日付は「意味が変わった日の版」を指す
+  - 公開キーは config.js から読むので、Actions の secrets は使わない（キーは公開の publishable で、ページにも書いてある。secrets に入れても隠せるものはない）
+- 却下（作業の中で）：ページを Playwright で開いて WORDS を書き出す（Actions にブラウザが要り重い。HAND・KANA は index.html から読める）／meanings.js 全体を比べる（日付だけで毎日コミットになる）
+- 起きたこと：最初の版は JMdict の取得に時間の上限がなく、2回目の実行が www.edrdg.org の応答待ちで止まった（15分で打ち切り）。上限と別の取得先を足した
+- 根拠：Notion の DECISION_LOG の D-035
+
 # リポジトリにしかない記録（R-番号）
 
 ## R-001 投げられない並びで「投げる」を押したら、ログに残す（作者 2026-11-19 19:55「Bでお願い」）
