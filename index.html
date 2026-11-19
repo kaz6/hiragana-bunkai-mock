@@ -382,6 +382,7 @@ const HAND=new Set(`
 はしわたし まつのき たけうま くさもち まめまき たねまき
 あたし わたくし ころし ほーい ろしあ くさつ
 すまほ ぬまる わろた さうなー にいさ るたー るくす
+あほ すこ すめし
 `.trim().split(/\s+/));
 // 自動の相手は HAND（手選び）だけを使う。こちらは IPADIC も通る
 const WORDS=[...new Set([...HAND].concat(String(window.HB_IPADIC||'').split(/\s+/)))].filter(w=>w && w[0]!=='ー' && [...w].length>=2 && [...w].every(c=>c==='ー'||KANA.has(c)));
