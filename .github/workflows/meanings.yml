@@ -8,7 +8,7 @@ on:
   schedule:
     - cron: '17 18 * * *'   # 毎日 18:17 UTC ＝ 日本時間 3:17（:00 と :30 を避けた）
   workflow_dispatch:        # GitHub の画面（Actions → この処理 → Run workflow）から手で動かす
-  push:                     # 試しの間だけ（2回目）。確かめたら外す
+  push:                     # 試しの間だけ（3回目：取得に時間の上限を付けたあと）。確かめたら外す
     paths: ['.github/workflows/meanings.yml']
 
 permissions:
@@ -21,7 +21,7 @@ concurrency:
 jobs:
   rebuild:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         with:
@@ -33,11 +33,16 @@ jobs:
 
       - name: JMdict_e を EDRDG から取ってくる
         run: |
+          # 1回の取得は最長4分（止まったままにしない）。www.edrdg.org が答えなければ ftp.edrdg.org（同じ EDRDG の置き場）から
+          ok=0
           for i in 1 2 3; do
-            curl -fsSL --retry 3 -o "$RUNNER_TEMP/JMdict_e.gz" https://www.edrdg.org/pub/Nihongo/JMdict_e.gz && break
+            for u in https://www.edrdg.org/pub/Nihongo/JMdict_e.gz http://ftp.edrdg.org/pub/Nihongo/JMdict_e.gz; do
+              if curl -fsSL --connect-timeout 30 --max-time 240 -o "$RUNNER_TEMP/JMdict_e.gz" "$u" && gzip -t "$RUNNER_TEMP/JMdict_e.gz"; then ok=1; echo "取れた: $u"; break 2; fi
+              echo "取れなかった: $u"
+            done
             sleep 30
           done
-          gzip -t "$RUNNER_TEMP/JMdict_e.gz"
+          [ "$ok" = 1 ]
           ls -l "$RUNNER_TEMP/JMdict_e.gz"
 
       - name: meanings.js を作り直す（extra_words は config.js の公開キーで読む）
