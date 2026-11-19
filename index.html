@@ -1,0 +1,587 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>ひらがな分解（仮）</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Klee+One:wght@600&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
+<style>
+/* 配置：上から 相手 → 言葉の往復（リスト）→ 自分のカゴ（主役）→ 台 → 手。色面で分け、囲みはカゴだけ。 */
+:root{
+  --bg:#E4ECEA; --field:#D2DEDB; --ink:#1B2A36; --sub:#52646C;
+  --tile:#FCFDFB; --off:#EDE0A0; --off-ink:#55460A;
+  --me:#23557F; --me-ink:#FFFFFF; --opp:#AE4129; --line:#93A8A5;
+  --f-kana:"Klee One","Hiragino Maru Gothic ProN","Yu Mincho","Noto Serif CJK JP",serif;
+  --f-ui:"Zen Kaku Gothic New","Hiragino Kaku Gothic ProN","Yu Gothic","Noto Sans CJK JP",sans-serif;
+  --s:52px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#141C23; --field:#1D2832; --ink:#E6EDEE; --sub:#96A7AD;
+    --tile:#2B3A47; --off:#4A4320; --off-ink:#EBDD9A;
+    --me:#7DB2E2; --me-ink:#0E1820; --opp:#EC8A72; --line:#445663; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#141C23; --field:#1D2832; --ink:#E6EDEE; --sub:#96A7AD;
+  --tile:#2B3A47; --off:#4A4320; --off-ink:#EBDD9A;
+  --me:#7DB2E2; --me-ink:#0E1820; --opp:#EC8A72; --line:#445663; color-scheme:dark;
+}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font:500 14px/1.5 var(--f-ui);-webkit-tap-highlight-color:transparent}
+button{font:inherit;color:inherit}
+#combo{position:fixed;left:50%;top:42%;transform:translate(-50%,-50%) scale(.6);pointer-events:none;z-index:50;font:900 34px/1.2 var(--f-ui);color:var(--me);text-shadow:0 2px 0 var(--bg),0 0 12px var(--bg);opacity:0;transition:opacity .18s,transform .18s;white-space:nowrap;text-align:center}
+#combo small{display:block;font:700 13px/1.4 var(--f-ui);color:var(--sub)}
+#combo.on{opacity:1;transform:translate(-50%,-50%) scale(1)}
+button:focus-visible{outline:2px solid var(--me);outline-offset:2px}
+
+.app{box-sizing:border-box;min-height:100%;max-width:480px;margin:0 auto;display:flex;flex-direction:column;gap:8px;
+  padding-block:8px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+.top{display:flex;align-items:baseline;gap:12px}
+.top h1{margin:0;font:700 16px/1.3 var(--f-ui);flex:1;min-width:0}
+.top h1 small{font-weight:500;font-size:12px;color:var(--sub);margin-left:4px}
+.link{background:none;border:0;padding:6px 2px;font-size:13px;font-weight:700;color:var(--me);cursor:pointer}
+
+/* 相手 */
+.opp-head{display:flex;align-items:baseline;gap:8px}
+.opp-head .who{font-weight:700;color:var(--opp)}
+.opp-head .num{font-variant-numeric:tabular-nums;color:var(--sub);font-size:13px}
+.opp-head .num{flex:1}
+.opp .say{margin:4px 0 0;font-size:13px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.slots{display:flex;gap:2px;margin-top:4px}
+.slots span{flex:1 1 0;max-width:26px;height:28px;display:grid;place-items:center;font:600 18px/1 var(--f-kana);
+  background:var(--field);border-radius:4px;color:var(--ink)}
+.slots span.fill{background:var(--tile)}
+.slots span.part{background:var(--off);color:var(--off-ink)}
+.slots span.out{background:var(--opp);color:var(--me-ink)}
+
+/* リスト */
+.log{flex:1 1 88px;min-height:88px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;padding-block:4px}
+.log .empty{margin:auto 0;color:var(--sub);font-size:13px;line-height:1.7}
+.row{display:flex;flex-direction:column;max-width:86%}
+.row .w{font:600 24px/1.25 var(--f-kana)}
+.row .st{font:700 14px/1 var(--f-ui);color:#D9A21B;margin:0 4px;letter-spacing:1px}
+#resBest .best{margin:6px 0;font-weight:700}
+#resBest .lb{font-size:12px;color:var(--sub);margin-right:4px}
+#resBest b{font:600 22px/1.3 var(--f-kana);color:var(--me);margin:0 4px}
+#resBest .op b{color:var(--opp)}
+#resBest .st{color:#D9A21B}
+#resBest .tr{display:block;font:500 13px/1.6 var(--f-kana);color:var(--sub)}
+.row .n{font-size:12px;color:var(--sub)}
+.row.me{align-self:flex-end;text-align:right}
+.row.me .w{color:var(--me)}
+.row.op{align-self:flex-start}
+.row.op .w{color:var(--opp)}
+.row.hit .w{background:var(--off);color:var(--off-ink);border-radius:6px;padding:0 6px;animation:hit .5s ease-out 3}
+@keyframes hit{0%{opacity:.35}100%{opacity:1}}
+
+/* カゴ */
+.basket{position:relative;background:var(--field);border-radius:0 0 10px 10px;
+  border:2px solid var(--line);border-top:0;flex:none}
+.rim{position:absolute;left:0;right:0;height:0;border-top:2px dashed var(--line);pointer-events:none}
+.rim span{position:absolute;right:6px;bottom:3px;font-size:12px;color:var(--sub)}
+.count{position:absolute;left:8px;top:4px;font:700 14px/1 var(--f-ui);font-variant-numeric:tabular-nums;color:var(--sub);pointer-events:none}
+.count.full{color:var(--opp)}
+.tile{position:absolute;left:0;top:0;width:var(--s);height:var(--s);padding:0;border:0;background:none;cursor:pointer;
+  touch-action:manipulation;transition:transform .34s cubic-bezier(.34,1.3,.6,1),opacity .22s}
+.face{position:absolute;inset:0;border-radius:7px;background:var(--tile);color:var(--ink);display:grid;place-items:center;
+  font:600 30px/1 var(--f-kana)}
+.tile.off .face{background:var(--off);color:var(--off-ink)}
+.tile.sel .face{background:var(--me);color:var(--me-ink)}
+.tile.over:not(.sel) .face{box-shadow:inset 0 0 0 2px var(--opp)}
+.tile.tgt .face{box-shadow:inset 0 0 0 3px var(--ink)}
+.g{display:block;transition:transform .17s ease-out}
+.ord{position:absolute;right:4px;top:3px;font:700 12px/1 var(--f-ui);color:var(--me-ink)}
+.tile.crack .face{animation:crack .26s ease-in}
+@keyframes crack{0%{transform:translateY(0)}45%{transform:translateY(-24px)}85%{transform:translateY(3px)}100%{transform:translateY(0) scale(1.06)}}
+
+/* 台 */
+.tray{display:flex;align-items:center;gap:10px;min-height:44px}
+.tray .word{font:600 26px/1.2 var(--f-kana);white-space:nowrap}
+.tray .stat{flex:1;min-width:0;font-size:13px;color:var(--sub)}
+.tray .stat.ok{color:var(--me);font-weight:700}
+.tray .stat.ng{color:var(--opp)}
+.pick{display:flex;gap:6px;align-items:center;flex:1}
+.pick button{font:600 22px/1 var(--f-kana);width:44px;height:40px;border:0;border-radius:6px;background:var(--me);color:var(--me-ink);cursor:pointer}
+
+/* 手 */
+.acts{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.act{border:0;border-radius:6px;background:var(--tile);color:var(--ink);height:46px;font-weight:700;font-size:14px;cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.15;touch-action:manipulation}
+.act small{font-weight:500;font-size:12px;color:var(--sub);font-variant-numeric:tabular-nums}
+.act:disabled{opacity:.38;cursor:default}
+.act.draw{grid-column:span 1}
+.act.throw{grid-column:span 4;background:var(--me);color:var(--me-ink);font-size:16px}
+.act.throw small{color:var(--me-ink)}
+
+.result{display:flex;flex-direction:column;gap:8px;padding-block:6px}
+.result p{margin:0}
+.result .big{font:700 20px/1.3 var(--f-ui)}
+.result .big.lose{color:var(--opp)}
+.result .big.win{color:var(--me)}
+.result .act{height:48px;background:var(--me);color:var(--me-ink);font-size:16px}
+.result .act.sub{background:var(--tile);color:var(--ink)}
+.result textarea{width:100%;height:180px;box-sizing:border-box;font:12px/1.5 ui-monospace,Menlo,monospace;background:var(--field);color:var(--ink);border:0;border-radius:6px;padding:8px}
+
+/* しくみ */
+.sheet{position:fixed;inset:0;background:var(--bg);overflow-y:auto;z-index:20;
+  padding-top:calc(12px + env(safe-area-inset-top,0px));padding-bottom:calc(24px + env(safe-area-inset-bottom,0px));
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.sheet-in{max-width:448px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+.sheet h2{margin:0;font:700 18px/1.3 var(--f-ui);flex:1}
+.sheet h3{margin:0 0 6px;font:700 14px/1.4 var(--f-ui)}
+.sheet p,.sheet li{margin:0;font-size:14px;line-height:1.7}
+.sheet ul{margin:0;padding-left:1.2em}
+.sheet .head{display:flex;align-items:baseline}
+.kanjo{display:grid;grid-template-columns:auto 1fr;gap:2px 16px;font-variant-numeric:tabular-nums}
+.kanjo b{font-weight:700}
+.recipes{display:grid;grid-template-columns:repeat(2,1fr);gap:4px 16px;font:600 20px/1.5 var(--f-kana)}
+.opt{display:flex;align-items:center;gap:10px;min-height:44px;cursor:pointer}
+.opt input{width:20px;height:20px;accent-color:var(--me)}
+details summary{cursor:pointer;font-weight:700;padding-block:6px}
+
+@media (prefers-reduced-motion: reduce){ .tile,.g{transition:none} .tile.crack .face{animation:none} }
+</style>
+
+<div class="app">
+  <header class="top">
+    <h1>ひらがな分解<small>（仮）モック</small></h1>
+    <button class="link" id="btnHelp" type="button">しくみ</button>
+    <button class="link" id="btnLog" type="button">ログ</button>
+    <button class="link" id="btnReset" type="button">やりなおし</button>
+  </header>
+
+  <section class="opp" aria-label="相手のカゴ">
+    <div class="opp-head">
+      <span class="who">あいて</span>
+      <span class="num" id="oppNum"></span>
+      <button class="link" id="btnSpeed" type="button"></button>
+    </div>
+    <div class="slots" id="oppSlots"></div>
+    <p class="say" id="oppSay"></p><div id="combo" aria-live="polite"></div>
+  </section>
+
+  <section class="log" id="log" aria-label="投げた言葉のリスト" aria-live="polite"></section>
+
+  <section class="basket" id="basket" aria-label="自分のカゴ">
+    <div class="rim" id="rim"><span>ここまで 12こ</span></div>
+    <div class="count" id="myNum"></div>
+  </section>
+
+  <div id="controls">
+    <div class="tray">
+      <div class="word" id="trayWord"></div>
+      <div class="stat" id="trayStat"></div>
+      <div class="pick" id="trayPick" hidden></div>
+      <button class="link" id="btnClear" type="button" hidden>えらび直す</button>
+    </div>
+    <div class="acts">
+      <button class="act" id="aSplit" type="button">割る<small>+1</small></button>
+      <button class="act" id="aRot" type="button">回す<small>±0</small></button>
+      <button class="act" id="aFlip" type="button">裏返す<small>±0</small></button>
+      <button class="act" id="aMerge" type="button">くっつける<small>−1</small></button>
+      
+      <button class="act throw" id="aThrow" type="button">投げる<small id="throwN"></small></button>
+    </div>
+  </div>
+
+  <div class="result" id="result" hidden>
+    <p class="big" id="resBig"></p>
+    <p id="resSub"></p><p id="resBest"></p>
+    <button class="act" id="btnAgain" type="button">もう一回</button>
+    <button class="act sub" id="btnCopy" type="button">ログをコピー</button>
+    <details><summary>ログを見る（コピーできないときはここから）</summary><textarea id="logText" readonly></textarea></details>
+  </div>
+</div>
+
+<div class="sheet" id="sheet" hidden>
+  <div class="sheet-in">
+    <div class="head"><h2>しくみ</h2><button class="link" id="btnClose" type="button">とじる</button></div>
+
+    <div>
+      <h3>かんじょう</h3>
+      <div class="kanjo">
+        <b>落ちてくる</b><span>カゴが 2こ以下になって 5秒たつと、3こになるまで（二人とも）</span>
+        <b>割る</b><span>+1（1こが2こになる）</span>
+        <b>くっつける</b><span>−1</span>
+        <b>回す・裏返す</b><span>±0</span>
+        <b>投げる</b><span>−字数（相手のカゴに +字数）</span>
+        <b>届く</b><span>+字数</span>
+      </div>
+      <p>カゴが 12こ をこえたら負け。山の形は見た目だけで、数えるのは個数。字は自分では引けない。12こ のときは割れない。あふれるのは、相手の言葉が届いたときだけ。</p>
+    </div>
+
+    <div>
+      <h3>割る ⇄ くっつける</h3>
+      <div class="recipes" id="recipes"></div>
+      <p>くっつけるときだけの作り方：し＋｜→い、一＋つ→う、に＋一→た、い＋一→け、一＋め→あ、わ＋∘→ね、｜＋ま→ほ</p>
+      <p>黄色い札は、まだ字になっていないもの（部品か、向きの違う字）。言葉には使えない。</p>
+    </div>
+
+    <div>
+      <h3>のばす音</h3>
+      <p>寝かせた棒（一）は、のばす音「ー」として言葉の中に置ける。頭には置けない。投げた「ー」は、棒として相手のカゴに届く。</p>
+    </div>
+
+    <details>
+      <summary>向きで変わる字（見ると探す楽しみが減る）</summary>
+      <ul>
+        <li>く ⇄ へ：回す</li>
+        <li>い ⇄ こ：回す</li>
+        <li>｜ ⇄ 一：回す</li>
+        <li>さ ⇄ ち：裏返す</li>
+        <li>し ⇄ つ：回して、裏返す</li>
+      </ul>
+      <p>回すと裏返すは、どの札でも押せる。意味のある向きになったときだけ別の字になる。</p>
+    </details>
+
+    <div>
+      <h3>きまり</h3>
+      <p>リストに出た言葉は、二人とも二度と投げられない。</p>
+      <p>作り替えた字（割った・回した・裏返した・くっつけた字）が入った言葉を投げると声が出る：1つでナイス、2つでグレート、3つ以上でエクセレント。リストにも★が残り（二人とも）、終わったら二人それぞれの★がいちばん多い言葉が「今日の一語」に出る。元の字からの道すじ（例：し→つ　は→よ　（は→｜）＋し→い）つき。どれも見た目だけで、勝ち負けには関わらない。</p>
+    </div>
+
+    <div>
+      <h3>このモックで仮に置いたもの</h3>
+      <ul>
+        <li>落ちてくる字は袋から出る（中身は28種類）</li>
+        <li>使える言葉は <span id="dictN"></span> 語。2字は手で並べたもの、3字以上はそれに IPADIC（人名だけの語と、有名でない地名だけの語は除き、形容詞の「〜く」の形を足した）を足したもの。正しい言葉でも通らないことがある</li>
+        <li>辞書データの出典：mecab-ipadic-2.7.0-20070801。<details><summary>著作権表示と条件（原文）</summary><pre id="ipadicNotice" style="white-space:pre-wrap;font-size:11px;line-height:1.5;margin:6px 0 0"></pre></details></li>
+        <li>相手は自動。最初に手を動かすまで待っている。知っているのは手で並べた3字までの言葉だけで、長い言葉は狙わない（IPADIC の言葉は使わない）</li>
+        <li>割る・回す・裏返すはボタン。「落として割る」はまだ入れていない</li>
+        <li>いくつか選んでいるときの回す・裏返すは、最後に選んだ札（ふちどり）にかかる。選んだままなので、そのまま投げられる</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<script src="dict-ipadic.js"></script>
+<script>
+(()=>{
+'use strict';
+const CAP=12, START=5;
+const KANA=new Set([...'はよほにこいくへさちきめぬろるつしうねわたけすなまのあも']);
+const PARTS=new Set(['｜','一','・','∘','十']);
+const SYMS=new Set([]); // D-011 記号（？！）はなし
+// 向き：字 = R^r F^f [root]
+const ROOT={'へ':['く',1,0],'こ':['い',1,0],'一':['｜',1,0],'ち':['さ',0,1],'つ':['し',3,1]};
+const ALIAS={'く':[['く',0,0],['へ',1,0]],'い':[['い',0,0],['こ',1,0]],'｜':[['｜',0,0],['一',1,0]],
+  'さ':[['さ',0,0],['ち',0,1]],'し':[['し',0,0],['つ',3,1]]};
+const SYMM={'く':'axis','い':'half','｜':'half','・':'full','∘':'full','十':'full'};
+const RECIPE={'は':['｜','よ'],'ほ':['は','一'],'に':['｜','こ'],'き':['さ','一'],'ぬ':['め','∘'],'る':['ろ','∘'],'ね':['｜','る'],'わ':['｜','ろ'],'十':['｜','一'],'た':['十','こ'],'け':['｜','十'],'す':['十','∘'],'な':['十','よ'],'ま':['一','よ'],'め':['｜','の'],'あ':['十','の'],'も':['し','こ'],'ち':['十','つ'],
+  'い':['｜','｜'],'こ':['一','一'],'う':['・','つ']};
+const key=(a,b)=>[a,b].sort().join('');
+const MERGE={};
+for(const [k,[a,b]] of Object.entries(RECIPE)){ (MERGE[key(a,b)] ||= []).push(k); }
+(MERGE[key('｜','し')] ||= []).push('い');
+(MERGE[key('一','め')] ||= []).push('あ'); (MERGE[key('わ','∘')] ||= []).push('ね'); (MERGE[key('｜','ま')] ||= []).push('ほ');
+(MERGE[key('に','一')] ||= []).push('た'); (MERGE[key('い','一')] ||= []).push('け'); // に＋一でも「た」、い＋一でも「け」（仮置き。割ると十が出る）
+(MERGE[key('一','つ')] ||= []).push('う'); // 一＋つでも「う」になる（仮置き。割ると・＋つ） // し＋｜でも「い」になる（仮置き。割ると｜＋｜）
+const TURN={'く':['へ','回した'],'へ':['く','回した'],'い':['こ','回した'],'こ':['い','回した'],'｜':['一','回した'],'一':['｜','回した'],
+  'さ':['ち','裏返した'],'ち':['さ','裏返した'],'し':['つ','回して裏返した'],'つ':['し','回して裏返した']};
+const BAG=[...'はははほほににこいいくくへささちききめぬろろるるつつしししううよねわたけすなまのあも'];
+const HAND=new Set(`
+はこ はし はち はる はい はく はは はつ よる よこ よい よし よく よめ よち よつ ほし ほこ ほろ ほる ほほ ほう
+にく にし にる こい こし こめ ここ ころ こる こう こつ こく いし いち いろ いぬ いく いる いき いう いい いつ
+くち くに くし くさ くろ くる くう くい くき くつ へい へる さき さる さく さめ さい さち さし
+ちち ちる ちく ちよ きく きし きる きち きぬ きめ きろ めし めい ぬし ぬる ぬく ぬう ろく ろう るい
+つき つる つち つく つめ つい つう しろ しる しき しち しい しく しめ うし うち うき うる うに うめ うろ うつ
+はしる はいる はいく はいち はくし よろい よめい よこく よほう よくし よいこ よこめ ほうき ほしい ほうち ほくろ ほうし ほめる
+にしき にくい こいし こうし こころ こうち こよい こうほ こうろ こいぬ こうき こうさ こうい こしつ こめこ こよう
+いろは いしき いるい いこい いくさ いきる いこう いほう いよく くるい くろい くうき くさい くいき くろう くさる くよう くろこ
+へいき へいし へいち へいさ さくし さいく さほう さつき ちしき ちいき ちほう ちこく ちめい
+きいろ きろく きこう きつい きよい きめる きこく きうい きはく きよう きめい めいし めいろ めいく めいき
+ぬるい ぬくい ぬいめ ろくろ ろうし つくし つよい つうち つくる つめる つうろ つきよ
+しろい しるし しいく しきち しさつ しほう しこう しよう しるこ しきい しめる しめい しうち
+うるし うろこ うちき うつる うしろ うよく うめる うつろ うつし
+はつめい よろしく よういく ほうこく ほうろう ほしくさ ほうさく ほろよい こくさい こうつう こうこく こくほう
+いしころ いちにち いきさつ いろいろ いよいよ いきいき くるしい くちさき くろつち くるくる へいこう へろへろ
+さいこう さいほう さいころ さくさく ちいさい ちくちく きつつき めいさい めきめき めろめろ ぬるぬる
+つうこう つくろう つるつる しつこい しろくろ しくしく うるさい うろうろ うきうき
+にこにこ ころころ よろよろ ほろほろ ほくほく はきはき こいこい はるさめ はくさい よさこい うつくしい
+きー めーる るーる しーる こーる くーる ろーる ほーる こーち しーつ つーる ちーく さーち るーつ うーる めーく るーく ほーく はろー めろー
+さーくる よーよー しーさー くろーる くろーく るーきー
+さこつ つつく くいつく はめつ きへい はくい さくい しさく
+ねる ねこ ほね はね いね ねつ こね ねいろ ねうち はねる わし わく わき いわ くわ わる わるい こわい しわ わしつ よわい よわる いわし きわ うわき くわしい わくわく
+よーく よーい ちくる いくよ よろし
+たこ たい たね たに たき たつ たけ たち たす たな たく いた うた きた した はた ねた わた さた
+たいこ たぬき たすき たいき たにし たいわ たこく たほう たいし たいさ たよる たよう したい こたつ こたい いたい きたい はたけ はたき はたち うたう ちたい したく したう たたく たたき わたし わたる わたす いたち ほたる きたく きたる たいほ たわし
+たいよう たいくつ たいこく たいさく たいしつ たちよる たいいく たいけい たいけつ したしい ついたち たいほう よこたわる
+けさ けち けし いけ さけ つけ はけ こけ うけ わけ しけ
+けいき けいこ けいろ けいい けしき けはい けつい ほけつ うける さける いける つける ぬける わける いけす たすけ しつけ こけし さけめ
+けいさつ けわしい けいほう けいこく けいしき けいさい たすける うけつけ めいわく
+すし すき すい すす すね すな いす うす なす はす めす るす こす さす ほす けす よす きす
+すこし すくい すくう すわる すいろ すいい すうち うすい はなす なくす こなす するめ すすき しすう しわす
+すうしき いすわる くすくす すいすい すいたい すいこう すいさい こうすい すすめる
+すーつ すきー こーす けーす けーき なーす ちーたー すけーる すけーたー たくしー
+なし なつ なに なわ なく なる ない なた はな つな わな こな なな しな にわ わに
+なさけ なつく はなし きなこ うなる なめる しなる ななつ なつめ なたね なける いなほ きつね うちわ はにわ
+ないよう いなさく はなうた はなよめ わなわな なくなく なさけない
+まち まつ まめ まね まく まき ます また まし まる いま うま しま くま つま たま なま はま こま ぬま
+まわる まよう まいる まなつ まほう まわす まける まもる まるい まさに まいく ますく まーく まーち まなー まいこ まよい すきま すまい あたま こまる しまる たまる はまる うまい あまい つまる きまる ぬまち くるま しまい なまけ たまに きまま ちまき こまち はまち ねまき
+まいにち なまける またたく ますます まつたけ しまうま はるまき たいまつ くろまめ すなはま このまま まくあけ
+のち のき のう のる のし もの つの ぬの
+のろい のこる のこす のうき のうち のろし きのう きのこ いのち いのる このは つのる あのよ このよ きもの にもつ きのめ
+のうさく たのしい ものまね たけのこ いのしし のろのろ のうこう ものさし ほしもの
+あい あう あき あく あさ あし あす あな あに あね あわ あめ
+あさい あした あいこ あきち あくま あたる あなた あつい あまる あるく あける あきる あいす あわい あいま あたい しあい きあい はあく あーち あーす
+あいさつ あさめし あきなす あしこし あきあき あまくち あたたまる あたためる
+もち もも もし もう もる もつ いも くも しも めも
+もよう にもの きもち すもう すもも こもる つもる たもつ はもの こもち くもる もろい もめる いもの くもま こもの もーる
+もくろく もくよう もうける ほしいも もろもろ もしもし もちもち ももいろ なにもの ものもち しもつき わるもの なまもの
+たのもしい なまけもの
+つるはし くつした さつまいも しろくま くろねこ こねこ ねくたい あまなつ にまめ あまさけ しいたけ きくな なのはな あさつき ししまい
+こわす ける つめたい よわい ねたましい このましい のろわしい つつましい あさましい たくましい うるわしい めめしい
+いたいたしい はなはなしい なまなましい ういういしい いまいましい いちしるしい
+あさいち いつつ ここのつ あいつ こいつ いくつ わたしたち あなたたち うわさ いいね あのね わーい さいあく まあまあ いまいち
+わいわい しわしわ くたくた ちまちま あつあつ あまあま いちいち こつこつ しめしめ すーすー ちくたく なよなよ ぬくぬく のこのこ はいはい ほいほい まちまち めいめい もくもく よちよち
+はしわたし まつのき たけうま くさもち まめまき たねまき
+あたし わたくし ころし ほーい ろしあ くさつ
+すまほ ぬまる わろた さうなー にいさ るたー るくす
+`.trim().split(/\s+/));
+// 自動の相手は HAND（手選び）だけを使う。こちらは IPADIC も通る
+const WORDS=[...new Set([...HAND].concat(String(window.HB_IPADIC||'').split(/\s+/)))].filter(w=>w && w[0]!=='ー' && [...w].length>=2 && [...w].every(c=>c==='ー'||KANA.has(c)));
+const DICT=new Set(WORDS);
+const SPECIAL=new Set(['ち∘']); // 部品を含む特別な言葉。作品名『チ。』（作者 2026-11-19）。リストでは ∘ を「。」として見せる
+const SPEEDS=[{name:'とまる',ms:0},{name:'のんびり',ms:11000},{name:'ゆっくり',ms:6500},{name:'ふつう',ms:4000}];
+const CPU_MAX=3; // 相手が知っているのは3字までの言葉だけ。長い言葉を狙わず、作れるものから適当に選ぶ
+const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const rnd=n=>Math.floor(Math.random()*n);
+const pick=a=>a[rnd(a.length)];
+const $=id=>document.getElementById(id);
+
+let speed=1; const once=true; /* D-013 確定 */ const bonus=false; // D-009 届くときのおまけはやめた
+try{ const s=localStorage.getItem('hb.speed'); if(s!==null) speed=Math.min(SPEEDS.length-1,Math.max(0,+s||0)); }catch(e){}
+
+/* ---- 札 ---- */
+let uid=0;
+function mk(letter,o){ const a=ROOT[letter];
+  return Object.assign({id:++uid,root:a?a[0]:letter,r:a?a[1]:0,f:a?a[2]:0,was:letter,orig:letter,base:(o&&o.note)||'',d:(o&&o.d)||letter,d0:(o&&o.d)||letter,ops:[],note:'',jit:Math.random()*6-3,spawn:null,delay:0},o||{}); }
+function norm(p){ const s=SYMM[p.root];
+  if(s==='full'){p.r=0;p.f=0} else if(s==='half'){p.f=0;p.r%=2} else if(s==='axis'&&p.f){p.r=(p.r+2)%4;p.f=0} }
+function letterOf(p){ const al=ALIAS[p.root]||[[p.root,0,0]]; const a=al.find(a=>a[1]===p.r&&a[2]===p.f); return a?a[0]:null; }
+function view(p){ const al=ALIAS[p.root]||[[p.root,0,0]];
+  let a=al.find(a=>a[1]===p.r&&a[2]===p.f); let v;
+  if(a) v={g:a[0],rot:0,flip:0};
+  else if((a=al.find(a=>a[2]===p.f))) v={g:a[0],rot:(p.r-a[1]+4)%4,flip:0};
+  else v={g:p.root,rot:p.r,flip:1};
+  if(v.g==='｜'){ v.g='一'; v.rot=(v.rot+1)%4; }   // 棒は同じ字形を寝かせ起こしして見せる
+  return v; }
+const tfG=v=>`rotate(${v.rot*90}deg)`+(v.flip?' scaleX(-1)':'');
+function verb(ops){ const r=ops.includes('回す'), f=ops.includes('裏返す'); return r&&f?'回して裏返した':r?'回した':'裏返した'; }
+
+/* ---- 状態 ---- */
+let S, cpuT=null, sheetOpen=false, games=0;
+let LOG=[], t0=0, lastNg='', tried=new Set();
+function lg(who,msg){ if(!S) return; LOG.push(`${((Date.now()-t0)/1000).toFixed(1)}s ${who==='me'?'自分':'相手'}｜${msg}　［自分${S.mine.length}・相手${S.opp.length}］`); }
+function logText(){ return [`ひらがな分解（仮）ログ ${new Date().toLocaleString('ja-JP')}`,
+  `速さ:${SPEEDS[speed].name}　一度きり:${once?'あり':'なし'}　辞書:${WORDS.length}語　上限:${CAP}　相手の語:${CPU_MAX}字まで　引く:なし（${FLOOR}こまで${REFILL_MS/1000}秒後に落ちる）`].concat(LOG).join('\n'); }
+const els=new Map();
+function newGame(){
+  clearTimeout(cpuT); clearTimeout(refT.me); clearTimeout(refT.op); refT={me:null,op:null}; els.forEach(el=>el.remove()); els.clear();
+  S={mine:[],opp:[],sel:[],log:[],used:new Set(),over:null,ending:false,started:false,busy:false,choose:null,
+     say:'あなたが動いたら、動き出す'};
+  const first=Array.from({length:START},()=>pick(BAG));
+  games++;
+  first.forEach((l,i)=>S.mine.push(mk(l,{delay:i*70})));
+  for(let i=0;i<START;i++) S.opp.push(mk(pick(BAG)));
+  LOG=[]; t0=Date.now(); lastNg=''; tried=new Set();
+  lg('me','はじめの手 '+S.mine.map(letterOf).join('')); lg('op','はじめの手 '+S.opp.map(letterOf).join(''));
+  render();
+}
+
+/* ---- 言葉の判定 ---- */
+const asWord=l=>l==='一'?'ー':l;
+function canMake(word,letters){ const pool=letters.map(asWord); for(const ch of word){ const i=pool.indexOf(ch); if(i<0) return false; pool.splice(i,1);} return true; }
+function candidates(letters){ return WORDS.filter(w=>!(once&&S.used.has(w))&&canMake(w,letters)); }
+let CPU_WORDS=null;
+function bestWord(letters){ CPU_WORDS ||= WORDS.filter(w=>[...w].length<=CPU_MAX&&HAND.has(w)); const c=CPU_WORDS.filter(w=>!(once&&S.used.has(w))&&canMake(w,letters)); if(!c.length) return null; return pick(c); }
+function selPieces(){ return S.sel.map(id=>S.mine.find(p=>p.id===id)).filter(Boolean); }
+function checkSel(){
+  const ps=selPieces(); const ls=ps.map(letterOf);
+  const text=ls.map((l,i)=>!l?'〓':(i>0?asWord(l):l)).join('');
+  if(ps.length===0) return {text:'',msg:'札をタップして選ぶ。順にならべると言葉になる',cls:''};
+  if(ps.length===1) return {text,msg: !ls[0]?'向きが違う。まだ字になっていない':KANA.has(ls[0])?'':SYMS.has(ls[0])?'記号。言葉の最後に付けられる':ls[0]==='一'?'のばす音。言葉の中に置ける':'部品。まだ字になっていない',cls:''};
+  if(ls.some(l=>!l)) return {text,msg:'向きの違う札がまじっている',cls:'ng'};
+  const merge=ps.length===2?(MERGE[key(ls[0],ls[1])]||null):null;
+  const ng=msg=>merge?{text,msg:'くっつけられる',cls:'ok',merge}:{text,msg,cls:'ng'};
+  const last=ls[ls.length-1]; const core=(SYMS.has(last)?ls.slice(0,-1):ls).map(asWord);
+  { const sp=core.join(''); if(SPECIAL.has(sp)){ if(once&&S.used.has(sp)) return ng('もうリストに出た言葉（リストで光っている）'); return {text,msg:'投げられる',cls:'ok',word:text,core:sp,merge}; } }
+  { const badPart=core.find(l=>l!=='ー'&&!KANA.has(l)); if(badPart) return ng(`「${badPart}」は部品。言葉には使えない`); }
+  if(core.length<2) return ng('二字から');
+  if(core[0]==='ー') return ng('のばす音は頭に置けない');
+  const cw=core.join('');
+  if(!DICT.has(cw)) return ng('ことばの表にない');
+  if(once&&S.used.has(cw)) return ng('もうリストに出た言葉（リストで光っている）');
+  return {text,msg:'投げられる',cls:'ok',word:text,core:cw,merge};
+}
+
+/* ---- 自分の手 ---- */
+function begin(){ if(!S.started){ S.started=true; S.say='考えている'; schedule(); } }
+function locked(){ return S.over||S.ending||S.busy; }
+function tapTile(id){ if(locked()) return; const i=S.sel.indexOf(id); if(i>=0) S.sel.splice(i,1); else S.sel.push(id); S.choose=null; render(); }
+function one(){ const ps=selPieces(); return ps.length===1?ps[0]:null; }
+
+function doSplit(){ const p=one(); if(!p||locked()) return; const L=letterOf(p); const parts=RECIPE[L]; if(!parts||S.mine.length>=CAP) return;
+  begin(); S.busy=true; const el=els.get(p.id); if(el) el.classList.add('crack');
+  setTimeout(()=>{ const i=S.mine.indexOf(p);
+    const made=parts.map(x=>mk(x,{note:`「${L}」を割った`,spawn:{x:p.x,y:p.y},d:`${p.d}→${x}`}));
+    S.mine.splice(i,1,...made); S.sel=[]; S.busy=false; lg('me',`割る ${L}→${parts.join('＋')}`); render(); }, reduced?0:260); }
+
+function doTurn(kind){ const ps0=selPieces(); const p=ps0[ps0.length-1]; if(!p||locked()) return; begin(); const before=letterOf(p)||'〓';
+  const el=els.get(p.id), g=el&&el.querySelector('.g');
+  const apply=()=>{ if(kind==='回す'){ p.r=(p.r+1)%4; } else { p.r=(4-p.r)%4; p.f=p.f?0:1; } norm(p);
+    p.ops.push(kind); const now=letterOf(p); lg('me',`${kind} ${before}→${now||'〓'}`);
+    if(now){ p.d=now===p.orig?p.d0:`${p.d0}→${now}`; if(now===p.orig){ p.note=p.base; p.was=now; } else if(now!==p.was){ p.note=`「${p.was}」を${verb(p.ops)}`; p.was=now; } p.ops=[]; }
+    if(g){ g.style.transition='none'; } S.busy=false; render(); if(g){ void g.offsetWidth; g.style.transition=''; } };
+  if(reduced||!g){ apply(); return; }
+  S.busy=true; g.style.transform=(kind==='回す'?'rotate(90deg) ':'scaleX(-1) ')+g.style.transform; setTimeout(apply,180); }
+
+function doMerge(res){ const ps=selPieces(); if(ps.length!==2||locked()) return; begin();
+  const [a,b]=ps, la=letterOf(a), lb=letterOf(b); const i=Math.min(S.mine.indexOf(a),S.mine.indexOf(b));
+  const n=mk(res,{note:`「${la}」と「${lb}」をくっつけた`,spawn:{x:a.x,y:a.y},d:joinD(a.d,b.d,res)});
+  S.mine=S.mine.filter(p=>p!==a&&p!==b); S.mine.splice(i,0,n); S.sel=[]; S.choose=null; lg('me',`くっつける ${la}＋${lb}→${res}`); render(); }
+
+function doDraw(){ if(locked()||S.mine.length>=CAP) return; begin(); const n=mk(pick(BAG)); S.mine.push(n); lg('me','引く '+letterOf(n)); render(); }
+
+const wrapD=x=>x.includes('→')?`（${x}）`:x;
+function joinD(a,b,r){ return `${wrapD(a)}＋${wrapD(b)}→${r}`; }
+function trailOf(ps){ return ps.filter(p=>p.d&&p.d.includes('→')).map(p=>p.d.replace(/→一$/,'→ー')).join('　'); } // 作り替えの道すじ（元の字から）
+function notesOf(ps){ const out=[]; ps.forEach(p=>{ if(p.note){ const s=`${asWord(letterOf(p))}←${p.note}`; if(!out.includes(s)) out.push(s); } }); return out.slice(0,3).join('　'); }
+
+const COMBO=['','ナイス','グレート','エクセレント']; let comboT=null; // 作り替えた字の数で出す声（見た目だけ。仮置き 2026-11-19）
+function comboOf(ps){ return ps.filter(p=>p.note&&p.note!=='おまけ').length; }
+function showCombo(k){ const el=document.getElementById('combo'); if(!el||k<1) return; el.innerHTML=`${COMBO[Math.min(k,3)]}！<small>工夫 ${k}</small>`; el.classList.remove('on'); void el.offsetWidth; el.classList.add('on'); clearTimeout(comboT); comboT=setTimeout(()=>el.classList.remove('on'),1100); }
+function doThrow(){ if(locked()) return; const c=checkSel(); if(!c.word) return; begin();
+  const ps=selPieces(); S.used.add(c.core); S.log.push({who:'me',word:c.word,note:notesOf(ps),k:comboOf(ps),trail:trailOf(ps)});
+  ps.forEach(p=>{ const el=els.get(p.id); if(el){ els.delete(p.id); el.style.transitionDelay='0ms'; el.style.transform=`translate(${p.x}px,-90px)`; el.style.opacity='0'; setTimeout(()=>el.remove(),280);} });
+  S.mine=S.mine.filter(p=>!ps.includes(p)); S.sel=[]; S.choose=null;
+  [...c.word].forEach(ch=>S.opp.push(mk(ch==='ー'?'一':ch)));
+  let bx=''; if(bonus){ const b=mk(pick(BAG)); S.opp.push(b); bx=letterOf(b); }
+  { const nt=notesOf(ps), k=comboOf(ps); lg('me',`投げる「${c.word}」`+(nt?`（${nt}）`:'')+(k?` ★${COMBO[Math.min(k,3)]}（工夫${k}）`:'')+(bx?` 相手におまけ「${bx}」`:'')); showCombo(k); }
+  if(S.opp.length>CAP) finish('win');
+  render(); }
+
+/* ---- 相手 ---- */
+function schedule(){ clearTimeout(cpuT); if(!S||S.over||S.ending||!S.started||sheetOpen||!SPEEDS[speed].ms) return;
+  cpuT=setTimeout(cpuAct, SPEEDS[speed].ms*(0.8+Math.random()*0.4)); }
+function cpuSteps(){ const L=S.opp.map(letterOf), out=[];
+  L.forEach((l,i)=>{ const rest=()=>[...L.slice(0,i),...L.slice(i+1)];
+    if(RECIPE[l]&&L.length<CAP) out.push({t:'split',i,res:[...rest(),...RECIPE[l]]});
+    if(TURN[l]) out.push({t:'turn',i,res:[...rest(),TURN[l][0]]}); });
+  for(let i=0;i<L.length;i++) for(let j=i+1;j<L.length;j++){ const m=MERGE[key(L[i],L[j])];
+    if(m) m.forEach(r=>out.push({t:'merge',i,j,r,res:[...L.filter((_,k)=>k!==i&&k!==j),r]})); }
+  return out; }
+function cpuApply(s){ const p=S.opp[s.i], l=letterOf(p);
+  if(s.t==='split'){ S.opp.splice(s.i,1,...RECIPE[l].map(x=>mk(x,{note:`「${l}」を割った`,d:`${p.d}→${x}`}))); S.say=`「${l}」を割った`; }
+  else if(s.t==='turn'){ const [to,v]=TURN[l]; S.opp.splice(s.i,1,mk(to,{note:`「${l}」を${v}`,d:`${p.d}→${to}`})); S.say=`「${l}」を${v}`; }
+  else { const q=S.opp[s.j], lq=letterOf(q); S.opp=S.opp.filter(x=>x!==p&&x!==q); S.opp.push(mk(s.r,{note:`「${l}」と「${lq}」をくっつけた`,d:joinD(p.d,q.d,s.r)})); S.say=`「${l}」と「${lq}」をくっつけた`; } lg('op',S.say); }
+function cpuAct(){ if(S.over||S.ending||sheetOpen) return;
+  const L=S.opp.map(letterOf); const w=bestWord(L);
+  if(w){ const used=[]; for(const ch of w){ const p=S.opp.find(x=>!used.includes(x)&&asWord(letterOf(x))===ch); used.push(p); }
+    S.used.add(w); S.log.push({who:'op',word:w,note:notesOf(used),k:comboOf(used),trail:trailOf(used)}); S.opp=S.opp.filter(x=>!used.includes(x));
+    [...w].forEach((ch,k)=>S.mine.push(mk(ch==='ー'?'一':ch,{delay:k*110}))); S.say=`「${w}」を投げてきた`;
+    let bx=''; if(bonus){ const b=mk(pick(BAG),{delay:[...w].length*110,note:'おまけ'}); S.mine.push(b); bx=letterOf(b); S.say+='（＋おまけ1字）'; }
+    lg('op',`投げる「${w}」`+(bx?` 自分におまけ「${bx}」`:''));
+    if(S.mine.length>CAP) finish('lose'); }
+  else { const steps=cpuSteps(); const good=steps.filter(s=>bestWord(s.res));
+    if(good.length) cpuApply(pick(good));
+    else if(steps.length&&S.opp.length<=8){ cpuApply(pick(steps)); }
+    else { const m=steps.filter(s=>s.t==='merge'); if(m.length) cpuApply(pick(m)); else { S.say='手が出ない'; lg('op','手が出ない'); } } }
+  render(); schedule(); }
+function finish(kind){ LOG.push(`結果：${kind==='win'?'勝ち（相手のカゴがあふれた）':'負け（自分のカゴがあふれた）'}`); S.ending=true; clearTimeout(cpuT); setTimeout(()=>{ S.over=kind; render(); }, reduced?0:900); }
+
+/* ---- 描画 ---- */
+const basket=$('basket');
+let TILE=52; const GAP=4, PAD=8;
+function measure(){ const W=basket.clientWidth; TILE=Math.max(40,Math.min(52,Math.floor((W-12-4*GAP)/5)));
+  basket.style.setProperty('--s',TILE+'px'); const H=PAD+4*(TILE+2)+6; basket.style.height=H+'px';
+  $('rim').style.top=(H-PAD-3*(TILE+2)-2)+'px'; return {W,H:H}; }
+function slotPos(i,W,H){ let k=0,n=5,j=i; while(j>=n&&n>1){ j-=n; n--; k++; } if(j>=n){ k+=j; j=0; }
+  const step=TILE+GAP, rowW=n*step-GAP; return {x:(W-rowW)/2+j*step, y:H-PAD-TILE-k*(TILE+2), row:k}; }
+function renderBasket(){ const {W,H}=measure(); const sel=S.sel;
+  S.mine.forEach((p,i)=>{ const pos=slotPos(i,W,H); let el=els.get(p.id);
+    if(!el){ el=document.createElement('button'); el.type='button'; el.className='tile';
+      el.innerHTML='<span class="face"><span class="g"></span></span><span class="ord"></span>';
+      el.addEventListener('click',()=>tapTile(p.id)); basket.appendChild(el); els.set(p.id,el);
+      const sx=p.spawn?p.spawn.x:pos.x, sy=p.spawn?p.spawn.y:-TILE-14;
+      el.style.transition='none'; el.style.transform=`translate(${sx}px,${sy}px)`; void el.offsetWidth; el.style.transition='';
+      el.style.transitionDelay=(p.delay||0)+'ms'; p.spawn=null; p.delay=0;
+    } else el.style.transitionDelay='0ms';
+    p.x=pos.x; p.y=pos.y;
+    el.style.transform=`translate(${pos.x}px,${pos.y}px) rotate(${p.jit.toFixed(1)}deg)`;
+    const L=letterOf(p), v=view(p), g=el.querySelector('.g'); g.textContent=v.g; g.style.transform=tfG(v);
+    const k=sel.indexOf(p.id);
+    el.className='tile'+(k>=0?' sel':'')+(k>=0&&sel.length>1&&k===sel.length-1?' tgt':'')+((!L||(PARTS.has(L)&&L!=='一'))?' off':'')+(pos.row>=3?' over':'');
+    el.querySelector('.ord').textContent=k>=0&&sel.length>1?(k+1):'';
+    el.setAttribute('aria-label',(L||'向きの違う'+p.root)+(k>=0?'（選択中）':'')); el.setAttribute('aria-pressed',k>=0);
+  });
+  const live=new Set(S.mine.map(p=>p.id)); els.forEach((el,id)=>{ if(!live.has(id)){ el.remove(); els.delete(id); } });
+  const n=$('myNum'); n.textContent=`${S.mine.length} / ${CAP}`+(refT.me?'　まもなく落ちてくる':''); n.className='count'+(S.mine.length>=CAP?' full':''); }
+function renderOpp(){ const n=S.opp.length; $('oppNum').textContent=`${n} / ${CAP}`; $('oppSay').textContent=S.say;
+  $('btnSpeed').textContent='速さ：'+SPEEDS[speed].name;
+  let h=''; for(let i=0;i<Math.max(CAP,n);i++){ const p=S.opp[i]; if(!p){ h+='<span></span>'; continue; }
+    const l=letterOf(p); h+=`<span class="${i>=CAP?'out':(PARTS.has(l)&&l!=='一')?'part':'fill'}">${l}</span>`; }
+  $('oppSlots').innerHTML=h; }
+let logN=-1;
+function renderLog(){ const el=$('log'); if(logN===S.log.length) return; logN=S.log.length;
+  if(!S.log.length){ el.innerHTML='<p class="empty">投げた言葉は、ここに二人ぶん残る。<br>相手から届いた言葉は、こっちのカゴの材料になる。</p>'; return; }
+  el.innerHTML=S.log.map(r=>`<div class="row ${r.who}" data-w="${r.word}"><span class="w">${r.word.replace(/∘/g,'。')}${r.k?`<span class="st" aria-label="工夫${r.k}">${'★'.repeat(Math.min(r.k,3))}</span>`:''}</span>${r.note?`<span class="n">${r.note}</span>`:''}</div>`).join('');
+  el.scrollTop=el.scrollHeight; }
+function renderControls(){ const over=!!S.over; $('controls').hidden=over; $('result').hidden=!over;
+  if(over){ const mine=S.log.filter(r=>r.who==='me').length, theirs=S.log.length-mine; const b=$('resBig');
+    b.textContent=S.over==='lose'?'カゴがあふれた。負け':'相手のカゴがあふれた。勝ち'; b.className='big '+S.over;
+    $('resSub').textContent=`投げた言葉　あなた ${mine}　あいて ${theirs}`;
+    { const bestOf=who=>S.log.filter(r=>r.who===who&&r.k).reduce((a,r)=>(!a||r.k>a.k||(r.k===a.k&&[...r.word].length>[...a.word].length))?r:a,null);
+      const card=(who,label)=>{ const b=bestOf(who); return b?`<div class="best ${who}"><span class="lb">${label}の今日の一語</span><b>${b.word.replace(/∘/g,'。')}</b><span class="st">${'★'.repeat(Math.min(b.k,3))}</span>${b.trail?`<span class="tr">${b.trail}</span>`:''}</div>`:''; };
+      $('resBest').innerHTML=card('me','あなた')+card('op','あいて'); } $('logText').value=logText(); return; }
+  const c=checkSel(), ps=selPieces(), p=ps.length===1?ps[0]:null, L=p&&letterOf(p);
+  { const logEl=$('log'), hitW=(c.msg&&c.msg.startsWith('もうリストに出た言葉'))?c.text:'';
+    logEl.querySelectorAll('.row').forEach(e=>{ const on=!!hitW&&e.dataset.w===hitW; if(on&&!e.classList.contains('hit')){ e.classList.add('hit'); try{ e.scrollIntoView({block:'nearest',behavior:reduced?'auto':'smooth'}); }catch(_){} } else if(!on) e.classList.remove('hit'); }); }
+  if(c.msg==='ことばの表にない'&&[...c.text].length>=3&&c.text!==lastNg){ lastNg=c.text; lg('me',`はじかれた「${c.text}」（ことばの表にない）`); }
+  if(ps.length>=2&&!c.merge&&(c.msg.endsWith('言葉には使えない')||c.msg==='向きの違う札がまじっている'||c.msg==='のばす音は頭に置けない')){ const k=ps.map(q=>letterOf(q)||('〓'+q.root)).join('・'); if(!tried.has(k)){ tried.add(k); lg('me',`ためした「${k}」（字にも言葉にもならない）`); } }
+  $('trayWord').textContent=c.text?`「${c.text}」`:'';
+  const pickEl=$('trayPick'), stat=$('trayStat');
+  if(S.choose){ stat.hidden=true; pickEl.hidden=false; pickEl.innerHTML='<span>どっち</span>'+S.choose.map(r=>`<button type="button" data-r="${r}">${r}</button>`).join(''); }
+  else { stat.hidden=false; pickEl.hidden=true; stat.textContent=c.msg; stat.className='stat '+c.cls; }
+  $('btnClear').hidden=!ps.length;
+  const lock=locked();
+  $('aSplit').disabled=lock||!(L&&RECIPE[L])||S.mine.length>=CAP;
+  $('aRot').disabled=lock||!ps.length; $('aFlip').disabled=lock||!ps.length;
+  $('aMerge').disabled=lock||!c.merge;
+  
+  $('aThrow').disabled=lock||!c.word; $('throwN').textContent=c.word?`−${[...c.word].length}`:''; }
+const FLOOR=3; // D-014 引くはなし。カゴが2こ以下になったら、3こになるまで袋から落ちてくる（二人とも）
+const REFILL_MS=5000; // 2こ以下になってから落ちてくるまでの待ち（作者の案、仮の5秒）
+let refT={me:null,op:null};
+function refill(){ if(!S||S.over||S.ending) return;
+  for(const side of ['me','op']){ const cur=side==='me'?S.mine:S.opp;
+    if(cur.length<FLOOR && !refT[side]){ refT[side]=setTimeout(()=>{ refT[side]=null; if(!S||S.over||S.ending) return;
+      const a=side==='me'?S.mine:S.opp; if(a.length>=FLOOR){ render(); return; }
+      const got=[]; while(a.length<FLOOR){ const n=mk(pick(BAG),{delay:got.length*110}); a.push(n); got.push(letterOf(n)); }
+      lg(side,'落ちてきた '+got.join('')); render(); }, REFILL_MS); } } }
+function render(){ refill(); renderOpp(); renderLog(); renderBasket(); renderControls(); }
+
+/* ---- つなぎ ---- */
+$('aSplit').onclick=doSplit; $('aRot').onclick=()=>doTurn('回す'); $('aFlip').onclick=()=>doTurn('裏返す');
+$('aMerge').onclick=()=>{ const c=checkSel(); if(!c.merge||locked()) return; if(c.merge.length>1){ S.choose=c.merge; render(); } else doMerge(c.merge[0]); };
+$('trayPick').addEventListener('click',e=>{ const r=e.target.closest('button'); if(r) doMerge(r.dataset.r); });
+$('aThrow').onclick=doThrow;
+function fb(t){ try{ const a=document.createElement('textarea'); a.value=t; a.style.position='fixed'; a.style.opacity='0'; document.body.appendChild(a); a.select(); const ok=document.execCommand('copy'); a.remove(); return ok; }catch(e){ return false; } }
+function copyLog(btn){ const t=logText(), o=btn.textContent; const done=m=>{ btn.textContent=m; setTimeout(()=>{ btn.textContent=o; },1600); };
+  const no=()=>done(fb(t)?'コピーした':'コピーできず');
+  if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(()=>done('コピーした'),no); else no(); }
+$('btnLog').onclick=()=>copyLog($('btnLog')); $('btnCopy').onclick=()=>copyLog($('btnCopy'));
+$('btnClear').onclick=()=>{ if(locked()) return; S.sel=[]; S.choose=null; render(); };
+$('btnReset').onclick=()=>{ logN=-1; newGame(); }; $('btnAgain').onclick=()=>{ logN=-1; newGame(); };
+$('btnSpeed').onclick=()=>{ speed=(speed+1)%SPEEDS.length; try{localStorage.setItem('hb.speed',speed)}catch(e){} renderOpp(); schedule(); };
+$('btnHelp').onclick=()=>{ sheetOpen=true; clearTimeout(cpuT); $('sheet').hidden=false; $('btnClose').focus(); };
+$('btnClose').onclick=()=>{ sheetOpen=false; $('sheet').hidden=true; schedule(); $('btnHelp').focus(); };
+
+$('recipes').innerHTML=Object.entries(RECIPE).map(([k,[a,b]])=>`<span>${k} ＝ ${a} ＋ ${b}</span>`).join('');
+$('dictN').textContent=WORDS.length; $('ipadicNotice').textContent=window.HB_IPADIC_NOTICE||'（辞書データを読み込めなかった）';
+document.addEventListener('visibilitychange',()=>{ if(document.hidden) clearTimeout(cpuT); else schedule(); });
+if('ResizeObserver' in window) new ResizeObserver(()=>{ if(S) renderBasket(); }).observe(basket);
+newGame();
+})();
+</script>
+
+</body></html>
