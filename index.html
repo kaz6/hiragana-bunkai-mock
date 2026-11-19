@@ -52,6 +52,14 @@ button{font:inherit;color:inherit}
 @keyframes mwGlow{0%{text-shadow:0 0 0 rgba(255,214,90,0)}25%{text-shadow:0 0 18px rgba(255,214,90,.95),0 0 4px #fff}100%{text-shadow:0 0 0 rgba(255,214,90,0)}}
 .app.shake{animation:appShake .42s ease-out}
 @keyframes appShake{0%,100%{translate:0 0}20%{translate:0 4px}40%{translate:0 -3px}60%{translate:0 2px}80%{translate:0 -1px}} /* 縦だけ（横に揺らすとページの幅が一瞬広がる） */
+/* 受け取る側（HB-019 追記）：5字以上でカゴが沈んで揺れる。「あいて」の札の行は字数で弾む */
+.basket.thud{animation:bkThud .45s ease-out}
+@keyframes bkThud{0%{translate:0 0}25%{translate:0 6px}45%{translate:-3px 3px}65%{translate:3px 1px}85%{translate:-1px 0}100%{translate:0 0}}
+.slots.bump1{animation:slHop .35s ease-out} .slots.bump2{animation:slHop2 .45s ease-out} .slots.bump3{animation:slHop2 .45s ease-out,slWig .5s ease-out}
+@keyframes slHop{0%,100%{translate:0 0}40%{translate:0 -3px}}
+@keyframes slHop2{0%,100%{translate:0 0}35%{translate:0 -6px}70%{translate:0 1px}}
+@keyframes slWig{0%,100%{rotate:0deg}25%{rotate:-1deg}50%{rotate:1deg}75%{rotate:-.5deg}}
+@media (prefers-reduced-motion: reduce){ .basket.thud,.slots.bump1,.slots.bump2,.slots.bump3{animation:none} }
 #burst{position:fixed;inset:0;pointer-events:none;z-index:48;overflow:hidden}
 #burst i{position:absolute;width:8px;height:12px;border-radius:2px}
 @media (prefers-reduced-motion: reduce){ #meaning .mw{animation:none!important} .app.shake{animation:none} #burst{display:none} }
@@ -709,6 +717,14 @@ const withEn=(jp,b)=>escH(jp)+enTag(enOf(jp),b);
 /* 字数の段（HB-019, D-047）：3字 1（小）・4字 2（中）・5字以上 3（大）。2字以下は 0（今のまま）。「ー」も1字、∘・゛は言葉の字としてだけ（言葉の長さと同じ数え方） */
 const tierOf=w=>{ const n=[...String(w)].length; return n>=5?3:n>=4?2:n>=3?1:0; };
 let shakeT=null;
+/* 受け取る側（HB-019 追記, D-047）。相手の言葉が自分のカゴに届くとき、字数が多いほど札が重く落ちる。1枚ずつ遅れて落ちる動きはそのまま、速さと着地の弾みだけ変える。
+   DROP[段]＝[落ちる時間(秒), 動き方]。2字以下は今のまま（.tile の .34s）。5字以上は全部落ちたところでカゴが沈んで揺れる（画面全体は揺らさない）。
+   自分の言葉が相手に届くときは「あいて」の札の行が弾む。動きを減らす設定では沈み・揺れ・弾みなし */
+const DROP={1:[.42,'cubic-bezier(.5,0,.6,1.35)'],2:[.48,'cubic-bezier(.6,0,.6,1.6)'],3:[.5,'cubic-bezier(.7,0,.6,1.9)']};
+let thudT=null;
+function landFx(w){ const t=tierOf(w); if(t<3||reduced) return; const n=[...String(w)].length; clearTimeout(thudT);
+  thudT=setTimeout(()=>{ basket.classList.remove('thud'); void basket.offsetWidth; basket.classList.add('thud'); setTimeout(()=>basket.classList.remove('thud'),500); },(n-1)*110+DROP[3][0]*1000*.8); }
+function oppBump(w){ const t=tierOf(w); if(!t||reduced) return; const el=$('oppSlots'); el.classList.remove('bump1','bump2','bump3'); void el.offsetWidth; el.classList.add('bump'+t); setTimeout(()=>el.classList.remove('bump'+t),600); }
 /* 大：画面を軽く揺らし、粒を散らす。動きを減らす設定では出さない（大きさと色だけ） */
 function burst(who){ if(reduced) return; const app=document.querySelector('.app'); app.classList.remove('shake'); void app.offsetWidth; app.classList.add('shake'); clearTimeout(shakeT); shakeT=setTimeout(()=>app.classList.remove('shake'),450);
   let box=$('burst'); if(!box){ box=document.createElement('div'); box.id='burst'; box.setAttribute('aria-hidden','true'); document.body.appendChild(box); }
@@ -769,7 +785,7 @@ let lastTry='';
 function logFailedThrow(c){ if(!c.text||c.cls==='ok') return; const k=c.text+'|'+c.msg; if(k===lastTry) return; lastTry=k; lg('me',`投げようとした「${c.text}」（${c.msg}）`); }
 function doThrow(){ if(locked()) return; const c=checkSel(); if(!c.word){ logFailedThrow(c); return; } lastTry=''; begin();
   if(isOnline()){ throwOnline(c); return; }
-  const ps=selPieces(); recordMyThrow(c,ps); removeMyPieces(ps);
+  const ps=selPieces(); recordMyThrow(c,ps); removeMyPieces(ps); oppBump(c.word);
   [...c.word].forEach(ch=>S.opp.push(mk(ch==='ー'?'一':ch)));
   let bx=''; if(bonus){ const b=mk(pick(BAG)); S.opp.push(b); bx=letterOf(b); }
   logMyThrow(c,ps,bx);
@@ -808,7 +824,7 @@ function smartBest(letters){ const pool={}; letters.forEach(l=>{ if(!l) return; 
 (window.requestIdleCallback||(f=>setTimeout(f,1500)))(()=>{ try{ smartList(); }catch(_){} });
 function cpuThrow(w){ const used=[]; for(const ch of w){ const p=S.opp.find(x=>!used.includes(x)&&asWord(letterOf(x))===ch); used.push(p); }
     S.used.add(w); S.log.push({who:'op',word:w,note:notesOf(used),k:comboOf(used),trail:trailOf(used)}); zkRecord(w,'op',comboOf(used),trailOf(used)); S.opp=S.opp.filter(x=>!used.includes(x));
-    [...w].forEach((ch,k)=>S.mine.push(mk(ch==='ー'?'一':ch,{delay:k*110}))); S.say=`「${wordShow(w)}」を投げてきた`;
+    [...w].forEach((ch,k)=>S.mine.push(mk(ch==='ー'?'一':ch,{delay:k*110,drop:tierOf(w)}))); S.say=`「${wordShow(w)}」を投げてきた`; landFx(w);
     lg('op',`投げる「${w}」`); showMeaning(w,'op');
     if(S.mine.length>CAP) finish('lose'); }
 function cpuSmart(){ const L=S.opp.map(letterOf), now=smartBest(L);
@@ -825,7 +841,7 @@ function cpuAct(){ if(S.over||S.ending||sheetOpen) return;
   const L=S.opp.map(letterOf); const w=bestWord(L);
   if(w){ const used=[]; for(const ch of w){ const p=S.opp.find(x=>!used.includes(x)&&asWord(letterOf(x))===ch); used.push(p); }
     S.used.add(w); S.log.push({who:'op',word:w,note:notesOf(used),k:comboOf(used),trail:trailOf(used)}); zkRecord(w,'op',comboOf(used),trailOf(used)); S.opp=S.opp.filter(x=>!used.includes(x));
-    [...w].forEach((ch,k)=>S.mine.push(mk(ch==='ー'?'一':ch,{delay:k*110}))); S.say=`「${wordShow(w)}」を投げてきた`;
+    [...w].forEach((ch,k)=>S.mine.push(mk(ch==='ー'?'一':ch,{delay:k*110,drop:tierOf(w)}))); S.say=`「${wordShow(w)}」を投げてきた`; landFx(w);
     let bx=''; if(bonus){ const b=mk(pick(BAG),{delay:[...w].length*110,note:'おまけ'}); S.mine.push(b); bx=letterOf(b); S.say+='（＋おまけ1字）'; }
     lg('op',`投げる「${w}」`+(bx?` 自分におまけ「${bx}」`:'')); showMeaning(w,'op');
     if(S.mine.length>CAP) finish('lose'); }
@@ -851,7 +867,9 @@ function renderBasket(){ const {W,H}=measure(); const sel=S.sel;
       el.addEventListener('click',()=>tapTile(p.id)); basket.appendChild(el); els.set(p.id,el);
       const sx=p.spawn?p.spawn.x:pos.x, sy=p.spawn?p.spawn.y:-TILE-14;
       el.style.transition='none'; el.style.transform=`translate(${sx}px,${sy}px)`; void el.offsetWidth; el.style.transition='';
-      el.style.transitionDelay=(p.delay||0)+'ms'; p.spawn=null; p.delay=0;
+      el.style.transitionDelay=(p.delay||0)+'ms';
+      if(p.drop&&DROP[p.drop]&&!reduced){ const [d,ease]=DROP[p.drop]; el.style.transition=`transform ${d}s ${ease},opacity .22s`; const e2=el; setTimeout(()=>{ e2.style.transition=''; },(p.delay||0)+d*1000+50); } // 重く落ちる（D-047 追記）
+      p.spawn=null; p.delay=0; p.drop=0;
     } else el.style.transitionDelay='0ms';
     p.x=pos.x; p.y=pos.y;
     el.style.transform=`translate(${pos.x}px,${pos.y}px) rotate(${p.jit.toFixed(1)}deg)`;
@@ -1205,7 +1223,7 @@ async function throwOnline(c){ const ps=selPieces(); S.busy=true; render();
   const result=await insertThrow(c,ps);
   S.busy=false;
   if(S.over||S.ending){ render(); return; } // 投げている間に対局が終わった
-  if(result==='ok'){ recordMyThrow(c,ps); removeMyPieces(ps); logMyThrow(c,ps,''); }
+  if(result==='ok'){ recordMyThrow(c,ps); removeMyPieces(ps); logMyThrow(c,ps,''); oppBump(c.word); }
   else if(result==='dup'){ S.used.add(c.core); S.say='もうリストに出た言葉。札は手元に残した'; }
   else { S.say='送れなかった。つながりを確かめて、もう一度投げてください'; }
   render(); }
@@ -1215,7 +1233,7 @@ function onOpponentThrow(row){ if(!S||S.over||S.ending) return;
   if(row.player===NET.playerId) return; // 自分の投げは投げたときに済んでいる
   S.used.add(row.word);
   S.log.push({who:'op',word:row.word,note:'',k:row.stars||0,trail:row.trail||''}); zkRecord(row.word,'op',row.stars||0,row.trail||'');
-  [...row.word].forEach((ch,k)=>S.mine.push(mk(ch==='ー'?'一':ch,{delay:k*110})));
+  [...row.word].forEach((ch,k)=>S.mine.push(mk(ch==='ー'?'一':ch,{delay:k*110,drop:tierOf(row.word)}))); landFx(row.word);
   S.say=`「${wordShow(row.word)}」が届いた`;
   lg('op',`投げる「${row.word}」`); showMeaning(row.word,'op');
   if(S.mine.length>CAP){ sendLoseToOpponent(); finish('lose'); return; }
