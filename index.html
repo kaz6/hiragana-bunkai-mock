@@ -370,7 +370,7 @@ details summary{cursor:pointer;font-weight:700;padding-block:6px}
 <script>
 (()=>{
 'use strict';
-const CAP=12, START=5;
+const CAP=12, START=5, START_PART='｜'; // 最初の手は START 枚（うち1枚は START_PART。D-034）
 const KANA=new Set([...'はよほにこいくへさちきめぬろるつしうねわたけすなまのあも']);
 const PARTS=new Set(['｜','一','・','∘','十']);
 const SYMS=new Set([]); // D-011 記号（？！）はなし
@@ -499,10 +499,11 @@ function newGame(){
   clearTimeout(cpuT); clearTimeout(refT.me); clearTimeout(refT.op); refT={me:null,op:null}; els.forEach(el=>el.remove()); els.clear();
   S={mine:[],opp:[],oppL:null,oppO:null,sel:[],log:[],used:new Set(),over:null,ending:false,started:false,busy:false,choose:null,
      say:'あなたが動いたら、動き出す'};
-  const first=Array.from({length:START},()=>pick(BAG));
+  const firstHand=()=>[...Array.from({length:START-1},()=>pick(BAG)),START_PART]; // 最初の手は袋から4枚＋部品「｜」（D-034。二人とも）
+  const first=firstHand();
   games++;
   first.forEach((l,i)=>S.mine.push(mk(l,{delay:i*70})));
-  for(let i=0;i<START;i++) S.opp.push(mk(pick(BAG)));
+  firstHand().forEach(l=>S.opp.push(mk(l)));
   LOG=[]; t0=Date.now(); lastNg=''; tried=new Set(); sentRejects=new Set();
   lg('me','はじめの手 '+S.mine.map(letterOf).join('')); if(!isOnline()) lg('op','はじめの手 '+S.opp.map(letterOf).join('')); // ふたりでの相手の手は届いてから
   NET.sentSig=null; guideNewGame();
@@ -758,7 +759,9 @@ function guideNewGame(){ if(G.active&&G.shown.size) guideMarkDone(); guideHide()
 function guideTarget(n){ if(n===1){ const p=S.mine[0]; if(!p) return null; const b=basket.getBoundingClientRect(); return {left:b.left+p.x,top:b.top+p.y,width:TILE,height:TILE,bottom:b.top+p.y+TILE}; }
   if(n===2) return $('aThrow').getBoundingClientRect();
   if(n===3) return $('oppNum').getBoundingClientRect();
-  if(n===4){ const a=$('aSplit').getBoundingClientRect(), z=$('aMerge').getBoundingClientRect(); return {left:a.left,top:a.top,width:z.right-a.left,height:a.height,bottom:a.bottom}; }
+  if(n===4){ const bar=S.mine.find(p=>p.d===START_PART&&letterOf(p)===START_PART); // 最初の手の ｜ がまだあれば、それを指す（D-034）
+    if(bar){ const b=basket.getBoundingClientRect(); return {left:b.left+bar.x,top:b.top+bar.y,width:TILE,height:TILE,bottom:b.top+bar.y+TILE}; }
+    const a=$('aSplit').getBoundingClientRect(), z=$('aMerge').getBoundingClientRect(); return {left:a.left,top:a.top,width:z.right-a.left,height:a.height,bottom:a.bottom}; }
   if(n===5) return $('btnHow').getBoundingClientRect(); return null; }
 /* 的の上か下に置く（上に場所がなければ下）。横は画面の中に収め、三角だけ的の真ん中を指す */
 function guidePlace(){ const el=$('guide'); if(!G.cur||el.hidden) return; const r=guideTarget(G.cur); if(!r){ guideHide(); return; }
