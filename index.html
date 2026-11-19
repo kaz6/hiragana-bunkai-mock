@@ -40,6 +40,21 @@ button{font:inherit;color:inherit}
 #meaning.op .mw{color:var(--opp)}
 #meaning .mk{display:block;font:700 calc(26px*var(--fz))/1.3 var(--f-ui);color:var(--ink,inherit)}
 #meaning .mn{display:block;font:500 calc(15px*var(--fz))/1.4 var(--f-ui);color:var(--sub);overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+ /* 投げた言葉の長さで真ん中の表示を強める（HB-019, D-047）。3字 t1・4字 t2・5字以上 t3。2字は今のまま。箱は増やさない。--n は字数（長い言葉は画面幅に合わせて小さく） */
+#meaning.t1 .mw,#meaning.t2 .mw,#meaning.t3 .mw{white-space:nowrap} /* 言葉は1行のまま、画面幅に合わせて縮む */
+#meaning.t1 .mw{font-size:min(calc(38px*var(--fz)),calc(80vw/var(--n,3)))}
+#meaning.t2 .mw{font-size:min(calc(46px*var(--fz)),calc(80vw/var(--n,4)));color:#D9A21B}
+#meaning.t3 .mw{font-size:min(calc(54px*var(--fz)),calc(80vw/var(--n,5)));color:#D9A21B}
+#meaning.on.t1 .mw{animation:mwHop .5s cubic-bezier(.3,1.6,.5,1)}
+#meaning.on.t2 .mw{animation:mwHop .55s cubic-bezier(.3,1.6,.5,1),mwGlow .9s ease-out}
+#meaning.on.t3 .mw{animation:mwHop .6s cubic-bezier(.3,1.8,.5,1),mwGlow 1.2s ease-out}
+@keyframes mwHop{0%{transform:scale(.6) translateY(10px)}55%{transform:scale(1.15) translateY(-6px)}100%{transform:none}}
+@keyframes mwGlow{0%{text-shadow:0 0 0 rgba(255,214,90,0)}25%{text-shadow:0 0 18px rgba(255,214,90,.95),0 0 4px #fff}100%{text-shadow:0 0 0 rgba(255,214,90,0)}}
+.app.shake{animation:appShake .42s ease-out}
+@keyframes appShake{0%,100%{translate:0 0}20%{translate:0 4px}40%{translate:0 -3px}60%{translate:0 2px}80%{translate:0 -1px}} /* 縦だけ（横に揺らすとページの幅が一瞬広がる） */
+#burst{position:fixed;inset:0;pointer-events:none;z-index:48;overflow:hidden}
+#burst i{position:absolute;width:8px;height:12px;border-radius:2px}
+@media (prefers-reduced-motion: reduce){ #meaning .mw{animation:none!important} .app.shake{animation:none} #burst{display:none} }
 .row .m{font-size:calc(12px*var(--fz));color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 .meanSet{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
 .meanSet button{font:600 calc(14px*var(--fz))/1 var(--f-ui);padding:8px 12px;border-radius:999px;border:1px solid var(--sub);background:transparent;color:inherit}
@@ -691,11 +706,24 @@ function enOf(jp){ if(!jp) return ''; if(EN_FIX[jp]) return EN_FIX[jp]; for(cons
 const enTag=(t,b)=>t?`<small class="en${b?' b':''}" lang="en">${escH(t)}</small>`:'';
 const withEn=(jp,b)=>escH(jp)+enTag(enOf(jp),b);
 /* 投げた瞬間に、声と同じ場所に「言葉／漢字／英語」を出して1.5秒ほどで消す。タップは下に通す（pointer-events:none） */
-function showMeaning(word,who){ const el=$('meaning'), m=meaningOf(word); if(!el) return; if(!m){ return; }
-  el.innerHTML=`<span class="mw">${escH(wordShow(word))}</span>${m.k?`<span class="mk">${escH(m.k)}</span>`:''}${m.e?`<span class="mn">${escH(m.e)}</span>`:''}`;
+/* 字数の段（HB-019, D-047）：3字 1（小）・4字 2（中）・5字以上 3（大）。2字以下は 0（今のまま）。「ー」も1字、∘・゛は言葉の字としてだけ（言葉の長さと同じ数え方） */
+const tierOf=w=>{ const n=[...String(w)].length; return n>=5?3:n>=4?2:n>=3?1:0; };
+let shakeT=null;
+/* 大：画面を軽く揺らし、粒を散らす。動きを減らす設定では出さない（大きさと色だけ） */
+function burst(who){ if(reduced) return; const app=document.querySelector('.app'); app.classList.remove('shake'); void app.offsetWidth; app.classList.add('shake'); clearTimeout(shakeT); shakeT=setTimeout(()=>app.classList.remove('shake'),450);
+  let box=$('burst'); if(!box){ box=document.createElement('div'); box.id='burst'; box.setAttribute('aria-hidden','true'); document.body.appendChild(box); }
+  const cs=getComputedStyle(document.documentElement), cols=[cs.getPropertyValue('--me'),cs.getPropertyValue('--opp'),'#D9A21B',cs.getPropertyValue('--off')].map(c=>c.trim()||'#D9A21B');
+  const mr=$('meaning').getBoundingClientRect(), cx=mr.left+mr.width/2||innerWidth/2, cy=mr.top+mr.height/2||innerHeight*.42;
+  for(let i=0;i<28;i++){ const p=document.createElement('i'); p.style.left=cx+'px'; p.style.top=cy+'px'; p.style.background=cols[i%cols.length]; box.appendChild(p);
+    const a=Math.random()*Math.PI*2, d=90+Math.random()*130, dx=Math.cos(a)*d, dy=Math.sin(a)*d-60, r=Math.random()*720-360;
+    p.animate([{transform:'translate(-50%,-50%) rotate(0deg)',opacity:1},{transform:`translate(calc(-50% + ${dx}px),calc(-50% + ${dy}px)) rotate(${r/2}deg)`,opacity:1,offset:.45},{transform:`translate(calc(-50% + ${dx*1.2}px),calc(-50% + ${dy+220}px)) rotate(${r}deg)`,opacity:0}],{duration:1400+Math.random()*300,easing:'cubic-bezier(.2,.7,.4,1)'}).onfinish=()=>p.remove(); } }
+function showMeaning(word,who){ const el=$('meaning'), m=meaningOf(word); if(!el) return; const tier=tierOf(word); if(!m&&!tier){ return; } // 3字以上は意味がなくても言葉だけ出す（D-047）
+  el.innerHTML=`<span class="mw">${escH(wordShow(word))}</span>${m&&m.k?`<span class="mk">${escH(m.k)}</span>`:''}${m&&m.e?`<span class="mn">${escH(m.e)}</span>`:''}`;
+  el.classList.remove('t1','t2','t3'); if(tier) el.classList.add('t'+tier); el.style.setProperty('--n',[...String(word)].length);
   el.classList.toggle('op',who==='op'); const cb=$('combo'), low=cb.classList.contains('on');
   el.classList.toggle('low',low); el.style.top=low?`${Math.round(cb.offsetTop+cb.offsetHeight/2+4)}px`:''; // 声は translate(-50%,-50%) なので、下端＝中心＋高さの半分
-  el.classList.remove('on'); void el.offsetWidth; el.classList.add('on'); clearTimeout(meanT); meanT=setTimeout(()=>el.classList.remove('on'),1500); }
+  el.classList.remove('on'); void el.offsetWidth; el.classList.add('on'); clearTimeout(meanT); meanT=setTimeout(()=>el.classList.remove('on'),1500);
+  if(tier===3) burst(who); }
 function renderMeanSet(){ document.querySelectorAll('#meanSet button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.v===meanMode)));
   // しくみの図の英語（D-039）と画面の言葉の英語（D-042）は、「漢字＋英語」のときだけ。html の no-en ひとつでまとめて切り替える（はじめの画面の強さボタン D-041 は別。いつも出す）
   document.documentElement.classList.toggle('no-en',meanMode!=='both');
