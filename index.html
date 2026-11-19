@@ -108,7 +108,7 @@ button:focus-visible{outline:2px solid var(--me);outline-offset:2px}
 .act{border:0;border-radius:6px;background:var(--tile);color:var(--ink);height:46px;font-weight:700;font-size:14px;cursor:pointer;
   display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.15;touch-action:manipulation}
 .act small{font-weight:500;font-size:12px;color:var(--sub);font-variant-numeric:tabular-nums}
-.act:disabled{opacity:.38;cursor:default}
+.act:disabled,.act.off{opacity:.38;cursor:default}
 .act.draw{grid-column:span 1}
 .act.throw{grid-column:span 4;background:var(--me);color:var(--me-ink);font-size:16px}
 .act.throw small{color:var(--me-ink)}
@@ -505,7 +505,10 @@ function removeMyPieces(ps){ ps.forEach(p=>{ const el=els.get(p.id); if(el){ els
 function logMyThrow(c,ps,bonusLetter){ const nt=notesOf(ps), k=comboOf(ps);
   lg('me',`投げる「${c.word}」`+(nt?`（${nt}）`:'')+(k?` ★${COMBO[Math.min(k,3)]}（工夫${k}）`:'')+(bonusLetter?` 相手におまけ「${bonusLetter}」`:''));
   showCombo(k); }
-function doThrow(){ if(locked()) return; const c=checkSel(); if(!c.word) return; begin();
+let lastTry='';
+/* 投げられない並びで「投げる」を押したら、何がだめだったかをログに残す（出来そうでできなかった言葉を後で見られるように） */
+function logFailedThrow(c){ if(!c.text||c.cls==='ok') return; const k=c.text+'|'+c.msg; if(k===lastTry) return; lastTry=k; lg('me',`投げようとした「${c.text}」（${c.msg}）`); }
+function doThrow(){ if(locked()) return; const c=checkSel(); if(!c.word){ logFailedThrow(c); return; } lastTry=''; begin();
   if(isOnline()){ throwOnline(c); return; }
   const ps=selPieces(); recordMyThrow(c,ps); removeMyPieces(ps);
   [...c.word].forEach(ch=>S.opp.push(mk(ch==='ー'?'一':ch)));
@@ -605,7 +608,7 @@ function renderControls(){ const over=!!S.over; $('controls').hidden=over; $('re
   $('aRot').disabled=lock||!ps.length; $('aFlip').disabled=lock||!ps.length;
   $('aMerge').disabled=lock||!c.merge;
   
-  $('aThrow').disabled=lock||!c.word; $('throwN').textContent=c.word?`−${[...c.word].length}`:''; }
+  $('aThrow').disabled=lock; $('aThrow').classList.toggle('off',!c.word); $('throwN').textContent=c.word?`−${[...c.word].length}`:''; }
 const FLOOR=3; // D-014 引くはなし。カゴが2こ以下になったら、3こになるまで袋から落ちてくる（二人とも）
 const REFILL_MS=5000; // 2こ以下になってから落ちてくるまでの待ち（作者の案、仮の5秒）
 let refT={me:null,op:null};
