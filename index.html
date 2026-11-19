@@ -417,7 +417,7 @@ function verb(ops){ const r=ops.includes('回す'), f=ops.includes('裏返す');
 
 /* ---- 状態 ---- */
 let S, cpuT=null, sheetOpen=false, games=0;
-let LOG=[], t0=0, lastNg='', tried=new Set();
+let LOG=[], t0=0, lastNg='', tried=new Set(), sentRejects=new Set();
 function lg(who,msg){ if(!S) return; LOG.push(`${((Date.now()-t0)/1000).toFixed(1)}s ${who==='me'?'自分':'相手'}｜${msg}　［自分${S.mine.length}・相手${S.opp.length}］`); }
 function logText(){ return [`ひらがな分解（仮）ログ ${new Date().toLocaleString('ja-JP')}`,
   `速さ:${SPEEDS[speed].name}　一度きり:${once?'あり':'なし'}　辞書:${WORDS.length}語　上限:${CAP}　相手の語:${CPU_MAX}字まで　引く:なし（${FLOOR}こまで${REFILL_MS/1000}秒後に落ちる）`].concat(LOG).join('\n'); }
@@ -430,7 +430,7 @@ function newGame(){
   games++;
   first.forEach((l,i)=>S.mine.push(mk(l,{delay:i*70})));
   for(let i=0;i<START;i++) S.opp.push(mk(pick(BAG)));
-  LOG=[]; t0=Date.now(); lastNg=''; tried=new Set();
+  LOG=[]; t0=Date.now(); lastNg=''; tried=new Set(); sentRejects=new Set();
   lg('me','はじめの手 '+S.mine.map(letterOf).join('')); lg('op','はじめの手 '+S.opp.map(letterOf).join(''));
   render();
 }
@@ -597,6 +597,7 @@ function renderControls(){ const over=!!S.over; $('controls').hidden=over; $('re
   const c=checkSel(), ps=selPieces(), p=ps.length===1?ps[0]:null, L=p&&letterOf(p);
   { const logEl=$('log'), hitW=(c.msg&&c.msg.startsWith('もうリストに出た言葉'))?c.text:'';
     logEl.querySelectorAll('.row').forEach(e=>{ const on=!!hitW&&e.dataset.w===hitW; if(on&&!e.classList.contains('hit')){ e.classList.add('hit'); try{ e.scrollIntoView({block:'nearest',behavior:reduced?'auto':'smooth'}); }catch(_){} } else if(!on) e.classList.remove('hit'); }); }
+  if(c.msg==='ことばの表にない') sendReject(c.text);
   if(c.msg==='ことばの表にない'&&[...c.text].length>=3&&c.text!==lastNg){ lastNg=c.text; lg('me',`はじかれた「${c.text}」（ことばの表にない）`); }
   if(ps.length>=2&&!c.merge&&(c.msg.endsWith('言葉には使えない')||c.msg==='向きの違う札がまじっている'||c.msg==='のばす音は頭に置けない')){ const k=ps.map(q=>letterOf(q)||('〓'+q.root)).join('・'); if(!tried.has(k)){ tried.add(k); lg('me',`ためした「${k}」（字にも言葉にもならない）`); } }
   $('trayWord').textContent=c.text?`「${c.text}」`:'';
@@ -654,6 +655,30 @@ $('dictN').textContent=WORDS.length; $('ipadicNotice').textContent=window.HB_IPA
 document.addEventListener('visibilitychange',()=>{ if(document.hidden) clearTimeout(cpuT); else schedule(); });
 if('ResizeObserver' in window) new ResizeObserver(()=>{ if(S) renderBasket(); }).observe(basket);
 
+/* ---- はじかれた並びの記録・足した言葉の読み込み（HB-005, D-027）----
+   どちらも失敗は黙って捨てる。遊びは止めない。 */
+const TAB_ID=Math.random().toString(36).slice(2,10); // タブごとの乱数ID（makePlayerId と同じ作り）
+function sendReject(text){
+  try{
+    const n=[...text].length; if(n<2||n>16||text[0]==='ー'||sentRejects.has(text)) return;
+    if(!/^[\u3041-\u3096ー]+$/.test(text)) return;   // 部品・記号がまじる並びは送らない
+    sentRejects.add(text);
+    const client=getClient(); if(!client) return;
+    Promise.resolve(client.from('rejects').insert({word:text,mode:isOnline()?'online':'cpu',player:TAB_ID})).then(()=>{},()=>{});
+  }catch(_){}
+}
+/* 起動時に extra_words を読み、辞書（DICT・WORDS）に足す。手選び（HAND）には足さない＝CPU は使わない */
+function loadExtraWords(){
+  try{
+    const client=getClient(); if(!client) return;
+    Promise.resolve(client.from('extra_words').select('word').limit(1000)).then(({data,error})=>{
+      if(error||!Array.isArray(data)) return;
+      for(const r of data){ const w=r&&r.word; if(typeof w==='string'&&w[0]!=='ー'&&[...w].length>=2&&[...w].length<=16&&[...w].every(c=>c==='ー'||KANA.has(c))&&!DICT.has(w)){ DICT.add(w); WORDS.push(w); } }
+      $('dictN').textContent=WORDS.length;
+    }).catch(()=>{});
+  }catch(_){}
+}
+
 /* ---- 通信対戦（HB-002）----
    同じ合言葉の二人が「入室」（lobby の channel）し、二人そろったら3秒数えて始める。
    一戦ごとに matchId を作り、その中で投げた言葉だけを表 throws に入れて相手に届ける。
@@ -663,6 +688,7 @@ const COUNTDOWN_SEC=3; // そろってから始めるまでの秒数
 const RESULT_LABEL={win:'勝ち（相手のカゴがあふれた）',lose:'負け（自分のカゴがあふれた）',gone:'相手がいなくなった（途中で抜けた）'};
 const RESULT_TITLE={win:'相手のカゴがあふれた。勝ち',lose:'カゴがあふれた。負け',gone:'相手がいなくなった。ここで終わり'};
 const NET={mode:'cpu',client:null,lobby:null,match:null,matchId:'',roomKey:'',playerId:'',starting:false};
+loadExtraWords(); // NET を作ったあとで呼ぶ（getClient が NET を使う）
 
 function isOnline(){ return NET.mode==='online'; }
 /* 自分を区別する短い番号（タブごとに変わる） */
