@@ -138,6 +138,16 @@ button:focus-visible{outline:2px solid var(--me);outline-offset:2px}
 .g.mark{font-size:1.9em;line-height:1;translate:.18em .12em} /* ゜と゛は字のままだと小さく左上に寄るので、大きくして真ん中へ（HB-013） */
 .ord{position:absolute;right:4px;top:3px;font:700 12px/1 var(--f-ui);color:var(--me-ink)}
 .tile.crack .face{animation:crack .26s ease-in}
+/* 濁音が落ちてきたときのキラキラ（HB-026, D-058）。.kira は札の最初の子なので .face の下に虹の縁だけが見える */
+.kira{position:absolute;inset:-3px;border-radius:10px;pointer-events:none;
+  background:conic-gradient(#ff5a5a,#ffb23f,#ffe14a,#5fd35f,#4ac8ff,#6a7bff,#d36bff,#ff5a5a);animation:kiraRing 1.2s .3s ease-out both}
+.kira i{position:absolute;left:50%;top:50%;font:700 calc(var(--s)*.3)/1 var(--f-ui);translate:-50% -50%;opacity:0;
+  transform:translate(calc(var(--x)*var(--s)),calc(var(--y)*var(--s))) scale(.3);animation:kiraStar .9s ease-out both}
+@keyframes kiraRing{0%{opacity:0;filter:hue-rotate(0)}20%{opacity:1}75%{opacity:1}100%{opacity:0;filter:hue-rotate(180deg)}}
+@keyframes kiraStar{0%{opacity:0;transform:translate(calc(var(--x)*var(--s)*.6),calc(var(--y)*var(--s)*.6)) scale(.3) rotate(0)}
+  35%{opacity:1;transform:translate(calc(var(--x)*var(--s)),calc(var(--y)*var(--s))) scale(1.1) rotate(45deg)}
+  100%{opacity:0;transform:translate(calc(var(--x)*var(--s)*1.15),calc(var(--y)*var(--s)*1.15)) scale(.6) rotate(90deg)}}
+@media (prefers-reduced-motion: reduce){ .kira{animation:none} } /* 動きを減らす設定：縁の色だけ（約1.2秒で消す） */
 @keyframes crack{0%{transform:translateY(0)}45%{transform:translateY(-24px)}85%{transform:translateY(3px)}100%{transform:translateY(0) scale(1.06)}}
 
 /* 台 */
@@ -387,7 +397,7 @@ small.en.b{display:block;margin-left:0}
       <h3>割る ⇄ くっつける<small class="en" lang="en">Split ⇄ Join</small></h3>
       <div class="recipes" id="recipes"></div>
       <p>くっつけるときだけの作り方：し＋｜→い、に＋一→た、い＋一→け、一＋め→あ、わ＋゜→ね、｜＋ま→ほ</p>
-      <p>゜＋゜で濁点「゛」。字＋゛で濁音（は＋゛→ば）、字＋゜で半濁音（は＋゜→ぱ）。濁音・半濁音の字は袋からは出ない。</p>
+      <p>゜＋゜で濁点「゛」。字＋゛で濁音（は＋゛→ば）、字＋゜で半濁音（は＋゜→ぱ）。<span id="dropRule">濁音・半濁音の字は袋からは出ない。カゴを空にするとすぐ濁音が、1こになると半濁音が落ちてくる。</span></p><!-- 仮の文（HB-026, D-058）。作者が見て直す。落ち方の説明はここ1か所 -->
       <p>黄色い札は、まだ字になっていないもの（部品か、向きの違う字）。言葉には使えない。</p>
     </div>
 
@@ -608,8 +618,8 @@ function oppCount(){ return isOnline()?(S.oppL?S.oppL.length:'？'):S.opp.length
 function lg(who,msg){ if(!S||(who==='me'&&(S.over||S.ending))) return; LOG.push(`${((Date.now()-t0)/1000).toFixed(1)}s ${who==='me'?'自分':'相手'}｜${shown(msg)}　［自分${S.mine.length}・相手${oppCount()}］`); }
 function logText(){ return [`ひらがな分解（仮）ログ ${new Date().toLocaleString('ja-JP')}`,
   isOnline()
-    ? `ふたりで（合言葉の部屋「${NET.pass}」）　一度きり:${once?'あり':'なし'}　辞書:${WORDS.length}語　上限:${CAP}　引く:なし（${FLOOR}こまで${REFILL_MS/1000}秒後に落ちる）`
-    : `ひとりで（CPU）　速さ:${SPEEDS[speed].name}　一度きり:${once?'あり':'なし'}　辞書:${WORDS.length}語　上限:${CAP}　相手の語:${SPEEDS[speed].deep?'辞書全部・2手先まで読む（つよい。D-051）':SPEEDS[speed].smart?'辞書全部（賢い。D-045）':cpuMax()+'字まで'}　引く:なし（${FLOOR}こまで${REFILL_MS/1000}秒後に落ちる）`].concat(LOG).join('\n'); }
+    ? `ふたりで（合言葉の部屋「${NET.pass}」）　一度きり:${once?'あり':'なし'}　辞書:${WORDS.length}語　上限:${CAP}　引く:なし（${FLOOR}こまで1こずつ。0こ→すぐ濁音・1こ→${REFILL_MS/1000}秒後に半濁音・2こ→${REFILL_MS/1000}秒後にふつう）`
+    : `ひとりで（CPU）　速さ:${SPEEDS[speed].name}　一度きり:${once?'あり':'なし'}　辞書:${WORDS.length}語　上限:${CAP}　相手の語:${SPEEDS[speed].deep?'辞書全部・2手先まで読む（つよい。D-051）':SPEEDS[speed].smart?'辞書全部（賢い。D-045）':cpuMax()+'字まで'}　引く:なし（${FLOOR}こまで1こずつ。0こ→すぐ濁音・1こ→${REFILL_MS/1000}秒後に半濁音・2こ→${REFILL_MS/1000}秒後にふつう）`].concat(LOG).join('\n'); }
 const els=new Map();
 function newGame(){
   clearTimeout(cpuT); clearTimeout(refT.me); clearTimeout(refT.op); refT={me:null,op:null}; els.forEach(el=>el.remove()); els.clear();
@@ -958,6 +968,11 @@ function measure(){ const W=basket.clientWidth; TILE=Math.max(40,Math.min(52,Mat
   $('rim').style.top=(H-PAD-3*(TILE+2)-2)+'px'; return {W,H:H}; }
 function slotPos(i,W,H){ let k=0,n=5,j=i; while(j>=n&&n>1){ j-=n; n--; k++; } if(j>=n){ k+=j; j=0; }
   const step=TILE+GAP, rowW=n*step-GAP; return {x:(W-rowW)/2+j*step, y:H-PAD-TILE-k*(TILE+2), row:k}; }
+/* 濁音が落ちてきたときの虹色のキラキラ（HB-026, D-058）。札のうしろに虹の縁、まわりに星。着いてから約1秒。動きを減らす設定では縁の色だけ */
+function kira(el){ const k=document.createElement('span'); k.className='kira'; k.setAttribute('aria-hidden','true');
+  if(!reduced) for(let i=0;i<8;i++){ const s=document.createElement('i'); s.textContent='✦'; const a=i/8*Math.PI*2-Math.PI/2;
+    s.style.cssText=`--x:${(Math.cos(a)*0.78).toFixed(2)};--y:${(Math.sin(a)*0.78).toFixed(2)};color:hsl(${i*45},95%,60%);animation-delay:${300+(i%2)*90}ms`; k.appendChild(s); }
+  el.insertBefore(k,el.firstChild); setTimeout(()=>k.remove(), reduced?1200:1500); }
 function renderBasket(){ const {W,H}=measure(); const sel=S.sel;
   S.mine.forEach((p,i)=>{ const pos=slotPos(i,W,H); let el=els.get(p.id);
     if(!el){ el=document.createElement('button'); el.type='button'; el.className='tile';
@@ -967,6 +982,7 @@ function renderBasket(){ const {W,H}=measure(); const sel=S.sel;
       el.style.transition='none'; el.style.transform=`translate(${sx}px,${sy}px)`; void el.offsetWidth; el.style.transition='';
       el.style.transitionDelay=(p.delay||0)+'ms';
       if(p.drop&&DROP[p.drop]&&!reduced){ const [d,ease]=DROP[p.drop]; el.style.transition=`transform ${d}s ${ease},opacity .22s`; const e2=el; setTimeout(()=>{ e2.style.transition=''; },(p.delay||0)+d*1000+50); } // 重く落ちる（D-047 追記）
+      if(p.kira) kira(el); p.kira=false;
       p.spawn=null; p.delay=0; p.drop=0;
     } else el.style.transitionDelay='0ms';
     p.x=pos.x; p.y=pos.y;
@@ -1028,15 +1044,22 @@ function renderControls(){ const over=!!S.over; $('controls').hidden=over; $('re
   $('aMerge').disabled=lock||!c.merge;
   
   $('aThrow').disabled=lock; $('aThrow').classList.toggle('off',!c.word); $('throwN').textContent=c.word?`−${[...c.word].length}`:''; }
-const FLOOR=3; // D-014 引くはなし。カゴが2こ以下になったら、3こになるまで袋から落ちてくる（二人とも）
-const REFILL_MS=5000; // 2こ以下になってから落ちてくるまでの待ち（作者の案、仮の5秒）
+const FLOOR=3; // D-014 引くはなし。カゴが2こ以下になったら、3こになるまで落ちてくる（二人とも）
+const REFILL_MS=5000; // 1こ・2こになってから落ちてくるまでの待ち（作者の案、仮の5秒）
+/* 落ちてくるのは1こずつ。何が落ちるかは落ちるときのカゴの数で決める（HB-026, D-058）
+   0こ→すぐ濁音／1こ→5秒後に半濁音／2こ→5秒後に袋からふつうの字。濁音・半濁音の字は RECIPE の「字＋゛」「字＋゜」から作る（NFD で濁点・半濁点に分かれる字） */
+const DAKU=Object.keys(RECIPE).filter(k=>KANA.has(k)&&k.normalize('NFD').endsWith('゙'));
+const HANDAKU=Object.keys(RECIPE).filter(k=>KANA.has(k)&&k.normalize('NFD').endsWith('゚'));
+const DROP_TIER=[{from:DAKU,tag:'濁音'},{from:HANDAKU,tag:'半濁音'},{from:BAG,tag:''}];
 let refT={me:null,op:null};
+function dropOne(side){ const a=side==='me'?S.mine:S.opp; if(a.length>=FLOOR) return;
+  const t=DROP_TIER[a.length], n=mk(pick(t.from)); if(side==='me'&&t.from===DAKU) n.kira=true; // 濁音が自分のカゴに落ちたらキラキラ（見た目だけ）
+  a.push(n); lg(side,'落ちてきた '+letterOf(n)+(t.tag?`（${t.tag}）`:'')); }
 function refill(){ if(!S||S.over||S.ending) return;
   for(const side of isOnline()?['me']:['me','op']){ const cur=side==='me'?S.mine:S.opp; // ふたりででは相手のカゴは相手の端末が動かす
+    if(cur.length===0){ clearTimeout(refT[side]); refT[side]=null; dropOne(side); } // 空になったら待たずに濁音。待っている途中でも、その待ちはやめる
     if(cur.length<FLOOR && !refT[side]){ refT[side]=setTimeout(()=>{ refT[side]=null; if(!S||S.over||S.ending) return;
-      const a=side==='me'?S.mine:S.opp; if(a.length>=FLOOR){ render(); return; }
-      const got=[]; while(a.length<FLOOR){ const n=mk(pick(BAG),{delay:got.length*110}); a.push(n); got.push(letterOf(n)); }
-      lg(side,'落ちてきた '+got.join('')); render(); }, REFILL_MS); } } }
+      dropOne(side); render(); }, REFILL_MS); } } }
 function render(){ refill(); renderOpp(); renderLog(); renderBasket(); renderControls(); queueBasket(); guideCheck(); }
 
 /* ---- 最初の1戦の案内（HB-010, D-032）----
