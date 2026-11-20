@@ -685,7 +685,7 @@ function doSplit(){ const p=one(); if(!p||locked()) return; const L=letterOf(p);
   begin(); S.busy=true; const el=els.get(p.id); if(el) el.classList.add('crack');
   setTimeout(()=>{ S.busy=false; if(S.over||S.ending){ render(); return; } // 動きの間に勝ち負けが決まったら、割らない（D-054）
     const i=S.mine.indexOf(p);
-    const made=parts.map(x=>mk(x,{note:`「${L}」を割った`,spawn:{x:p.x,y:p.y},d:`${p.d}→${x}`}));
+    const made=splitMade(p,L,parts,{spawn:{x:p.x,y:p.y}}); // 戻すだけの往復は数えない（D-067）
     S.mine.splice(i,1,...made); S.sel=[]; lg('me',`割る ${L}→${parts.join('＋')}`); render(); }, reduced?0:260); }
 
 function doTurn(kind){ const ps0=selPieces(); const p=ps0[ps0.length-1]; if(!p||locked()) return; begin(); const before=letterOf(p)||'〓';
@@ -700,13 +700,27 @@ function doTurn(kind){ const ps0=selPieces(); const p=ps0[ps0.length-1]; if(!p||
 
 function doMerge(res){ const ps=selPieces(); if(ps.length!==2||locked()) return; begin();
   const [a,b]=ps, la=letterOf(a), lb=letterOf(b); const i=Math.min(S.mine.indexOf(a),S.mine.indexOf(b));
-  const n=mk(res,{note:`「${la}」と「${lb}」をくっつけた`,spawn:{x:a.x,y:a.y},d:joinD(a.d,b.d,res)});
+  const n=mergeMade(a,b,res,{spawn:{x:a.x,y:a.y}}); // 戻すだけの往復は数えない（D-067）
   S.mine=S.mine.filter(p=>p!==a&&p!==b); S.mine.splice(i,0,n); S.sel=[]; S.choose=null; lg('me',`くっつける ${la}＋${lb}→${res}`); render(); }
 
 function doDraw(){ if(locked()||S.mine.length>=CAP) return; begin(); const n=mk(pick(BAG)); S.mine.push(n); lg('me','引く '+letterOf(n)); render(); }
 
 const wrapD=x=>x.includes('→')?`（${x}）`:x;
 function joinD(a,b,r){ return `${wrapD(a)}＋${wrapD(b)}→${r}`; }
+/* 元に戻すだけの往復は工夫に数えない（HB-032, D-067）。自分（doSplit・doMerge）と CPU（cpuApply）で同じものを使う
+   割る：出た2枚に、割る前の札の写し（sp。2枚で同じもの）を持たせる。くっつける：できた札に、くっつける前の2枚の写し（jn）を持たせる
+   割って出た2枚をくっつけて割る前の字に戻ったら、割る前の札（道すじ・元の字・印）に戻す。
+   くっつけてできた札を割って、くっつける前の2枚と同じ字が出たら、その2枚（道すじ・元の字・印）に戻す。
+   字は操作する時点のもので比べる（途中で回しても、そのとき元の組に戻っていればよい） */
+const snapP=p=>({L:letterOf(p),d:p.d,d0:p.d0,orig:p.orig,was:p.was,base:p.base,note:p.note,sp:p.sp,jn:p.jn});
+const restoreP=(n,x)=>Object.assign(n,{d:x.d,d0:x.d0,orig:x.orig,was:x.was,base:x.base,note:x.note,sp:x.sp,jn:x.jn});
+function splitMade(p,L,parts,o){ const j=p.jn;
+  if(j&&parts.slice().sort().join()===[j[0].L,j[1].L].sort().join()){ const rest=j.slice(); // くっつける前の2枚に戻す
+    return parts.map(x=>restoreP(mk(x,o),rest.splice(rest.findIndex(y=>y.L===x),1)[0])); }
+  const sp=snapP(p); return parts.map(x=>Object.assign(mk(x,{...o,note:`「${L}」を割った`,d:`${p.d}→${x}`}),{sp})); }
+function mergeMade(a,b,res,o){ const la=letterOf(a), lb=letterOf(b);
+  if(a.sp&&a.sp===b.sp&&a.sp.L===res) return restoreP(mk(res,o),a.sp); // 割る前の札に戻す
+  return Object.assign(mk(res,{...o,note:`「${la}」と「${lb}」をくっつけた`,d:joinD(a.d,b.d,res)}),{jn:[snapP(a),snapP(b)]}); }
 function trailOf(ps){ return shown(ps.filter(p=>p.d&&p.d.includes('→')).map(p=>p.d.replace(/→一$/,'→ー')).join('　')); } // 作り替えの道すじ（元の字から）
 function notesOf(ps){ const out=[]; ps.forEach(p=>{ if(p.note){ const s=`${asWord(letterOf(p))}←${p.note}`; if(!out.includes(s)) out.push(s); } }); return shown(out.slice(0,3).join('　')); }
 
@@ -870,9 +884,9 @@ function stepsOf(L){ const out=[]; // 字の並び L からの1手（割る・�
     if(m) m.forEach(r=>out.push({t:'merge',i,j,r,res:[...L.filter((_,k)=>k!==i&&k!==j),r]})); }
   return out; }
 function cpuApply(s,tag){ const p=S.opp[s.i], l=letterOf(p);
-  if(s.t==='split'){ S.opp.splice(s.i,1,...RECIPE[l].map(x=>mk(x,{note:`「${l}」を割った`,d:`${p.d}→${x}`}))); S.say=`「${l}」を割った`; }
-  else if(s.t==='turn'){ const [to,v]=TURN[l]; S.opp.splice(s.i,1,mk(to,{note:`「${l}」を${v}`,d:`${p.d}→${to}`})); S.say=`「${l}」を${v}`; }
-  else { const q=S.opp[s.j], lq=letterOf(q); S.opp=S.opp.filter(x=>x!==p&&x!==q); S.opp.push(mk(s.r,{note:`「${l}」と「${lq}」をくっつけた`,d:joinD(p.d,q.d,s.r)})); S.say=`「${l}」と「${lq}」をくっつけた`; } lg('op',S.say+(tag?`（${tag}）`:'')); }
+  if(s.t==='split'){ S.opp.splice(s.i,1,...splitMade(p,l,RECIPE[l],{})); S.say=`「${l}」を割った`; }
+  else if(s.t==='turn'){ const [to,v]=TURN[l]; S.opp.splice(s.i,1,mk(to,{note:`「${l}」を${v}`,d:`${p.d}→${to}`,sp:p.sp,jn:p.jn})); /* 往復の印は回しても持ち越す（D-067） */ S.say=`「${l}」を${v}`; }
+  else { const q=S.opp[s.j], lq=letterOf(q); S.opp=S.opp.filter(x=>x!==p&&x!==q); S.opp.push(mergeMade(p,q,s.r,{})); S.say=`「${l}」と「${lq}」をくっつけた`; } lg('op',S.say+(tag?`（${tag}）`:'')); }
 /* ---- 賢い相手（ふつう だけ。HB-017, D-045）----
    知っている言葉は辞書全部（WORDS）。点数＝字数＋重い字の数×HEAVY_W。重い字＝割る作り方（RECIPE）も向きの道（TURN）もない字（字のデータから作る。いまは よ・ろ・の）。
    投げられる言葉がない、または1手（割る・回す・裏返す・くっつける）で点数がもっと高い言葉が作れるなら、その1手。読むのは1手先まで。
