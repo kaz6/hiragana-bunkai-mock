@@ -160,3 +160,76 @@ test('り は字の一覧（KANA）と回す・裏返す表（TURN）にあり�
   expect(r.turnRi).toEqual(['い:裏返した', 'こ:回した']);
   expect(r.turnKo).toEqual(['い:回した']);
 });
+
+// ---- HB-042（D-076）：て・で・そ・ぞ・ん・え ----
+test('一＋⊂→て（どちらの順でも）。て を割ると 一＋⊂。｜＋⊂→と はいまのまま（D-076）', async ({ page }) => {
+  for (const order of [['一', '⊂'], ['⊂', '一']]) {
+    await setBasket(page, order);
+    await tapTiles(page, [0, 1]);
+    await mergeTo(page, 'て');
+    expect((await state(page)).mine).toBe('て');
+    await press(page, '#aSplit');
+    expect((await state(page)).mine).toBe('一⊂');
+  }
+  await setBasket(page, ['｜', '⊂']);
+  await tapTiles(page, [0, 1]);
+  await mergeTo(page, 'と');
+  expect((await state(page)).mine).toBe('と');
+});
+
+test('て を裏返して回す（裏返す→回す×3）と ん。ん から同じ向きで て に戻る。ん を割れない（D-076）', async ({ page }) => {
+  await setBasket(page, ['て']);
+  await tapTiles(page, [0]);
+  await press(page, '#aFlip');
+  expect((await state(page)).mine).not.toBe('て'); // 裏返しただけでは字にならない
+  for (let i = 0; i < 3; i++) await press(page, '#aRot');
+  const s = await state(page);
+  expect(s.mine).toBe('ん');
+  expect(s.canSplit).toBe(false);
+  await press(page, '#aFlip');
+  for (let i = 0; i < 3; i++) await press(page, '#aRot');
+  expect((await state(page)).mine).toBe('て');
+});
+
+test('こ＋ん→え（どちらの順でも）。え を割ると こ＋ん（D-076）', async ({ page }) => {
+  for (const order of [['こ', 'ん'], ['ん', 'こ']]) {
+    await setBasket(page, order);
+    await tapTiles(page, [0, 1]);
+    await mergeTo(page, 'え');
+    expect((await state(page)).mine).toBe('え');
+    await press(page, '#aSplit');
+    expect((await state(page)).mine).toBe('こん');
+  }
+});
+
+test('く を裏返した部品（＞）＋て→そ。そ を割ると ＞＋て。く を裏返すと ＞、もう一度で く（D-076）', async ({ page }) => {
+  expect(await turnOnce(page, 'く', '#aFlip')).toBe('＞');
+  expect(await turnOnce(page, '＞', '#aFlip')).toBe('く');
+  for (const order of [['＞', 'て'], ['て', '＞']]) {
+    await setBasket(page, order);
+    await tapTiles(page, [0, 1]);
+    await mergeTo(page, 'そ');
+    expect((await state(page)).mine).toBe('そ');
+    await press(page, '#aSplit');
+    expect((await state(page)).mine).toBe('＞て');
+  }
+  // く・へ はいまのまま
+  expect(await turnOnce(page, 'く', '#aRot')).toBe('へ');
+  expect(await turnOnce(page, 'へ', '#aRot')).toBe('＞'); // へ をもう一回回した形＝く を180°回した形＝＞（これまでは字にならない黄色い札だった）
+});
+
+test('て＋゛→で、そ＋゛→ぞ。割ると元に戻る（D-076）', async ({ page }) => {
+  for (const [a, r] of [['て', 'で'], ['そ', 'ぞ']]) {
+    await setBasket(page, [a, '゛']);
+    await tapTiles(page, [0, 1]);
+    await mergeTo(page, r);
+    expect((await state(page)).mine).toBe(r);
+    await press(page, '#aSplit');
+    expect((await state(page)).mine).toBe(a + '゛');
+  }
+});
+
+test('て・で・そ・ぞ・ん・え は字の一覧（KANA）にあり、袋（BAG）にはない（D-076）', async ({ page }) => {
+  const r = await page.evaluate(() => { const T = window.HB_TEST; return [...'てでそぞんえ'].map(c => [c, T.KANA.has(c), T.BAG.includes(c)]); });
+  for (const [c, k, b] of r) { expect(k, c).toBe(true); expect(b, c).toBe(false); }
+});
