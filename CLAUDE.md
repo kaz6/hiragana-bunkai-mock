@@ -33,6 +33,7 @@
   | `tests/e2e/stars.spec.js` | ★（工夫の数。D-031・D-067 の往復） |
   | `tests/e2e/tail.spec.js` | 選んでいる途中の割る・くっつける（D-070） |
   | `tests/e2e/scenes.spec.js` | 場面の組（挨拶返し。scene-groups.js） |
+| `tests/e2e/votes.spec.js` | 結果の画面の「やりとり」の候補と いい／いまいち（exchange_votes。D-081） |
 | `tests/e2e/basket.spec.js` | カゴの上限（12こを超えたら負け） |
   | `tests/e2e/cpu.spec.js` | CPU（禁止用語 cpu-ng.js、各強さを短く回す） |
   | `tests/e2e/screen.spec.js` | 画面（390px、遊び方、ひとりでの開始、ページの語数） |
