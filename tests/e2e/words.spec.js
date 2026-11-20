@@ -76,3 +76,20 @@ test('はじかれた並びは rejects に送る（テストでは止めて記�
   const sent = await page.evaluate(() => window.__hbSent);
   expect(sent.filter(x => x.table === 'rejects').map(x => x.row.word)).toContain('ろち');
 });
+
+// 作者が書いた意味（HB-046, D-080）：meanings-author.js が JMdict（meanings.js）より先に出る
+test.describe('作者の意味の表（meanings-author.js）', () => {
+  const seen = (page, word) => page.evaluate(w => {
+    const T = window.HB_TEST; T.newGame(); T.showMeaning(w, 'op');
+    const S = T.S(); S.log.push({ who: 'op', word: w, k: 0 }); T.render();
+    return { big: (document.querySelector('#meaning')||{}).textContent || '', row: (document.querySelector('#log .row .m')||{}).textContent || '' };
+  }, word);
+  test('こいけ は「ラーメン大好き」が出る（投げた瞬間・リスト）', async ({ page }) => {
+    const r = await seen(page, 'こいけ');
+    expect(r.big).toContain('ラーメン大好き'); expect(r.row).toBe('ラーメン大好き');
+  });
+  test('表に無い語は JMdict の意味のまま（はし＝橋・端・箸）', async ({ page }) => {
+    const r = await seen(page, 'はし');
+    expect(r.row).toContain('橋・端・箸');
+  });
+});

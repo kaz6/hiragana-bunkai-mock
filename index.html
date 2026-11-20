@@ -474,6 +474,7 @@ small.en.b{display:block;margin-left:0}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="dict-ipadic.js"></script>
 <script src="meanings.js"></script>
+<script src="meanings-author.js"></script>
 <script src="scenes.js"></script>
 <script src="cpu-ng.js"></script>
 <script src="nice-words.js"></script>
@@ -775,8 +776,9 @@ const STAR_AT=[1,2,4];
 function comboOf(ps){ return ps.reduce((n,p)=>n+((p.d||'').match(/→/g)||[]).length,0); }
 const starsOf=k=>STAR_AT.filter(t=>(k||0)>=t).length;
 function showCombo(k){ const el=document.getElementById('combo'); if(!el||starsOf(k)<1) return; el.innerHTML=`${COMBO[starsOf(k)]}！<small>工夫 ${k}</small>`+enTag(`${COMBO_EN[starsOf(k)]}! ${k} ${k===1?'trick':'tricks'}`); el.classList.remove('on'); void el.offsetWidth; el.classList.add('on'); clearTimeout(comboT); comboT=setTimeout(()=>el.classList.remove('on'),1100); }
-/* ---- 投げた言葉の意味（HB-007, D-028）。データは meanings.js（JMdict, CC BY-SA 4.0）。意味が付かない語は何も出さない ---- */
-const MEAN=window.HB_MEANINGS||{}; const MEAN_MODES=['none','kanji','both'];
+/* ---- 投げた言葉の意味（HB-007, D-028）。データは meanings.js（JMdict, CC BY-SA 4.0）。意味が付かない語は何も出さない。
+   作者が書いた意味（meanings-author.js, HB-046）は JMdict より先（同じ語は作者の行で上書き）---- */
+const MEAN=Object.assign({},window.HB_MEANINGS||{},window.HB_MEANINGS_AUTHOR||{}); const MEAN_MODES=['none','kanji','both'];
 let meanMode='both'; try{ const v=localStorage.getItem('hb.meaning'); if(MEAN_MODES.includes(v)) meanMode=v; }catch(e){}
 let meanT=null;
 function meaningOf(word){ if(meanMode==='none') return null; const m=MEAN[String(word).replace(/∘/g,'')]; if(!m) return null;
