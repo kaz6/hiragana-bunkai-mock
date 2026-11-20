@@ -506,6 +506,7 @@ const key=(a,b)=>[a,b].sort().join('');
 const MERGE={};
 for(const [k,[a,b]] of Object.entries(RECIPE)){ (MERGE[key(a,b)] ||= []).push(k); }
 (MERGE[key('｜','し')] ||= []).push('い');
+(MERGE[key('｜','く')] ||= []).push('い'); // ｜＋く でも「い」（D-066。割ると ｜＋｜。く の向きだけ。｜＋へ は何にもならない）
 (MERGE[key('一','め')] ||= []).push('あ'); (MERGE[key('わ','∘')] ||= []).push('ね'); (MERGE[key('｜','ま')] ||= []).push('ほ');
 (MERGE[key('に','一')] ||= []).push('た'); (MERGE[key('い','一')] ||= []).push('け'); // に＋一でも「た」、い＋一でも「け」（仮置き。割ると十が出る）
 // し＋｜でも「い」になる（仮置き。割ると｜＋｜）。一＋つ→う は割り方（RECIPE）から作られる
