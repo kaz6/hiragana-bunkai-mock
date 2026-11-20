@@ -1,0 +1,13 @@
+{
+  "name": "hiragana-bunkai-mock",
+  "private": true,
+  "description": "ひらがな分解（仮）のモック。テストは npm test",
+  "scripts": {
+    "test": "node --test tests/unit/*.test.js && playwright test",
+    "test:unit": "node --test tests/unit/*.test.js",
+    "test:e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0"
+  }
+}

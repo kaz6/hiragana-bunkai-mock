@@ -1432,6 +1432,10 @@ function onOpponentThrow(row){ if(!S||S.over||S.ending) return;
 /* 相手が「負けた」を送ってきた */
 function onOpponentLost(){ if(!S||S.over||S.ending) return; finish('win'); }
 
+/* 自動テストの窓（HB-035）。テストがページを開く前に window.HB_TEST={} を置いたときだけ、中の表と関数を渡す。ふだんの遊びでは何もしない */
+if(window.HB_TEST&&typeof window.HB_TEST==='object') Object.assign(window.HB_TEST,{CAP,KANA,PARTS,RECIPE,MERGE,TURN,BAG,HAND,DICT,SPEEDS,key,
+  words:()=>WORDS, S:()=>S, mk,letterOf,checkSel,splitMade,mergeMade,comboOf,cpuOk,tapTile,doSplit,doMerge,doTurn,doThrow,render,newGame,startSolo,cpuAct,cpuThrow,setSpeed});
+
 newGame();
 showMenu();
 $('btnSolo').onclick=soloPickOpen; $('btnJoin').onclick=joinRoom; $('btnLeave').onclick=leaveOnline;

@@ -1,2 +1,5 @@
 # 辞書を作るときの作業用フォルダ（IPADIC を npm pack して展開する場所。リポジトリには入れない）
 .work/
+node_modules/
+test-results/
+playwright-report/

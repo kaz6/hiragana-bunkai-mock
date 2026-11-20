@@ -4,4 +4,4 @@
 
 - 公開ページ：https://kaz6.github.io/hiragana-bunkai-mock/
 
-設計の要点は `docs/`、第三者のデータの条件は `docs/THIRD_PARTY.md` を見てください。
+テストは `npm test`（作業の決まりは `CLAUDE.md`）。設計の要点は `docs/`、第三者のデータの条件は `docs/THIRD_PARTY.md` を見てください。
