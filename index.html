@@ -66,6 +66,8 @@ button{font:inherit;color:inherit}
 /* 素敵な言葉の演出（HB-030, D-065）。見た目は仮置き。タップをじゃましない */
 #niceFx{position:fixed;inset:0;pointer-events:none;z-index:49;overflow:hidden}
 #niceFx .pt{position:absolute;top:-24px;width:12px;height:9px;border-radius:9px 1px 9px 1px;opacity:.9}
+/* 虹色（HB-043, D-077）：文字だけ虹のグラデーション。止まった色（動かさない） */
+.rb{background:linear-gradient(90deg,#E5484D,#F2994A,#E9C21B,#3FA66B,#3B8FD9,#7A5AD6);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent!important;text-shadow:none!important}
 #niceFx .ht{position:absolute;line-height:1;color:#E5487A;text-shadow:0 1px 3px rgba(0,0,0,.15)}
 @media (prefers-reduced-motion: reduce){ #meaning .mw{animation:none!important} .app.shake{animation:none} #burst{display:none} }
 .row .m{font-size:calc(12px*var(--fz));color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
@@ -835,6 +837,7 @@ function burst(who){ if(reduced) return; const app=document.querySelector('.app'
 /* 素敵な言葉の演出（HB-030, D-065）。一覧は nice-words.js。比べる形は辞書と同じ（小さい字→大きい字。D-043）。
    声・意味・長い言葉の演出（D-020・D-028・D-047）とは別の層で、重なってよい。約1.5秒で消える。動きを減らす設定では数を減らし短く */
 const NICE={}; for(const [w,k] of Object.entries(window.HB_NICE||{})) NICE[bigForm(w)]=k;
+function isRainbow(word){ return NICE[bigForm(String(word).replace(/∘/g,''))]==='rainbow'; }
 function niceFx(word){ const kind=NICE[bigForm(String(word).replace(/∘/g,''))]; if(!kind) return;
   let box=$('niceFx'); if(!box){ box=document.createElement('div'); box.id='niceFx'; box.setAttribute('aria-hidden','true'); document.body.appendChild(box); }
   const W=innerWidth, H=innerHeight, few=reduced;
@@ -861,7 +864,7 @@ function greetBack(word,who){ const w=String(word).replace(/∘/g,''), prev=last
   if(el.classList.contains('on')) el.insertAdjacentHTML('beforeend','<br>'+html); else { el.innerHTML=html; el.classList.remove('on'); void el.offsetWidth; el.classList.add('on'); }
   clearTimeout(comboT); comboT=setTimeout(()=>el.classList.remove('on'),1100); }
 function showMeaning(word,who){ niceFx(word); greetBack(word,who); const el=$('meaning'), m=meaningBig(word); if(!el) return; const tier=tierOf(word); if(!m&&!tier){ return; } // 3字以上は意味がなくても言葉だけ出す（D-047）
-  el.innerHTML=`<span class="mw">${escH(wordShow(word))}</span>${m&&m.k?`<span class="mk">${escH(m.k)}</span>`:''}${m&&m.e?`<span class="mn">${escH(m.e)}</span>`:''}`;
+  el.innerHTML=`<span class="mw${isRainbow(word)?' rb':''}">${escH(wordShow(word))}</span>${m&&m.k?`<span class="mk">${escH(m.k)}</span>`:''}${m&&m.e?`<span class="mn">${escH(m.e)}</span>`:''}`;
   el.classList.remove('t1','t2','t3'); if(tier) el.classList.add('t'+tier); el.classList.toggle('sc',!!(m&&m.sc)); el.style.setProperty('--n',[...String(word)].length);
   el.classList.toggle('op',who==='op'); const cb=$('combo'), low=cb.classList.contains('on');
   el.classList.toggle('low',low); el.style.top=low?`${Math.round(cb.offsetTop+cb.offsetHeight/2+4)}px`:''; // 声は translate(-50%,-50%) なので、下端＝中心＋高さの半分
@@ -1103,7 +1106,7 @@ function renderOpp(){ const online=isOnline();
 let logN=-1;
 function renderLog(){ const el=$('log'); if(logN===S.log.length) return; logN=S.log.length;
   if(!S.log.length){ el.innerHTML='<p class="empty">投げた言葉は、ここに二人ぶん残る。'+enTag('Words you both throw stay here.',1)+'相手から届いた言葉は、こっちのカゴの材料になる。'+enTag('Words you receive become tiles in your basket.',1)+'</p>'; return; }
-  el.innerHTML=S.log.map(r=>`<div class="row ${r.who}" data-w="${r.word}"><span class="w">${escH(wordShow(r.word))}${r.k?`<span class="st" aria-label="工夫${r.k}">${'★'.repeat(starsOf(r.k))}</span>`:''}</span>${r.note?`<span class="n">${r.note}</span>`:''}${(m=>m?`<span class="m">${escH([m.k,m.e].filter(Boolean).join('　'))}</span>`:'')(meaningOf(r.word))}</div>`).join('');
+  el.innerHTML=S.log.map(r=>`<div class="row ${r.who}" data-w="${r.word}"><span class="w">${isRainbow(r.word)?`<span class="rb">${escH(wordShow(r.word))}</span>`:escH(wordShow(r.word))}${r.k?`<span class="st" aria-label="工夫${r.k}">${'★'.repeat(starsOf(r.k))}</span>`:''}</span>${r.note?`<span class="n">${r.note}</span>`:''}${(m=>m?`<span class="m">${escH([m.k,m.e].filter(Boolean).join('　'))}</span>`:'')(meaningOf(r.word))}</div>`).join('');
   el.scrollTop=el.scrollHeight; }
 function renderControls(){ const over=!!S.over; $('controls').hidden=over; $('result').hidden=!over;
   if(over){ const mine=S.log.filter(r=>r.who==='me').length, theirs=S.log.length-mine; const b=$('resBig');
