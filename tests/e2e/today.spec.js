@@ -34,6 +34,18 @@ test('同じ種（matchId）なら同じ今日の字。ひとりでは戦ごと�
   expect(r.same).toBe(true); expect(r.varied).toBe(true);
 });
 
+test('ふたりでの「もう一回」は入室し直して matchId が変わる。matchId が違えば今日の字も変わり、同じなら二人で同じ（HB-041）', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const T = window.HB_TEST;
+    const ids = Array.from({ length: 30 }, (_, i) => 'room1-game' + i);
+    const todays = ids.map(id => T.makeToday(T.seedRng('today-' + id)));
+    const again = ids.map(id => T.makeToday(T.seedRng('today-' + id)));
+    const sig = t => t.more.join('') + '/' + t.less.join('');
+    return { varied: new Set(todays.map(sig)).size > 5, twoDevicesSame: todays.every((t, i) => sig(t) === sig(again[i])) };
+  });
+  expect(r.varied).toBe(true); expect(r.twoDevicesSame).toBe(true);
+});
+
 test('はじめの手・CPU・落ちてくる字は、その戦の袋から引く', async ({ page }) => {
   const r = await page.evaluate(() => {
     const T = window.HB_TEST; T.newGame(); const t = T.TODAY(), S = T.S(); const inBag = new Set(t.bag);
