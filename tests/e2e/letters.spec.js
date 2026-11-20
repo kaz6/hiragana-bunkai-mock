@@ -89,6 +89,8 @@ test('う＋｜→か、か を割ると う＋｜、か＋゛→が、が を�
   await setBasket(page, ['う', '｜']);
   await tapTiles(page, [0, 1]);
   await mergeTo(page, 'か');
+  expect((await state(page)).mine).toBe(''); // くっつけた直後は裏返して90°回した向き（HB-045, D-079）。向きは下のテスト
+  await press(page, '#aFlip'); await press(page, '#aRot'); // 裏返す→回す で か に戻る
   expect((await state(page)).mine).toBe('か');
   await press(page, '#aSplit');
   expect((await state(page)).mine).toBe('う｜');
@@ -232,4 +234,81 @@ test('て＋゛→で、そ＋゛→ぞ。割ると元に戻る（D-076）', asy
 test('て・で・そ・ぞ・ん・え は字の一覧（KANA）にあり、袋（BAG）にはない（D-076）', async ({ page }) => {
   const r = await page.evaluate(() => { const T = window.HB_TEST; return [...'てでそぞんえ'].map(c => [c, T.KANA.has(c), T.BAG.includes(c)]); });
   for (const [c, k, b] of r) { expect(k, c).toBe(true); expect(b, c).toBe(false); }
+});
+
+// くっつけてできた か は「裏返して90°回した向き」で出る（HB-045, D-079）
+async function joinKa(page) {
+  await setBasket(page, ['う', '｜']);
+  await tapTiles(page, [0, 1]);
+  await mergeTo(page, 'か');
+}
+const piece = page => page.evaluate(() => { const T = window.HB_TEST, p = T.S().mine.find(x => !x.filler); return { L: T.letterOf(p), r: p.r, f: p.f, d: p.d, note: p.note }; });
+
+test('う＋｜でできた か の札は letterOf が null で r=1・f=1。裏返す→回す で か になり、言葉に使える。ログに向きが出る', async ({ page }) => {
+  expect(await page.evaluate(() => window.HB_TEST.MERGE_TURN)).toEqual({ 'か': [1, 1] });
+  await joinKa(page);
+  const a = await piece(page);
+  expect([a.L, a.r, a.f]).toEqual([null, 1, 1]);
+  expect(await page.evaluate(() => window.HB_TEST.logText())).toContain('くっつける う＋｜→か（かの裏返して回した向き）');
+  await press(page, '#aFlip'); await press(page, '#aRot');
+  const b = await piece(page);
+  expect([b.L, b.r, b.f]).toEqual(['か', 0, 0]);
+  // 戻した か は、くっつけたときの道すじ・印のまま
+  expect(b.d).toBe('う＋｜→か');
+  expect(b.note).toBe('「う」と「｜」をくっつけた');
+});
+
+test('向きのずれた か は言葉に使えない。戻した か は言葉に使えて、★は1つぶん（D-031）。か＋゛→が は か に戻したあとでだけできる', async ({ page }) => {
+  await setBasket(page, ['う', '｜', 'き']);
+  await tapTiles(page, [0, 1]);
+  await mergeTo(page, 'か');
+  expect((await state(page)).mine).toBe('き'); // か は向きがずれていて字にならない（できた札は選ばれたまま）
+  await tapTiles(page, [1]); // き を足して選ぶ：か（ずれ）＋き は投げられない
+  expect((await page.evaluate(() => window.HB_TEST.checkSel())).msg).toBe('向きの違う札がまじっている');
+  await tapTiles(page, [1]); // き を外す
+  await press(page, '#aFlip'); await press(page, '#aRot');
+  expect((await state(page)).mine).toBe('かき');
+  await tapTiles(page, [1]);
+  expect((await page.evaluate(() => window.HB_TEST.checkSel())).msg).not.toBe('向きの違う札がまじっている'); // 字になっている（かき が辞書にあるかは別の話）
+  expect(await page.evaluate(() => { const T = window.HB_TEST; const ps = T.S().mine.filter(p => !p.filler); return T.comboOf([ps[0]]); })).toBe(1);
+});
+
+test('か＋゛→が：ずれたままでは か として数えない。戻したあとでだけ が になる', async ({ page }) => {
+  await setBasket(page, ['う', '｜', '゛']);
+  await tapTiles(page, [0, 1]);
+  await mergeTo(page, 'か');
+  // できた か（ずれた向き）と ゛：いまの札の字は null なので、が の組にはならない
+  const L = await page.evaluate(() => { const T = window.HB_TEST; return T.S().sel.length; });
+  expect(L).toBe(1);
+  await tapTiles(page, [1]);
+  expect((await state(page)).canMerge).toBe(false); // ずれた か（字にならない）と ゛ はくっつかない
+  await tapTiles(page, [1]); // ゛ を外す
+  await press(page, '#aFlip'); await press(page, '#aRot');
+  expect((await state(page)).mine).toBe('か゛');
+  await tapTiles(page, [1]); // か は選ばれたまま。゛ を足す
+  expect((await state(page)).canMerge).toBe(true);
+  await mergeTo(page, 'が');
+  expect((await state(page)).mine).toBe('が');
+});
+
+test('が を割った か はずれない。割った う＋｜ をくっつけ直した か もずれない（割る前の札に戻す）', async ({ page }) => {
+  await setBasket(page, ['が']);
+  await tapTiles(page, [0]);
+  await press(page, '#aSplit');
+  expect((await state(page)).mine).toBe('か゛');
+  const a = await page.evaluate(() => { const T = window.HB_TEST, p = T.S().mine[0]; return [T.letterOf(p), p.r, p.f]; });
+  expect(a).toEqual(['か', 0, 0]);
+  await setBasket(page, ['か']);
+  await tapTiles(page, [0]);
+  await press(page, '#aSplit');
+  await tapTiles(page, [0, 1]);
+  await mergeTo(page, 'か');
+  expect((await state(page)).mine).toBe('か');
+});
+
+test('CPU のくっつけは いまのまま：mergeMade に向きを頼まなければ か はずれない', async ({ page }) => {
+  const r = await page.evaluate(() => { const T = window.HB_TEST, a = T.mk('う'), b = T.mk('｜'); const n = T.mergeMade(a, b, 'か', {}); return [T.letterOf(n), n.r, n.f]; });
+  expect(r).toEqual(['か', 0, 0]);
+  const r2 = await page.evaluate(() => { const T = window.HB_TEST, a = T.mk('う'), b = T.mk('｜'); const n = T.mergeMade(a, b, 'か', {}, true); return [T.letterOf(n), n.r, n.f]; });
+  expect(r2).toEqual([null, 1, 1]);
 });
