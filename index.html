@@ -519,6 +519,9 @@ const RECIPE={'は':['｜','よ'],'ほ':['は','一'],'に':['｜','こ'],'き':
   'か':['う','｜'],'が':['か','゛'], // か＝う＋｜、が＝か＋゛（HB-040, D-075）。袋には入れない（作るしかない字）。向きで別の字にならない
   'ぱ':['は','∘'],'ぽ':['ほ','∘'],'ぺ':['へ','∘'],'ぷ':['ふ','∘']};
 const key=(a,b)=>[a,b].sort().join('');
+/* 自分がくっつけてできた字の札の向き（HB-045, D-079）：字→[r,f]。か は「裏返して90°回した向き」で出る（裏返す→回す の2手で か に戻る）。
+   この表を空にすれば、くっつけてできた字はいままでどおり向きのずれなしで出る。CPU のくっつけ・割って出た字には使わない */
+const MERGE_TURN={'か':[1,1]};
 const MERGE={};
 for(const [k,[a,b]] of Object.entries(RECIPE)){ if(k==='り') continue; /* り は割るだけ（裏返しで作る。D-072） */ (MERGE[key(a,b)] ||= []).push(k); }
 (MERGE[key('｜','し')] ||= []).push('い');
@@ -738,8 +741,8 @@ function doTurn(kind){ const ps0=selPieces(); const p=ps0[ps0.length-1]; if(!p||
 
 function doMerge(res){ const ps=selPieces(); if(ps.length<2||locked()) return; begin();
   const [a,b]=ps.slice(-2), la=letterOf(a), lb=letterOf(b); const i=Math.min(S.mine.indexOf(a),S.mine.indexOf(b));
-  const n=mergeMade(a,b,res,{spawn:{x:a.x,y:a.y}}); // 戻すだけの往復は数えない（D-067）
-  S.mine=S.mine.filter(p=>p!==a&&p!==b); S.mine.splice(i,0,n); S.sel=S.sel.filter(id=>id!==a.id&&id!==b.id).concat(n.id); /* できた字はその位置で選ばれたまま（D-070） */ S.choose=null; lg('me',`くっつける ${la}＋${lb}→${res}`); render(); }
+  const n=mergeMade(a,b,res,{spawn:{x:a.x,y:a.y}},true); // 戻すだけの往復は数えない（D-067）。true＝できた字を MERGE_TURN の向きで出す（自分だけ）
+  S.mine=S.mine.filter(p=>p!==a&&p!==b); S.mine.splice(i,0,n); S.sel=S.sel.filter(id=>id!==a.id&&id!==b.id).concat(n.id); /* できた字はその位置で選ばれたまま（D-070） */ S.choose=null; lg('me',`くっつける ${la}＋${lb}→${res}`+(letterOf(n)!==res?`（${res}の裏返して回した向き）`:'')); render(); }
 
 function doDraw(){ if(locked()||S.mine.length>=CAP) return; begin(); const n=mk(pick(TODAY.bag)); S.mine.push(n); lg('me','引く '+letterOf(n)); render(); }
 
@@ -756,9 +759,10 @@ function splitMade(p,L,parts,o){ const j=p.jn;
   if(j&&parts.slice().sort().join()===[j[0].L,j[1].L].sort().join()){ const rest=j.slice(); // くっつける前の2枚に戻す
     return parts.map(x=>restoreP(mk(x,o),rest.splice(rest.findIndex(y=>y.L===x),1)[0])); }
   const sp=snapP(p); return parts.map(x=>Object.assign(mk(x,{...o,note:`「${L}」を割った`,d:`${p.d}→${x}`}),{sp})); }
-function mergeMade(a,b,res,o){ const la=letterOf(a), lb=letterOf(b);
-  if(a.sp&&a.sp===b.sp&&a.sp.L===res) return restoreP(mk(res,o),a.sp); // 割る前の札に戻す
-  return Object.assign(mk(res,{...o,note:`「${la}」と「${lb}」をくっつけた`,d:joinD(a.d,b.d,res)}),{jn:[snapP(a),snapP(b)]}); }
+function mergeMade(a,b,res,o,turned){ const la=letterOf(a), lb=letterOf(b);
+  if(a.sp&&a.sp===b.sp&&a.sp.L===res) return restoreP(mk(res,o),a.sp); // 割る前の札に戻す（向きのずれなし）
+  const n=Object.assign(mk(res,{...o,note:`「${la}」と「${lb}」をくっつけた`,d:joinD(a.d,b.d,res)}),{jn:[snapP(a),snapP(b)]});
+  const t=turned&&MERGE_TURN[res]; if(t){ n.r=t[0]; n.f=t[1]; } return n; }
 function trailOf(ps){ return shown(ps.filter(p=>p.d&&p.d.includes('→')).map(p=>p.d.replace(/→一$/,'→ー')).join('　')); } // 作り替えの道すじ（元の字から）
 function notesOf(ps){ const out=[]; ps.forEach(p=>{ if(p.note){ const s=`${asWord(letterOf(p))}←${p.note}`; if(!out.includes(s)) out.push(s); } }); return shown(out.slice(0,3).join('　')); }
 
@@ -1481,7 +1485,7 @@ function onOpponentThrow(row){ if(!S||S.over||S.ending) return;
 function onOpponentLost(){ if(!S||S.over||S.ending) return; finish('win'); }
 
 /* 自動テストの窓（HB-035）。テストがページを開く前に window.HB_TEST={} を置いたときだけ、中の表と関数を渡す。ふだんの遊びでは何もしない */
-if(window.HB_TEST&&typeof window.HB_TEST==='object') Object.assign(window.HB_TEST,{CAP,KANA,PARTS,RECIPE,MERGE,TURN,BAG,logText,makeToday,seedRng,TODAY:()=>TODAY,HAND,DICT,SPEEDS,key,
+if(window.HB_TEST&&typeof window.HB_TEST==='object') Object.assign(window.HB_TEST,{CAP,KANA,PARTS,RECIPE,MERGE,MERGE_TURN,TURN,BAG,logText,makeToday,seedRng,TODAY:()=>TODAY,HAND,DICT,SPEEDS,key,
   words:()=>WORDS, S:()=>S, mk,letterOf,checkSel,splitMade,mergeMade,comboOf,cpuOk,tapTile,doSplit,doMerge,doTurn,doThrow,render,newGame,startSolo,cpuAct,cpuThrow,setSpeed,showMeaning,SCENE_OF});
 
 newGame();
