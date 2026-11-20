@@ -698,3 +698,11 @@
 - 確かめ：npm test 全部。tests/e2e/votes.spec.js（候補の判定・最大3組・0組で何も出ない・insert 1回と中身・2回押しても1回・390px）。本物の表には書かない（tests/helpers.js の STUB が insert を window.__hbSent に残すだけ。helpers.js は変えていない）
 - 却下／やらなかったこと：遊びの間に聞くこと・rejects／extra_words への書き込み・表の形の変更・見た目の作り込み
 - 作業：HB-047
+
+## R-013 カゴの上限を 12／14 から選べるようにする（HB-048、D-082、作者 2026-11-21 1:20・1:21）
+
+- 決めたこと（作者）：「いま12マスだけど、14マスにする？狭さは感じるけど、ヒリヒリ感は強い」「選べるようにしたいです」。はじめは12
+- 中身（編集の仮置き）：index.html の CAP を let にし、設定 capSetting（localStorage hb.cap）から newGame で決める。メニュー（#capBox・#capSet）に「カゴの上限 Basket size」と 12・14 のボタン。ふたりでは startAsLeader が start の合図に cap を載せ、受けた側（onStartMessage）が NET.cap に入れて newGame で使う（12か14以外・cap なしは12）。CAP を使う所（表示・あふれ・割る・引く・CPU の読み・升目・遊び方の図・ログの頭）はそのまま CAP に従う。表の形は変えていない。自動テストの窓 HB_TEST.CAP は値でなく読み出し（getter）にし、NET・onStartMessage を渡す名前に足した
+- 確かめ：npm test 全部。tests/e2e/basket.spec.js に、はじめは12／14を選ぶと覚える・上限14・ログの頭「上限:14」／14では13こはあふれず15こであふれる（自分・相手）／14では13こでも割れる／ふたりで合図の cap を受ける（なし・14以外は12）。390px の画像：docs/reports/img/hb-048-cap-setting.png
+- 却下／やらなかったこと：はじめの値の変更・ほかの数（はじめの手の5枚・引くの決まり）・CPU の強さ・読みの深さ・Supabase の表の形の変更
+- 作業：HB-048
