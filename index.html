@@ -91,6 +91,7 @@ button:focus-visible{outline:2px solid var(--me);outline-offset:2px}
 /* 字の大きさ（HB-018, D-046）で窮屈になるところ。標準・小さくでは並びは今のまま */
 .opp-head{flex-wrap:wrap} .opp-head .num{white-space:nowrap} /* 入りきらないと「速さ」が次の行へ */
 .fz-l .top{flex-wrap:wrap;row-gap:0} .fz-l .top h1{flex:1 0 100%} .fz-l .top h1+.link{margin-left:auto} /* 大きく：題名を1行目、しくみ・ログ・やりなおしを2行目の右に */
+.today{margin:4px 0 0;font-size:calc(11px*var(--fz));color:var(--ink);opacity:.75;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.today small{opacity:.8}
 .opp .say{margin:4px 0 0;font-size:calc(13px*var(--fz));color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .slots{display:flex;gap:2px;margin-top:4px}
 .slots span{flex:1 1 0;max-width:26px;height:28px;display:grid;place-items:center;font:600 18px/1 var(--f-kana);
@@ -307,6 +308,8 @@ small.en.b{display:block;margin-left:0}
   </header>
   <div class="hows"><button class="how" id="btnHow" type="button">？ 遊び方<small class="en" lang="en">How to play</small></button><button class="how" id="btnZukan" type="button">辞書<small class="en" lang="en">Dictionary</small></button></div>
 
+  <p class="today" id="today" aria-label="今日の字"></p>
+
   <section class="opp" aria-label="相手のカゴ">
     <div class="opp-head">
       <span class="who">あいて<small class="en" lang="en">Opponent</small></span>
@@ -522,6 +525,19 @@ const TURN1={'く':['へ','回した'],'へ':['く','回した'],'い':['こ','�
 const TURN={}; for(const [k,v] of Object.entries(TURN1)) TURN[k]=[v];
 TURN['い'].push(['り','裏返した']); TURN['り']=[['い','裏返した'],['こ','回した']]; // り を回すと こ（字の形どおり。仮置き）。こ は裏返しても こ
 const BAG=[...'はははほほににこいいくくへささちききめぬろろるるつつしししううよねわたけすなまのあも'];
+/* 今日の字（HB-038, D-073。中身は編集の仮置き）：一戦の始めに袋の配合を変える。多め2〜3字は袋に＋2枚、少なめ1〜2字（袋に2枚以上ある字）は1枚に減らす（消さない）。
+   BAG は土台のまま。一戦で引く袋は TODAY.bag。ふたりででは matchId から決めるので二人とも同じ（作るしかない字・濁音・半濁音は BAG に無いので入らない） */
+const TODAY_MORE=[2,3], TODAY_LESS=[1,2], TODAY_PLUS=2;
+const seedRng=str=>{ let h=2166136261; for(const c of String(str)){ h^=c.charCodeAt(0); h=Math.imul(h,16777619); }
+  return ()=>{ h=(h+0x6D2B79F5)|0; let t=Math.imul(h^(h>>>15),1|h); t=(t+Math.imul(t^(t>>>7),61|t))^t; return ((t^(t>>>14))>>>0)/4294967296; }; }; // 同じ文字列なら同じ並び
+function makeToday(rng){ const r=rng||Math.random, ri=(lo,hi)=>lo+Math.floor(r()*(hi-lo+1));
+  const shuf=a=>{ a=[...a]; for(let i=a.length-1;i>0;i--){ const j=Math.floor(r()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; };
+  const cnt={}; BAG.forEach(l=>cnt[l]=(cnt[l]||0)+1);
+  const more=shuf(Object.keys(cnt)).slice(0,ri(TODAY_MORE[0],TODAY_MORE[1]));
+  const less=shuf(Object.keys(cnt).filter(l=>cnt[l]>=2&&!more.includes(l))).slice(0,ri(TODAY_LESS[0],TODAY_LESS[1]));
+  const bag=[]; BAG.forEach(l=>{ if(!less.includes(l)) bag.push(l); }); less.forEach(l=>bag.push(l)); more.forEach(l=>{ for(let i=0;i<TODAY_PLUS;i++) bag.push(l); });
+  return {bag,more,less}; }
+let TODAY={bag:BAG,more:[],less:[]};
 const HAND=new Set(`
 はこ はし はち はる はい はく はは はつ よる よこ よい よし よく よめ よち よつ ほし ほこ ほろ ほる ほほ ほう
 にく にし にる こい こし こめ ここ ころ こる こう こつ こく いし いち いろ いぬ いく いる いき いう いい いつ
@@ -639,21 +655,23 @@ function oppCount(){ return isOnline()?(S.oppL?S.oppL.length:'？'):S.opp.length
 function lg(who,msg){ if(!S||(who==='me'&&(S.over||S.ending))) return; LOG.push(`${((Date.now()-t0)/1000).toFixed(1)}s ${who==='me'?'自分':'相手'}｜${shown(msg)}　［自分${S.mine.length}・相手${oppCount()}］`); }
 function logText(){ return [`ひらがな分解（仮）ログ ${new Date().toLocaleString('ja-JP')}`,
   isOnline()
-    ? `ふたりで（合言葉の部屋「${NET.pass}」）　一度きり:${once?'あり':'なし'}　辞書:${WORDS.length}語　上限:${CAP}　引く:なし（${FLOOR}こまで1こずつ。0こ→すぐ濁音・1こ→${REFILL_MS/1000}秒後に半濁音・2こ→${REFILL_MS/1000}秒後にふつう）`
-    : `ひとりで（CPU）　速さ:${SPEEDS[speed].name}　一度きり:${once?'あり':'なし'}　辞書:${WORDS.length}語　上限:${CAP}　相手の語:${SPEEDS[speed].deep?'辞書全部・2手先まで読む（つよい。D-051）':SPEEDS[speed].smart?'辞書全部（賢い。D-045）':cpuMax()+'字まで'}　引く:なし（${FLOOR}こまで1こずつ。0こ→すぐ濁音・1こ→${REFILL_MS/1000}秒後に半濁音・2こ→${REFILL_MS/1000}秒後にふつう）`].concat(LOG).join('\n'); }
+    ? `ふたりで（合言葉の部屋「${NET.pass}」）　今日の字 多め:${TODAY.more.join('')} 少なめ:${TODAY.less.join('')}　一度きり:${once?'あり':'なし'}　辞書:${WORDS.length}語　上限:${CAP}　引く:なし（${FLOOR}こまで1こずつ。0こ→すぐ濁音・1こ→${REFILL_MS/1000}秒後に半濁音・2こ→${REFILL_MS/1000}秒後にふつう）`
+    : `ひとりで（CPU）　速さ:${SPEEDS[speed].name}　今日の字 多め:${TODAY.more.join('')} 少なめ:${TODAY.less.join('')}　一度きり:${once?'あり':'なし'}　辞書:${WORDS.length}語　上限:${CAP}　相手の語:${SPEEDS[speed].deep?'辞書全部・2手先まで読む（つよい。D-051）':SPEEDS[speed].smart?'辞書全部（賢い。D-045）':cpuMax()+'字まで'}　引く:なし（${FLOOR}こまで1こずつ。0こ→すぐ濁音・1こ→${REFILL_MS/1000}秒後に半濁音・2こ→${REFILL_MS/1000}秒後にふつう）`].concat(LOG).join('\n'); }
 const els=new Map();
 function newGame(){
   clearTimeout(cpuT); clearTimeout(refT.me); clearTimeout(refT.op); refT={me:null,op:null}; els.forEach(el=>el.remove()); els.clear();
   S={mine:[],opp:[],oppL:null,oppO:null,sel:[],log:[],used:new Set(),over:null,ending:false,started:false,busy:false,choose:null,
      say:'あなたが動いたら、動き出す'};
-  const firstHand=()=>[...Array.from({length:START-1},()=>pick(BAG)),START_PART]; // 最初の手は袋から4枚＋部品「｜」（D-034。二人とも）
+  TODAY=makeToday(isOnline()&&NET.matchId?seedRng('today-'+NET.matchId):null); // ふたりでは matchId から。ひとりでは毎戦ランダム
+  const firstHand=()=>[...Array.from({length:START-1},()=>pick(TODAY.bag)),START_PART]; // 最初の手は袋から4枚＋部品「｜」（D-034。二人とも）
   const first=firstHand();
   games++;
   first.forEach((l,i)=>S.mine.push(mk(l,{delay:i*70})));
   firstHand().forEach(l=>S.opp.push(mk(l)));
   LOG=[]; t0=Date.now(); lastNg=''; tried=new Set(); sentRejects=new Set();
-  lg('me','はじめの手 '+S.mine.map(letterOf).join('')); if(!isOnline()) lg('op','はじめの手 '+S.opp.map(letterOf).join('')); // ふたりでの相手の手は届いてから
+  lg('me','今日の字 多め：'+TODAY.more.join('')+' 少なめ：'+TODAY.less.join('')); lg('me','はじめの手 '+S.mine.map(letterOf).join('')); if(!isOnline()) lg('op','はじめの手 '+S.opp.map(letterOf).join('')); // ふたりでの相手の手は届いてから
   NET.sentSig=null; guideNewGame();
+  $('today').innerHTML=`今日の字　多め：${TODAY.more.join('')}　少なめ：${TODAY.less.join('')}<small class="en" lang="en"> Today: more ${TODAY.more.join('')} / fewer ${TODAY.less.join('')}</small>`;
   render();
 }
 
@@ -713,7 +731,7 @@ function doMerge(res){ const ps=selPieces(); if(ps.length<2||locked()) return; b
   const n=mergeMade(a,b,res,{spawn:{x:a.x,y:a.y}}); // 戻すだけの往復は数えない（D-067）
   S.mine=S.mine.filter(p=>p!==a&&p!==b); S.mine.splice(i,0,n); S.sel=S.sel.filter(id=>id!==a.id&&id!==b.id).concat(n.id); /* できた字はその位置で選ばれたまま（D-070） */ S.choose=null; lg('me',`くっつける ${la}＋${lb}→${res}`); render(); }
 
-function doDraw(){ if(locked()||S.mine.length>=CAP) return; begin(); const n=mk(pick(BAG)); S.mine.push(n); lg('me','引く '+letterOf(n)); render(); }
+function doDraw(){ if(locked()||S.mine.length>=CAP) return; begin(); const n=mk(pick(TODAY.bag)); S.mine.push(n); lg('me','引く '+letterOf(n)); render(); }
 
 const wrapD=x=>x.includes('→')?`（${x}）`:x;
 function joinD(a,b,r){ return `${wrapD(a)}＋${wrapD(b)}→${r}`; }
@@ -877,7 +895,7 @@ function doThrow(){ if(locked()) return; const c=checkSel(); if(!c.word){ logFai
   if(isOnline()){ throwOnline(c); return; }
   const ps=selPieces(); recordMyThrow(c,ps); removeMyPieces(ps); oppBump(c.word);
   [...c.word].forEach(ch=>S.opp.push(mk(ch==='ー'?'一':ch)));
-  let bx=''; if(bonus){ const b=mk(pick(BAG)); S.opp.push(b); bx=letterOf(b); }
+  let bx=''; if(bonus){ const b=mk(pick(TODAY.bag)); S.opp.push(b); bx=letterOf(b); }
   logMyThrow(c,ps,bx);
   if(S.opp.length>CAP) finish('win');
   render(); }
@@ -1009,7 +1027,7 @@ function cpuAct(){ if(S.over||S.ending||sheetOpen||guideHolds()) return;
   if(w){ const used=[]; for(const ch of w){ const p=S.opp.find(x=>!used.includes(x)&&asWord(letterOf(x))===ch); used.push(p); }
     S.used.add(w); S.log.push({who:'op',word:w,note:notesOf(used),k:comboOf(used),trail:trailOf(used)}); zkRecord(w,'op',comboOf(used),trailOf(used)); S.opp=S.opp.filter(x=>!used.includes(x));
     [...w].forEach((ch,k)=>S.mine.push(mk(ch==='ー'?'一':ch,{delay:k*110,drop:tierOf(w)}))); S.say=`「${wordShow(w)}」を投げてきた`; landFx(w);
-    let bx=''; if(bonus){ const b=mk(pick(BAG),{delay:[...w].length*110,note:'おまけ'}); S.mine.push(b); bx=letterOf(b); S.say+='（＋おまけ1字）'; }
+    let bx=''; if(bonus){ const b=mk(pick(TODAY.bag),{delay:[...w].length*110,note:'おまけ'}); S.mine.push(b); bx=letterOf(b); S.say+='（＋おまけ1字）'; }
     lg('op',`投げる「${w}」`+(bx?` 自分におまけ「${bx}」`:'')); showMeaning(w,'op');
     if(S.mine.length>CAP) finish('lose'); }
   else { const steps=cpuSteps(); const good=steps.filter(s=>bestWord(s.res));
@@ -1109,7 +1127,7 @@ const REFILL_MS=5000; // 1こ・2こになってから落ちてくるまでの�
    0こ→すぐ濁音／1こ→5秒後に半濁音／2こ→5秒後に袋からふつうの字。濁音・半濁音の字は RECIPE の「字＋゛」「字＋゜」から作る（NFD で濁点・半濁点に分かれる字） */
 const DAKU=Object.keys(RECIPE).filter(k=>KANA.has(k)&&k.normalize('NFD').endsWith('゙'));
 const HANDAKU=Object.keys(RECIPE).filter(k=>KANA.has(k)&&k.normalize('NFD').endsWith('゚'));
-const DROP_TIER=[{from:DAKU,tag:'濁音'},{from:HANDAKU,tag:'半濁音'},{from:BAG,tag:''}];
+const DROP_TIER=[{from:DAKU,tag:'濁音'},{from:HANDAKU,tag:'半濁音'},{get from(){return TODAY.bag},tag:''}];
 let refT={me:null,op:null};
 function dropOne(side){ const a=side==='me'?S.mine:S.opp; if(a.length>=FLOOR) return;
   const t=DROP_TIER[a.length], n=mk(pick(t.from)); if(side==='me'&&t.from===DAKU) n.kira=true; // 濁音が自分のカゴに落ちたらキラキラ（見た目だけ）
@@ -1439,7 +1457,7 @@ function onOpponentThrow(row){ if(!S||S.over||S.ending) return;
 function onOpponentLost(){ if(!S||S.over||S.ending) return; finish('win'); }
 
 /* 自動テストの窓（HB-035）。テストがページを開く前に window.HB_TEST={} を置いたときだけ、中の表と関数を渡す。ふだんの遊びでは何もしない */
-if(window.HB_TEST&&typeof window.HB_TEST==='object') Object.assign(window.HB_TEST,{CAP,KANA,PARTS,RECIPE,MERGE,TURN,BAG,HAND,DICT,SPEEDS,key,
+if(window.HB_TEST&&typeof window.HB_TEST==='object') Object.assign(window.HB_TEST,{CAP,KANA,PARTS,RECIPE,MERGE,TURN,BAG,logText,makeToday,seedRng,TODAY:()=>TODAY,HAND,DICT,SPEEDS,key,
   words:()=>WORDS, S:()=>S, mk,letterOf,checkSel,splitMade,mergeMade,comboOf,cpuOk,tapTile,doSplit,doMerge,doTurn,doThrow,render,newGame,startSolo,cpuAct,cpuThrow,setSpeed});
 
 newGame();
