@@ -371,6 +371,7 @@ small.en.b{display:block;margin-left:0}
     <button class="act menu-solo" id="btnSolo" type="button">ひとりで（CPU）<small class="en" lang="en">Solo vs CPU</small></button>
     <!-- ひとりでの相手の強さを、始める前に選ぶ（HB-014 追加, D-041）。中身は JS で SPEEDS から作る -->
     <div class="solo-pick" id="soloPick" role="group" aria-label="相手の強さ" hidden></div>
+    <div class="cap-set" id="capBox"><p class="menu-note" id="capLabel"></p><div class="meanSet" id="capSet" role="group"></div></div>
     <div class="menu-online" id="menuOnline">
       <p class="menu-note">ふたりで：同じ合言葉を入れた二人がそろうと、3秒後に同時に始まる。<small class="en b" lang="en">Two players: when both enter the same room code, the game starts 3 seconds later.</small></p>
       <div class="menu-row">
@@ -490,7 +491,11 @@ small.en.b{display:block;margin-left:0}
 <script>
 (()=>{
 'use strict';
-const CAP=12, START=5, START_PART='｜'; // 最初の手は START 枚（うち1枚は START_PART。D-034）
+/* カゴの上限（HB-048, D-082）。はじめは12。設定で 12／14 を選べる（hb.cap に覚える）。一戦の途中では変わらず、次の一戦（newGame）から。
+   ふたりでは、合図を出した側の値に二人とも合わせる（start の合図に cap を載せる。表の形は変えない） */
+const CAP_CHOICES=[12,14], CAP_LABEL=['カゴの上限','Basket size']; // 設定の見出しは仮（ここ1か所で直す）
+let CAP=12, capSetting=12; try{ const v=+localStorage.getItem('hb.cap'); if(CAP_CHOICES.includes(v)) capSetting=CAP=v; }catch(e){}
+const START=5, START_PART='｜'; // 最初の手は START 枚（うち1枚は START_PART。D-034）
 // 字。後ろの16字は濁音・半濁音（HB-013, D-037）。袋（BAG）には入れない＝作るか、相手から届くだけ
 // （tools/build_meanings.py がこの行をそのまま読むので、書き方を変えないこと）
 const KANA=new Set([...'はよほにこいくへさちきめぬろるつしうねわたけすなまのあもばぱぼぽごぐべぺざぢぎづじだげずふぶぷとどせぜりかがてでそぞんえ']);
@@ -682,6 +687,7 @@ function logText(){ return [`ひらがな分解（仮）ログ ${new Date().toLo
 const els=new Map();
 function newGame(){
   clearTimeout(cpuT); clearTimeout(refT.me); clearTimeout(refT.op); refT={me:null,op:null}; els.forEach(el=>el.remove()); els.clear();
+  CAP=isOnline()&&NET.cap?NET.cap:capSetting; // 一戦の始めに決める（HB-048）
   lastThrow=null; S={mine:[],opp:[],oppL:null,oppO:null,sel:[],log:[],used:new Set(),over:null,ending:false,started:false,busy:false,choose:null,
      say:'あなたが動いたら、動き出す'};
   TODAY=makeToday(isOnline()&&NET.matchId?seedRng('today-'+NET.matchId):null); // ふたりでは matchId から。ひとりでは毎戦ランダム
@@ -1390,7 +1396,7 @@ const ROOM_CAP=2;      // 通信対戦は二人まで
 const COUNTDOWN_SEC=3; // そろってから始めるまでの秒数
 const RESULT_LABEL={win:'勝ち（相手のカゴがあふれた）',lose:'負け（自分のカゴがあふれた）',gone:'相手がいなくなった（途中で抜けた）'};
 const RESULT_TITLE={win:'相手のカゴがあふれた。勝ち',lose:'カゴがあふれた。負け',gone:'相手がいなくなった。ここで終わり'};
-const NET={mode:'cpu',client:null,lobby:null,match:null,matchId:'',roomKey:'',pass:'',playerId:'',starting:false,sentSig:null};
+const NET={cap:0,mode:'cpu',client:null,lobby:null,match:null,matchId:'',roomKey:'',pass:'',playerId:'',starting:false,sentSig:null};
 loadExtraWords(); // NET を作ったあとで呼ぶ（getClient が NET を使う）
 
 function isOnline(){ return NET.mode==='online'; }
@@ -1454,11 +1460,12 @@ function onPartnerLeft(){
 /* 合図を出す側：matchId を作って相手に伝え、自分も数え始める */
 function startAsLeader(){ NET.starting=true;
   const matchId=`${NET.roomKey}-${makePlayerId()}`; // 合言葉の番号＋始めた側が作る乱数
-  NET.lobby.send({type:'broadcast',event:'start',payload:{matchId}});
+  NET.cap=capSetting; // 二人の上限は合図を出した側の値（HB-048）
+  NET.lobby.send({type:'broadcast',event:'start',payload:{matchId,cap:capSetting}});
   startCountdown(matchId); }
 /* 合図を受ける側（合図を出した側以外） */
 function onStartMessage(payload){ if(NET.starting||!payload||!payload.matchId) return;
-  NET.starting=true; startCountdown(payload.matchId); }
+  NET.starting=true; NET.cap=CAP_CHOICES.includes(payload.cap)?payload.cap:12; startCountdown(payload.matchId); }
 
 /* 3秒数えてから対局を始める（画面の文字で数える） */
 function startCountdown(matchId){ let left=COUNTDOWN_SEC; setLobbyText(`そろった。${left}`);
@@ -1519,11 +1526,17 @@ function onOpponentThrow(row){ if(!S||S.over||S.ending) return;
 function onOpponentLost(){ if(!S||S.over||S.ending) return; finish('win'); }
 
 /* 自動テストの窓（HB-035）。テストがページを開く前に window.HB_TEST={} を置いたときだけ、中の表と関数を渡す。ふだんの遊びでは何もしない */
-if(window.HB_TEST&&typeof window.HB_TEST==='object') Object.assign(window.HB_TEST,{CAP,KANA,PARTS,RECIPE,MERGE,MERGE_TURN,TURN,BAG,logText,makeToday,seedRng,TODAY:()=>TODAY,HAND,DICT,SPEEDS,key,
+if(window.HB_TEST&&typeof window.HB_TEST==='object') Object.defineProperty(window.HB_TEST,'CAP',{get:()=>CAP,configurable:true}); // 一戦ごとに変わるので値でなく読む（HB-048）
+if(window.HB_TEST&&typeof window.HB_TEST==='object') Object.assign(window.HB_TEST,{NET,onStartMessage,KANA,PARTS,RECIPE,MERGE,MERGE_TURN,TURN,BAG,logText,makeToday,seedRng,TODAY:()=>TODAY,HAND,DICT,SPEEDS,key,
   words:()=>WORDS, S:()=>S, mk,letterOf,checkSel,splitMade,mergeMade,comboOf,cpuOk,tapTile,doSplit,doMerge,doTurn,doThrow,render,newGame,startSolo,cpuAct,cpuThrow,setSpeed,showMeaning,SCENE_OF,exchangeCands,VOTE_TEXT});
 
 newGame();
 showMenu();
+/* カゴの上限の設定（HB-048）。メニュー（一戦の前）にだけ出る。選ぶと端末に覚え、次の一戦から効く */
+function renderCapSet(){ $('capLabel').innerHTML=CAP_LABEL[0]+enTag(CAP_LABEL[1]); $('capSet').setAttribute('aria-label',CAP_LABEL[0]);
+  $('capSet').innerHTML=CAP_CHOICES.map(n=>`<button type="button" data-cap="${n}" aria-pressed="${n===capSetting}">${n}</button>`).join(''); }
+$('capSet').addEventListener('click',e=>{ const b=e.target.closest('button[data-cap]'); if(!b) return; capSetting=+b.dataset.cap; try{localStorage.setItem('hb.cap',String(capSetting))}catch(_){} renderCapSet(); });
+renderCapSet();
 $('btnSolo').onclick=soloPickOpen; $('btnJoin').onclick=joinRoom; $('btnLeave').onclick=leaveOnline;
 $('roomInput').addEventListener('keydown',e=>{ if(e.key==='Enter') joinRoom(); });
 })();
