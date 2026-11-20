@@ -16,5 +16,7 @@ window.HB_SCENES={
   'うわ': ['うわ、雨だ。', "Ugh, it's raining."],
   'わあ': ['わあ、ありがとう！', 'Oh wow, thank you!'],
   'まあ': ['まあ、座って。', 'Well, have a seat.'],
-  'ほー': ['ほー、なかなかやるね。', 'Hmm, not bad.']
+  'ほー': ['ほー、なかなかやるね。', 'Hmm, not bad.'],
+  // 声の語ではないが、作者の文を出す（HB-027, D-060。英訳は編集の仮置き）
+  'のーつ': ['音ゲーの用語、落ちてくるアレ', 'Rhythm game term: the things that fall down']
 };
