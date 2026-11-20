@@ -85,6 +85,27 @@ test('い＋一 は せ だけ。「どっち」は出ない（D-072）', async 
   expect((await state(page)).mine).toBe('せ');
 });
 
+test('う＋｜→か、か を割ると う＋｜、か＋゛→が、が を割ると か＋゛。う＋い→ふ はいまのまま（D-075）', async ({ page }) => {
+  await setBasket(page, ['う', '｜']);
+  await tapTiles(page, [0, 1]);
+  await mergeTo(page, 'か');
+  expect((await state(page)).mine).toBe('か');
+  await press(page, '#aSplit');
+  expect((await state(page)).mine).toBe('う｜');
+  await setBasket(page, ['か', '゛']);
+  await tapTiles(page, [0, 1]);
+  await mergeTo(page, 'が');
+  expect((await state(page)).mine).toBe('が');
+  await press(page, '#aSplit');
+  expect((await state(page)).mine).toBe('か゛');
+  await setBasket(page, ['う', 'い']);
+  await tapTiles(page, [0, 1]);
+  await mergeTo(page, 'ふ');
+  expect((await state(page)).mine).toBe('ふ');
+  const t = await page.evaluate(() => ({ k: window.HB_TEST.BAG.includes('か') || window.HB_TEST.BAG.includes('が') }));
+  expect(t.k).toBe(false); // 袋に入れない（作るしかない字）
+});
+
 async function turnOnce(page, letter, btn) {
   await setBasket(page, [letter]);
   await tapTiles(page, [0]);
