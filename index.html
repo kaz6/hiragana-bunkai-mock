@@ -870,7 +870,14 @@ function cpuThrow(w,tag){ const used=[]; for(const ch of w){ const p=S.opp.find(
     [...w].forEach((ch,k)=>S.mine.push(mk(ch==='ー'?'一':ch,{delay:k*110,drop:tierOf(w)}))); S.say=`「${wordShow(w)}」を投げてきた`; landFx(w);
     lg('op',`投げる「${w}」`+(tag?`（${tag}）`:'')); showMeaning(w,'op');
     if(S.mine.length>CAP) finish('lose'); }
-function cpuSmart(){ const L=S.opp.map(letterOf), now=smartBest(L);
+/* 戻るだけの作り替えをしない（ふつう・つよい。HB-028, D-061）。賢い相手の手のたびに、そのときのカゴの中身（字の集まり。並びは見ない）を
+   OPP_MEMO 手分おぼえる。言葉にならないときの適当な1手・くっつけるだけの1手は、そのあとの中身がおぼえた中身と同じになる手を除く。
+   除くと何も残らないときは除かない（止まらない）。1手先・2手先で言葉ができる手は今までどおり選んでよい */
+const OPP_MEMO=4;
+const bagKey=L=>L.slice().sort().join('');
+function oppMemo(L){ const h=S.oppHist||(S.oppHist=[]); h.push(bagKey(L)); if(h.length>OPP_MEMO+1) h.shift(); }
+function fresh(steps){ const h=S.oppHist||[]; const f=steps.filter(st=>!h.includes(bagKey(st.res))); return f.length?f:steps; }
+function cpuSmart(){ const L=S.opp.map(letterOf), now=smartBest(L); oppMemo(L);
   const must=S.oppThrowNext; S.oppThrowNext=false;
   if(now&&(must||S.opp.length>=SMART_RUSH)){ cpuThrow(now.w); return; }
   const heavy=S.opp.length>=SMART_SPLIT_AT;
@@ -880,9 +887,9 @@ function cpuSmart(){ const L=S.opp.map(letterOf), now=smartBest(L);
   for(const st of all){ const b=smartBest(st.res); if(!b) continue; if(b.sc>bs){ bs=b.sc; best=[st]; } else if(b.sc===bs&&best.length) best.push(st); }
   if(best.length){ go(pick(best)); return; }
   if(now){ cpuThrow(now.w); return; }
-  const steps=all; // どの1手でも言葉にならないときは、今までの相手と同じく適当に動く（重いときの割り方は上で除いた）
-  if(steps.length&&S.opp.length<=8) go(pick(steps));
-  else { const m=steps.filter(s=>s.t==='merge'); if(m.length) cpuApply(pick(m)); else { S.say='手が出ない'; lg('op','手が出ない'); } } }
+  const steps=all; // どの1手でも言葉にならないときは、今までの相手と同じく適当に動く（重いときの割り方は上で除いた）。戻るだけの手は除く（D-061）
+  if(steps.length&&S.opp.length<=8) go(pick(fresh(steps)));
+  else { const m=steps.filter(s=>s.t==='merge'); if(m.length) cpuApply(pick(fresh(m))); else { S.say='手が出ない'; lg('op','手が出ない'); } } }
 /* ---- つよい相手（つよい だけ。HB-022, D-051）----
    土台は ふつう（cpuSmart）と同じ：辞書全部・点数＝字数＋重い字×HEAVY_W・8こ以上の割り方の決まり。そこに3つ足す。
    1. 守り：自分（相手側）のカゴが STRONG_GUARD こ以上なら、点数より字数を優先して、いちばん長い言葉をすぐ投げる
@@ -927,7 +934,7 @@ function strongPlan(L,base,firsts1,t0){ let best=base, firsts=[], word=null; con
   return firsts.length?{firsts,sc:best,w:word}:null; }
 let strongMs=[]; // 1回の計算時間（ms）。確かめ用。ログには出さない
 function cpuStrong(){ const t=performance.now(); try{ strongMove(t); } finally{ strongMs.push(performance.now()-t); if(strongMs.length>200) strongMs.shift(); } }
-function strongMove(t0){ const L=S.opp.map(letterOf), now=smartBest(L);
+function strongMove(t0){ const L=S.opp.map(letterOf), now=smartBest(L); oppMemo(L);
   const must=S.oppThrowNext; S.oppThrowNext=false;
   if(now&&must){ cpuThrow(now.w); return; }
   const kill=S.mine.length>=STRONG_KILL;
@@ -942,9 +949,9 @@ function strongMove(t0){ const L=S.opp.map(letterOf), now=smartBest(L);
   if(!heavy){ const order=ok.slice().sort((a,b)=>(b.top?b.top.sc:0)-(a.top?a.top.sc:0)); const p=strongPlan(L,bs,order,t0); if(p){ go(pick(p.firsts),`2手先「${p.w}」${p.sc}点`); return; } }
   if(best.length){ go(pick(best)); return; }
   if(now){ cpuThrow(now.w); return; }
-  const steps=ok;
-  if(steps.length&&S.opp.length<=8) go(pick(steps));
-  else { const m=steps.filter(s=>s.t==='merge'); if(m.length) cpuApply(pick(m)); else { S.say='手が出ない'; lg('op','手が出ない'); } } }
+  const steps=ok; // 戻るだけの手は除く（D-061）
+  if(steps.length&&S.opp.length<=8) go(pick(fresh(steps)));
+  else { const m=steps.filter(s=>s.t==='merge'); if(m.length) cpuApply(pick(fresh(m))); else { S.say='手が出ない'; lg('op','手が出ない'); } } }
 function cpuAct(){ if(S.over||S.ending||sheetOpen||guideHolds()) return;
   if(SPEEDS[speed].deep){ cpuStrong(); render(); schedule(); return; }
   if(SPEEDS[speed].smart){ cpuSmart(); render(); schedule(); return; }
