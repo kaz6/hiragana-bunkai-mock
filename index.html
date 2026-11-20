@@ -103,7 +103,11 @@ button:focus-visible{outline:2px solid var(--me);outline-offset:2px}
 .row .st{font:700 calc(14px*var(--fz))/1 var(--f-ui);color:#D9A21B;margin:0 4px;letter-spacing:1px}
 #resBest .best{margin:6px 0;font-weight:700}
 #resBest .lb{font-size:calc(12px*var(--fz));color:var(--sub);margin-right:4px}
-#resBest b{font:600 calc(22px*var(--fz))/1.3 var(--f-kana);color:var(--me);margin:0 4px}
+#resBest b{font:600 calc(22px*var(--fz))/1.3 var(--f-kana);color:var(--me);margin:0 4px;white-space:nowrap;display:inline-block;vertical-align:baseline}
+/* 言葉は行の途中で切らない（D-055）。欄に収まらない長さのときは、欄の幅に合わせて字を小さくする */
+.result .bests .best{container-type:inline-size}
+@supports (font-size:1cqi){ #resBest b{font-size:min(calc(22px*var(--fz)),calc((100cqi - 8px)/var(--n,4)))} }
+#resBest .mean{display:block;font:500 calc(12px*var(--fz))/1.5 var(--f-ui);color:var(--sub);overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical} /* 意味（D-055）。リストの小さい意味と同じくらい。長い英語は2行まで */
 #resBest .op b{color:var(--opp)}
 #resBest .st{color:#D9A21B}
 #resBest .tr{display:block;font:500 calc(13px*var(--fz))/1.6 var(--f-kana);color:var(--sub)}
@@ -208,6 +212,7 @@ small.en.b{display:block;margin-left:0}
 .act.throw small.en,.guide small.en{color:inherit;opacity:.75}
 .guide small.en{display:block;margin:2px 0 0;font-size:calc(12px*var(--fz));font-weight:500}
 .result .act small.en,.menu .act small.en{margin:0}
+.result .act:not(.sub) small.en{color:inherit;opacity:.85} /* 「もう一回」の青の上の英語（D-055）。グレーでは読めなかった */
 #combo small.en{display:block;margin:0;font-size:calc(12px*var(--fz))}
 .meanSet button[aria-pressed="true"] small.en{color:inherit;opacity:.8}
 #oppSayEn small.en{margin-left:0}
@@ -990,10 +995,13 @@ function renderControls(){ const over=!!S.over; $('controls').hidden=over; $('re
          ふたりででも、相手の分は届いた言葉（S.log の op）から作る。見た目だけ（D-022） */
       const longOf=who=>S.log.filter(r=>r.who===who).reduce((a,r)=>(!a||[...r.word].length>[...a.word].length)?r:a,null);
       const show=w=>escH(wordShow(w));
+      const word=w=>`<b style="--n:${[...wordShow(w)].length}">${show(w)}</b>`; // 言葉は1行の中で切らない（D-055）
+      // 意味（D-055）。投げた瞬間と同じ中身（声の語は場面の文）。設定に従い、意味がない語は何も出さない
+      const mean=w=>{ const m=meaningBig(w); return m?`<span class="mean">${escH([m.k,m.e].filter(Boolean).join('　'))}</span>`:''; };
       const card=(who,label)=>{ const b=bestOf(who), l=longOf(who); if(!b&&!l) return '';
         const W=who==='me'?'Your':'Opponent’s'; // 見出しの英語（D-042）
-        const best=b?`<div class="best ${who}"><span class="lb">${label}の${b===l?'いちばん長くて、いちばん★':'今日の一語'}${enTag(b===l?`${W} longest, most ★ word`:`${W} word of the day`)}</span><b>${show(b.word)}</b><span class="st">${'★'.repeat(starsOf(b.k))}</span>${b===l?`<span class="len">${[...b.word].length}字</span>`:''}${b.trail?`<span class="tr">${b.trail}</span>`:''}</div>`:'';
-        const long=l&&l!==b?`<div class="best long ${who}"><span class="lb">${label}のいちばん長い言葉${enTag(`${W} longest word`)}</span><b>${show(l.word)}</b><span class="len">${[...l.word].length}字</span>${l.k?`<span class="st">${'★'.repeat(starsOf(l.k))}</span>`:''}</div>`:'';
+        const best=b?`<div class="best ${who}"><span class="lb">${label}の${b===l?'いちばん長くて、いちばん★':'今日の一語'}${enTag(b===l?`${W} longest, most ★ word`:`${W} word of the day`)}</span>${word(b.word)}<span class="st">${'★'.repeat(starsOf(b.k))}</span>${b===l?`<span class="len">${[...b.word].length}字</span>`:''}${mean(b.word)}${b.trail?`<span class="tr">${b.trail}</span>`:''}</div>`:'';
+        const long=l&&l!==b?`<div class="best long ${who}"><span class="lb">${label}のいちばん長い言葉${enTag(`${W} longest word`)}</span>${word(l.word)}<span class="len">${[...l.word].length}字</span>${l.k?`<span class="st">${'★'.repeat(starsOf(l.k))}</span>`:''}${mean(l.word)}</div>`:'';
         return `<div class="bests">${best}${long}</div>`; };
       $('resBest').innerHTML=card('me','あなた')+card('op','あいて'); } $('logText').value=logText(); return; }
   const c=checkSel(), ps=selPieces(), p=ps.length===1?ps[0]:null, L=p&&letterOf(p);
