@@ -464,6 +464,7 @@ small.en.b{display:block;margin-left:0}
 <script src="dict-ipadic.js"></script>
 <script src="meanings.js"></script>
 <script src="scenes.js"></script>
+<script src="cpu-ng.js"></script>
 <script>
 (()=>{
 'use strict';
@@ -575,6 +576,10 @@ const HAND=new Set(`
 // 自動の相手は HAND（手選び）だけを使う。こちらは IPADIC も通る
 const WORDS=[...new Set([...HAND].concat(String(window.HB_IPADIC||'').split(/\s+/)))].filter(w=>w && w[0]!=='ー' && [...w].length>=2 && [...w].every(c=>c==='ー'||KANA.has(c)));
 const DICT=new Set(WORDS);
+/* CPU が投げない語（HB-029, D-064）。一覧は cpu-ng.js。比べる形は辞書と同じ（小さい字→大きい字。D-043）。人の側の判定には使わない */
+const bigForm=w=>String(w).normalize('NFC').replace(/[ぁぃぅぇぉっゃゅょゎ]/g,c=>String.fromCharCode(c.charCodeAt(0)+1));
+const CPU_NG=new Set((window.HB_CPU_NG||[]).map(bigForm));
+const cpuOk=w=>!CPU_NG.has(bigForm(w));
 const SPECIAL=new Set(['ち∘']); // 部品を含む特別な言葉。作品名『チ。』（作者 2026-11-19）。リストでは ∘ を「。」として見せる
 // ふつう（Hard）は ゆっくり と同じ間隔で、そのかわり賢く動く（smart。HB-017, D-045）。ゆるゆる〜ゆっくりは今のまま
 // つよい（Very hard）は作者向けの5段目。ふつうの賢さに2手先・守り・決め手を足し、約4秒ごとに動く（deep。HB-022, D-051）
@@ -643,7 +648,7 @@ const asWord=l=>l==='一'?'ー':l;
 function canMake(word,letters){ const pool=letters.map(asWord); for(const ch of word){ const i=pool.indexOf(ch); if(i<0) return false; pool.splice(i,1);} return true; }
 function candidates(letters){ return WORDS.filter(w=>!(once&&S.used.has(w))&&canMake(w,letters)); }
 let CPU_WORDS=null;
-function bestWord(letters){ CPU_WORDS ||= WORDS.filter(w=>[...w].length<=CPU_MAX&&HAND.has(w)); const mx=cpuMax(); const c=CPU_WORDS.filter(w=>[...w].length<=mx&&!(once&&S.used.has(w))&&canMake(w,letters)); if(!c.length) return null; return pick(c); }
+function bestWord(letters){ CPU_WORDS ||= WORDS.filter(w=>[...w].length<=CPU_MAX&&HAND.has(w)&&cpuOk(w)); /* D-064 */ const mx=cpuMax(); const c=CPU_WORDS.filter(w=>[...w].length<=mx&&!(once&&S.used.has(w))&&canMake(w,letters)); if(!c.length) return null; return pick(c); }
 function selPieces(){ return S.sel.map(id=>S.mine.find(p=>p.id===id)).filter(Boolean); }
 function checkSel(){
   const ps=selPieces(); const ls=ps.map(letterOf);
@@ -856,7 +861,7 @@ function cpuApply(s,tag){ const p=S.opp[s.i], l=letterOf(p);
 const HEAVY=new Set([...KANA].filter(L=>!RECIPE[L]&&!TURN[L])); const HEAVY_W=2, SMART_RUSH=10, SMART_SPLIT_AT=8;
 let SMART=null, smartN=-1;
 function smartList(){ if(SMART&&smartN===WORDS.length) return SMART; smartN=WORDS.length; // extra_words が後から足されたら作り直す
-  SMART=WORDS.map(w=>{ const cs=[...w]; return {w,cs,sc:cs.length+HEAVY_W*cs.filter(c=>HEAVY.has(c)).length}; }).sort((a,b)=>b.sc-a.sc); return SMART; }
+  SMART=WORDS.filter(cpuOk).map(w=>{ const cs=[...w]; /* CPU が投げない語は外す（D-064）。strongList・smartBest・topAbove（2手先）・longBest（守り）もこの表から */ return {w,cs,sc:cs.length+HEAVY_W*cs.filter(c=>HEAVY.has(c)).length}; }).sort((a,b)=>b.sc-a.sc); return SMART; }
 /* 作れるいちばん点数の高い言葉（点数の高い順に見て、最初に作れたもの。同点はその中からランダム） */
 function smartBest(letters){ const pool={}; letters.forEach(l=>{ if(!l) return; const c=asWord(l); pool[c]=(pool[c]||0)+1; });
   const ok=x=>{ if(x.cs.length>letters.length) return false; const need={}; for(const c of x.cs){ need[c]=(need[c]||0)+1; if(need[c]>(pool[c]||0)) return false; } return !(once&&S.used.has(x.w)); };
