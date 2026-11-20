@@ -186,6 +186,14 @@ button:focus-visible{outline:2px solid var(--me);outline-offset:2px}
 .result .big.win{color:var(--me)}
 .result .act{height:48px;background:var(--me);color:var(--me-ink);font-size:calc(16px*var(--fz))}
 .result .act.sub{background:var(--tile);color:var(--ink)}
+.result #resVotes{display:flex;flex-direction:column;gap:6px} /* やりとりの候補（HB-047, D-081）。結果の画面だけ */
+.result #resVotes .vh{font:600 calc(13px*var(--fz))/1.5 var(--f-ui);color:var(--sub)}
+.result #resVotes .ex{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px}
+.result #resVotes .pair{flex:1 1 100%;font:600 calc(16px*var(--fz))/1.4 var(--f-kana);overflow-wrap:anywhere}
+.result #resVotes .pair .who{font:500 calc(11px*var(--fz))/1 var(--f-ui);color:var(--sub);margin-right:4px}
+.result #resVotes .act{height:auto;min-height:36px;padding:4px 14px;font-size:calc(14px*var(--fz))}
+.result #resVotes .act.on{background:var(--me);color:var(--me-ink)}
+.result #resVotes .act small.en{color:inherit;opacity:.75;margin:0 0 0 4px}
 .result textarea{width:100%;height:180px;box-sizing:border-box;font:calc(12px*var(--fz))/1.5 ui-monospace,Menlo,monospace;background:var(--field);color:var(--ink);border:0;border-radius:6px;padding:8px}
 
 /* しくみ */
@@ -350,7 +358,7 @@ small.en.b{display:block;margin-left:0}
 
   <div class="result" id="result" hidden>
     <p class="big" id="resBig"></p>
-    <p id="resSub"></p><div id="resBest"></div>
+    <p id="resSub"></p><div id="resBest"></div><div id="resVotes" hidden></div>
     <button class="act" id="btnAgain" type="button">もう一回<small class="en" lang="en">Play again</small></button>
     <button class="act sub" id="btnCopy" type="button">ログをコピー<small class="en" lang="en">Copy log</small></button>
     <details><summary>ログを見る（コピーできないときはここから）<small class="en" lang="en">View log (if copying fails)</small></summary><textarea id="logText" readonly></textarea></details>
@@ -1111,6 +1119,30 @@ function renderOpp(){ const online=isOnline();
   let h=''; for(let i=0;i<Math.max(CAP,n);i++){ const l=L[i]; if(l===undefined){ h+='<span></span>'; continue; }
     h+=`<span class="${i>=CAP?'out':(O[i]||(PARTS.has(l)&&l!=='一'))?'part':'fill'}">${escH(shown(l))}</span>`; }
   $('oppSlots').innerHTML=h; }
+/* ---- 結果の画面の「やりとり」の候補（HB-047, D-081）----
+   ある言葉が、直前に相手が投げた言葉の3字以上を並びのまま含むとき、その組を候補にする。
+   「ー」も1字、小さい字は見せる形（wordShow）で比べる。見た目だけ：★・勝ち負け・ほめる声に効かせない。送れなくても遊びは止めない */
+const VOTE_TEXT={head:['このやりとり、どう？','How was this exchange?'], good:['いい','Good'], meh:['いまいち','Meh']}; // 仮。ここで直す
+const VOTE_MAX=3, VOTE_MIN_RUN=3;
+function sharesRun(a,b,n){ const A=[...a], B=[...b]; for(let i=0;i<A.length;i++) for(let j=0;j<B.length;j++){ let k=0; while(i+k<A.length&&j+k<B.length&&A[i+k]===B[j+k]) k++; if(k>=n) return true; } return false; }
+function exchangeCands(log){ const out=[];
+  log.forEach((r,i)=>{ let prev=null; for(let j=i-1;j>=0;j--) if(log[j].who!==r.who){ prev=log[j]; break; } if(!prev) return;
+    const p=wordShow(prev.word), w=wordShow(r.word); if(p===w) return;
+    if(sharesRun(p,w,VOTE_MIN_RUN)) out.push({prev:p,reply:w,who:r.who,n:[...w].length,i}); });
+  return out.sort((a,b)=>b.n-a.n||a.i-b.i).slice(0,VOTE_MAX); }
+function sendVote(c,vote){
+  try{ const client=getClient(); if(!client) return;
+    Promise.resolve(client.from('exchange_votes').insert({prev_word:[...c.prev].slice(0,32).join(''),reply_word:[...c.reply].slice(0,32).join(''),who:c.who,vote,mode:isOnline()?'online':'cpu'})).then(()=>{},()=>{});
+  }catch(_){} }
+function renderVotes(){ const el=$('resVotes'); if(!S||!S.over){ el.hidden=true; return; }
+  if(!S.cands) S.cands=exchangeCands(S.log); if(!S.votes) S.votes={};
+  if(!S.cands.length){ el.hidden=true; el.innerHTML=''; return; }
+  const t=VOTE_TEXT, btn=(i,v,on)=>`<button class="act sub${on?' on':''}" type="button" data-i="${i}" data-v="${v}"${S.votes[i]?' disabled':''} aria-pressed="${on}">${escH(t[v][0])}${enTag(t[v][1])}</button>`;
+  el.hidden=false;
+  el.innerHTML=`<div class="vh">${escH(t.head[0])}${enTag(t.head[1])}</div>`+S.cands.map((c,i)=>`<div class="ex"><span class="pair"><span class="who">${c.who==='me'?'あなたの返し':'あいての返し'}</span>${escH(c.prev)} → ${escH(c.reply)}</span>${btn(i,'good',S.votes[i]==='good')}${btn(i,'meh',S.votes[i]==='meh')}</div>`).join('');
+}
+document.addEventListener('click',e=>{ const b=e.target.closest&&e.target.closest('#resVotes button[data-v]'); if(!b||!S||!S.over||!S.cands) return;
+  const i=+b.dataset.i, c=S.cands[i]; if(!c||S.votes[i]) return; S.votes[i]=b.dataset.v; sendVote(c,b.dataset.v); renderVotes(); });
 let logN=-1;
 function renderLog(){ const el=$('log'); if(logN===S.log.length) return; logN=S.log.length;
   if(!S.log.length){ el.innerHTML='<p class="empty">投げた言葉は、ここに二人ぶん残る。'+enTag('Words you both throw stay here.',1)+'相手から届いた言葉は、こっちのカゴの材料になる。'+enTag('Words you receive become tiles in your basket.',1)+'</p>'; return; }
@@ -1133,7 +1165,7 @@ function renderControls(){ const over=!!S.over; $('controls').hidden=over; $('re
         const best=b?`<div class="best ${who}"><span class="lb">${label}の${b===l?'いちばん長くて、いちばん★':'今日の一語'}${enTag(b===l?`${W} longest, most ★ word`:`${W} word of the day`)}</span>${word(b.word)}<span class="st">${'★'.repeat(starsOf(b.k))}</span>${b===l?`<span class="len">${[...b.word].length}字</span>`:''}${mean(b.word)}${b.trail?`<span class="tr">${b.trail}</span>`:''}</div>`:'';
         const long=l&&l!==b?`<div class="best long ${who}"><span class="lb">${label}のいちばん長い言葉${enTag(`${W} longest word`)}</span>${word(l.word)}<span class="len">${[...l.word].length}字</span>${l.k?`<span class="st">${'★'.repeat(starsOf(l.k))}</span>`:''}${mean(l.word)}</div>`:'';
         return `<div class="bests">${best}${long}</div>`; };
-      $('resBest').innerHTML=card('me','あなた')+card('op','あいて'); } $('logText').value=logText(); return; }
+      $('resBest').innerHTML=card('me','あなた')+card('op','あいて'); } renderVotes(); $('logText').value=logText(); return; }
   const c=checkSel(), ps=selPieces(), p=ps.length?ps[ps.length-1]:null, L=p&&letterOf(p); // 割るは選んだ最後の1枚（D-070）
   { const logEl=$('log'), hitW=(c.msg&&c.msg.startsWith('もうリストに出た言葉'))?c.text:'';
     logEl.querySelectorAll('.row').forEach(e=>{ const on=!!hitW&&e.dataset.w===hitW; if(on&&!e.classList.contains('hit')){ e.classList.add('hit'); try{ e.scrollIntoView({block:'nearest',behavior:reduced?'auto':'smooth'}); }catch(_){} } else if(!on) e.classList.remove('hit'); }); }
@@ -1488,7 +1520,7 @@ function onOpponentLost(){ if(!S||S.over||S.ending) return; finish('win'); }
 
 /* 自動テストの窓（HB-035）。テストがページを開く前に window.HB_TEST={} を置いたときだけ、中の表と関数を渡す。ふだんの遊びでは何もしない */
 if(window.HB_TEST&&typeof window.HB_TEST==='object') Object.assign(window.HB_TEST,{CAP,KANA,PARTS,RECIPE,MERGE,MERGE_TURN,TURN,BAG,logText,makeToday,seedRng,TODAY:()=>TODAY,HAND,DICT,SPEEDS,key,
-  words:()=>WORDS, S:()=>S, mk,letterOf,checkSel,splitMade,mergeMade,comboOf,cpuOk,tapTile,doSplit,doMerge,doTurn,doThrow,render,newGame,startSolo,cpuAct,cpuThrow,setSpeed,showMeaning,SCENE_OF});
+  words:()=>WORDS, S:()=>S, mk,letterOf,checkSel,splitMade,mergeMade,comboOf,cpuOk,tapTile,doSplit,doMerge,doTurn,doThrow,render,newGame,startSolo,cpuAct,cpuThrow,setSpeed,showMeaning,SCENE_OF,exchangeCands,VOTE_TEXT});
 
 newGame();
 showMenu();
