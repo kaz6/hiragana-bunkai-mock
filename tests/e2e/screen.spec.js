@@ -59,3 +59,21 @@ test('extra_words が読めなくても遊べる（Supabase が空の返事）',
   await startSolo(page, 'ゆるゆる');
   await expect(page.locator('#basket .tile')).toHaveCount(5);
 });
+
+// 操作ボタンのアイコン（HB-044, D-078）
+test('割る・回す・裏返す・くっつける のボタンにアイコンが出る。押せないときも出て、390px ではみ出さない', async ({ page }, info) => {
+  info.ctx = await openGame(page);
+  await startSolo(page, 'ゆるゆる');
+  for (const id of ['aSplit', 'aRot', 'aFlip', 'aMerge']) {
+    const img = page.locator(`#${id} img.ico`);
+    await expect(img).toBeVisible();
+    expect(await img.evaluate(i => i.complete && i.naturalWidth > 0)).toBe(true); // 画像が読み込めている
+    const r = await page.evaluate(id => { const b = document.getElementById(id).getBoundingClientRect(), i = document.querySelector('#' + id + ' img').getBoundingClientRect(); return { l: b.left, r: b.right, il: i.left, ir: i.right }; }, id);
+    expect(r.il).toBeGreaterThanOrEqual(r.l - 0.5); expect(r.ir).toBeLessThanOrEqual(r.r + 0.5);
+  }
+  // 何も選んでいないので 回す・裏返す・くっつける は押せない。それでも出る
+  await expect(page.locator('#aRot')).toBeDisabled();
+  await expect(page.locator('#aMerge')).toBeDisabled();
+  await expect(page.locator('#aRot img.ico')).toBeVisible();
+  expect(await noOverflow(page)).toBe(true);
+});

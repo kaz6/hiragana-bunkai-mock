@@ -170,6 +170,8 @@ button:focus-visible{outline:2px solid var(--me);outline-offset:2px}
 .acts{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
 .act{border:0;border-radius:6px;background:var(--tile);color:var(--ink);height:46px;font-weight:700;font-size:calc(14px*var(--fz));cursor:pointer;
   display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.15;touch-action:manipulation}
+.acts .act:has(.ico){height:auto;min-height:46px;padding:4px 2px} /* アイコン付きは高さを中身に合わせる */
+.act .ico{display:block;width:calc(40px*var(--fz));height:calc(40px*var(--fz));max-width:100%;object-fit:contain;margin-bottom:2px;pointer-events:none} /* 操作のアイコン（HB-044, D-078）。色は絵のまま。押せないときはボタンごと薄くなる */
 .act small{font-weight:500;font-size:calc(12px*var(--fz));color:var(--sub);font-variant-numeric:tabular-nums}
 .fz-l .act{height:auto;min-height:46px} /* 大きく：字が増えた分だけボタンをのばす（標準・小さくは今の高さのまま） */
 .act:disabled,.act.off{opacity:.38;cursor:default}
@@ -337,10 +339,10 @@ small.en.b{display:block;margin-left:0}
       <button class="link" id="btnClear" type="button" hidden>えらび直す<small class="en b" lang="en">Clear</small></button>
     </div>
     <div class="acts">
-      <button class="act" id="aSplit" type="button">割る<small><small class="en" lang="en">Split</small>+1</small></button>
-      <button class="act" id="aRot" type="button">回す<small><small class="en" lang="en">Rotate</small>±0</small></button>
-      <button class="act" id="aFlip" type="button">裏返す<small><small class="en" lang="en">Flip</small>±0</small></button>
-      <button class="act" id="aMerge" type="button">くっつける<small><small class="en" lang="en">Join</small>−1</small></button>
+      <button class="act" id="aSplit" type="button"><img class="ico" src="img/icons/split.png" alt="" width="40" height="40">割る<small><small class="en" lang="en">Split</small>+1</small></button>
+      <button class="act" id="aRot" type="button"><img class="ico" src="img/icons/rotate.png" alt="" width="40" height="40">回す<small><small class="en" lang="en">Rotate</small>±0</small></button>
+      <button class="act" id="aFlip" type="button"><img class="ico" src="img/icons/flip.png" alt="" width="40" height="40">裏返す<small><small class="en" lang="en">Flip</small>±0</small></button>
+      <button class="act" id="aMerge" type="button"><img class="ico" src="img/icons/join.png" alt="" width="40" height="40">くっつける<small><small class="en" lang="en">Join</small>−1</small></button>
       
       <button class="act throw" id="aThrow" type="button"><span>投げる<small class="en" lang="en">Throw</small></span><small id="throwN"></small></button>
     </div>
