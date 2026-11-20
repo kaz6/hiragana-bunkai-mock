@@ -1,0 +1,37 @@
+# HB-035（D-071）：PR と main への push で npm test を回す。
+# テストはネットにつながない（Supabase・フォント・CDN はテストの中で止める）。ここで取ってくるのは npm の包みと Chromium だけ
+name: テスト
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: 包みを入れる
+        run: npm ci
+
+      - name: Chromium を入れる
+        run: npx playwright install --with-deps chromium
+
+      - name: npm test
+        run: npm test
