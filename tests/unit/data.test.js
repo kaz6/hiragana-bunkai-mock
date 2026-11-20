@@ -40,6 +40,13 @@ test('意味のデータ（meanings.js）の語数が大きく減っていない
   assert.ok(n >= Math.floor(MEANINGS_NOW * MIN_RATIO), `意味のある語 ${n}（記録 ${MEANINGS_NOW}）`);
 });
 
+test('作者の意味の表（meanings-author.js）：こいけ＝ラーメン大好き、英語の行は空、形が合っている（HB-046）', () => {
+  const a = load('meanings-author.js').HB_MEANINGS_AUTHOR;
+  assert.strictEqual(JSON.stringify(a['こいけ']), JSON.stringify(['ラーメン大好き', '']));
+  assert.ok(Object.values(a).every(v => Array.isArray(v) && v.length === 2 && v.every(x => typeof x === 'string')));
+  assert.ok(html.includes('<script src="meanings-author.js"></script>'));
+});
+
 test('cpu-ng.js・nice-words.js・scenes.js が読める', () => {
   const ng = load('cpu-ng.js').HB_CPU_NG;
   assert.ok(Array.isArray(ng) && ng.length > 0 && ng.every(x => typeof x === 'string' && x));
