@@ -2,7 +2,7 @@
 // IPADIC は npm の mecab-ipadic-seed（lib/dict に CSV と COPYING）を使う
 const fs=require('fs'),path=require('path');
 const [dir,out]=process.argv.slice(2);
-const LETTERS='はよほにこいくへさちきめぬろるつしうねわたけすなまのあもー'+'ばぱぼぽごぐべぺざぢぎづじだげず'+'ふぶぷ'+'とどせぜ'+'り'; // ふぶぷ（HB-027, D-059）。とどせぜ（HB-033, D-069）。り（HB-037, D-072）
+const LETTERS='はよほにこいくへさちきめぬろるつしうねわたけすなまのあもー'+'ばぱぼぽごぐべぺざぢぎづじだげず'+'ふぶぷ'+'とどせぜ'+'りかが'; // ふぶぷ（HB-027, D-059）。とどせぜ（HB-033, D-069）。り（HB-037, D-072）。かが（HB-040, D-075）
 const S=new Set([...LETTERS]);
 const famous=new Set(fs.readFileSync(path.join(__dirname,'famous_places.txt'),'utf8').split(/\s+/).filter(Boolean));
 const k2h=s=>s.replace(/[ァ-ヶ]/g,c=>String.fromCharCode(c.charCodeAt(0)-0x60));
