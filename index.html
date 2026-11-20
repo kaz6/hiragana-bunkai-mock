@@ -663,9 +663,11 @@ function checkSel(){
   const text=ls.map((l,i)=>!l?'〓':(i>0?asWord(l):l)).join('');
   if(ps.length===0) return {text:'',msg:'札をタップして選ぶ。順にならべると言葉になる',cls:''};
   if(ps.length===1) return {text,msg: !ls[0]?'向きが違う。まだ字になっていない':KANA.has(ls[0])?'1字では投げられない':SYMS.has(ls[0])?'記号。言葉の最後に付けられる':ls[0]==='一'?'のばす音。言葉の中に置ける':'部品。まだ字になっていない',cls:''};
-  if(ls.some(l=>!l)) return {text,msg:'向きの違う札がまじっている',cls:'ng'};
-  const merge=ps.length===2?(MERGE[key(ls[0],ls[1])]||null):null;
-  const ng=msg=>merge?{text,msg:'くっつけられる',cls:'ok',merge}:{text,msg,cls:'ng'};
+  // くっつけるは選んだ最後の2枚（HB-034, D-070。回す・裏返すと同じく末尾に効く）。2枚だけのときは今までどおり「くっつけられる」と出す。
+  // 3枚以上のときは言葉の知らせ（投げられる・ことばの表にない など）を出し、くっつけるはボタンが押せるだけ
+  const merge=ps.length>=2?(MERGE[key(ls[ls.length-2],ls[ls.length-1])]||null):null;
+  if(ls.some(l=>!l)) return {text,msg:'向きの違う札がまじっている',cls:'ng',merge};
+  const ng=msg=>merge&&ps.length===2?{text,msg:'くっつけられる',cls:'ok',merge}:{text,msg,cls:'ng',merge};
   const last=ls[ls.length-1]; const core=(SYMS.has(last)?ls.slice(0,-1):ls).map(asWord);
   { const sp=core.join(''); if(SPECIAL.has(sp)){ if(once&&S.used.has(sp)) return ng('もうリストに出た言葉（リストで光っている）'); return {text,msg:'投げられる',cls:'ok',word:text,core:sp,merge}; } }
   { const badPart=core.find(l=>l!=='ー'&&!KANA.has(l)); if(badPart) return ng(`「${badPart}」は部品。言葉には使えない`); }
@@ -683,12 +685,12 @@ function locked(){ return S.over||S.ending||S.busy; }
 function tapTile(id){ if(locked()) return; const i=S.sel.indexOf(id); if(i>=0) S.sel.splice(i,1); else S.sel.push(id); S.choose=null; render(); }
 function one(){ const ps=selPieces(); return ps.length===1?ps[0]:null; }
 
-function doSplit(){ const p=one(); if(!p||locked()) return; const L=letterOf(p); const parts=RECIPE[L]; if(!parts||S.mine.length>=CAP) return;
+function doSplit(){ const ps0=selPieces(); const p=ps0[ps0.length-1]; if(!p||locked()) return; /* 割るのは選んだ最後の1枚（HB-034, D-070） */ const L=letterOf(p); const parts=RECIPE[L]; if(!parts||S.mine.length>=CAP) return;
   begin(); S.busy=true; const el=els.get(p.id); if(el) el.classList.add('crack');
   setTimeout(()=>{ S.busy=false; if(S.over||S.ending){ render(); return; } // 動きの間に勝ち負けが決まったら、割らない（D-054）
     const i=S.mine.indexOf(p);
     const made=splitMade(p,L,parts,{spawn:{x:p.x,y:p.y}}); // 戻すだけの往復は数えない（D-067）
-    S.mine.splice(i,1,...made); S.sel=[]; lg('me',`割る ${L}→${parts.join('＋')}`); render(); }, reduced?0:260); }
+    S.mine.splice(i,1,...made); S.sel=S.sel.filter(id=>id!==p.id); /* 割った2つは選ばない。前に選んだ札はそのまま（D-070） */ lg('me',`割る ${L}→${parts.join('＋')}`); render(); }, reduced?0:260); }
 
 function doTurn(kind){ const ps0=selPieces(); const p=ps0[ps0.length-1]; if(!p||locked()) return; begin(); const before=letterOf(p)||'〓';
   const el=els.get(p.id), g=el&&el.querySelector('.g');
@@ -700,10 +702,10 @@ function doTurn(kind){ const ps0=selPieces(); const p=ps0[ps0.length-1]; if(!p||
   if(reduced||!g){ apply(); return; }
   S.busy=true; g.style.transform=(kind==='回す'?'rotate(90deg) ':'scaleX(-1) ')+g.style.transform; setTimeout(apply,180); }
 
-function doMerge(res){ const ps=selPieces(); if(ps.length!==2||locked()) return; begin();
-  const [a,b]=ps, la=letterOf(a), lb=letterOf(b); const i=Math.min(S.mine.indexOf(a),S.mine.indexOf(b));
+function doMerge(res){ const ps=selPieces(); if(ps.length<2||locked()) return; begin();
+  const [a,b]=ps.slice(-2), la=letterOf(a), lb=letterOf(b); const i=Math.min(S.mine.indexOf(a),S.mine.indexOf(b));
   const n=mergeMade(a,b,res,{spawn:{x:a.x,y:a.y}}); // 戻すだけの往復は数えない（D-067）
-  S.mine=S.mine.filter(p=>p!==a&&p!==b); S.mine.splice(i,0,n); S.sel=[]; S.choose=null; lg('me',`くっつける ${la}＋${lb}→${res}`); render(); }
+  S.mine=S.mine.filter(p=>p!==a&&p!==b); S.mine.splice(i,0,n); S.sel=S.sel.filter(id=>id!==a.id&&id!==b.id).concat(n.id); /* できた字はその位置で選ばれたまま（D-070） */ S.choose=null; lg('me',`くっつける ${la}＋${lb}→${res}`); render(); }
 
 function doDraw(){ if(locked()||S.mine.length>=CAP) return; begin(); const n=mk(pick(BAG)); S.mine.push(n); lg('me','引く '+letterOf(n)); render(); }
 
@@ -1078,12 +1080,12 @@ function renderControls(){ const over=!!S.over; $('controls').hidden=over; $('re
         const long=l&&l!==b?`<div class="best long ${who}"><span class="lb">${label}のいちばん長い言葉${enTag(`${W} longest word`)}</span>${word(l.word)}<span class="len">${[...l.word].length}字</span>${l.k?`<span class="st">${'★'.repeat(starsOf(l.k))}</span>`:''}${mean(l.word)}</div>`:'';
         return `<div class="bests">${best}${long}</div>`; };
       $('resBest').innerHTML=card('me','あなた')+card('op','あいて'); } $('logText').value=logText(); return; }
-  const c=checkSel(), ps=selPieces(), p=ps.length===1?ps[0]:null, L=p&&letterOf(p);
+  const c=checkSel(), ps=selPieces(), p=ps.length?ps[ps.length-1]:null, L=p&&letterOf(p); // 割るは選んだ最後の1枚（D-070）
   { const logEl=$('log'), hitW=(c.msg&&c.msg.startsWith('もうリストに出た言葉'))?c.text:'';
     logEl.querySelectorAll('.row').forEach(e=>{ const on=!!hitW&&e.dataset.w===hitW; if(on&&!e.classList.contains('hit')){ e.classList.add('hit'); try{ e.scrollIntoView({block:'nearest',behavior:reduced?'auto':'smooth'}); }catch(_){} } else if(!on) e.classList.remove('hit'); }); }
   if(c.msg==='ことばの表にない') sendReject(c.text);
   if(c.msg==='ことばの表にない'&&[...c.text].length>=3&&c.text!==lastNg){ lastNg=c.text; lg('me',`はじかれた「${c.text}」（ことばの表にない）`); }
-  if(ps.length>=2&&!c.merge&&(c.msg.endsWith('言葉には使えない')||c.msg==='向きの違う札がまじっている'||c.msg==='のばす音は頭に置けない')){ const k=ps.map(q=>letterOf(q)||('〓'+q.root)).join('＋'); /* 区切りは＋（部品の「・」と紛れないように。HB-012） */ if(!tried.has(k)){ tried.add(k); lg('me',`ためした「${k}」（字にも言葉にもならない）`); } }
+  if(ps.length>=2&&!(ps.length===2&&c.merge)&&(c.msg.endsWith('言葉には使えない')||c.msg==='向きの違う札がまじっている'||c.msg==='のばす音は頭に置けない')){ const k=ps.map(q=>letterOf(q)||('〓'+q.root)).join('＋'); /* 区切りは＋（部品の「・」と紛れないように。HB-012） */ if(!tried.has(k)){ tried.add(k); lg('me',`ためした「${k}」（字にも言葉にもならない）`); } }
   $('trayWord').textContent=c.text?`「${c.word?c.word.replace(/∘/g,'。'):shown(c.text)}」`:''; // 「ち∘」は「ち。」、ほかの ∘ は ゜ で見せる
   const pickEl=$('trayPick'), stat=$('trayStat');
   if(S.choose){ stat.hidden=true; pickEl.hidden=false; pickEl.innerHTML='<span>どっち'+enTag('Which one?',1)+'</span>'+S.choose.map(r=>`<button type="button" data-r="${r}">${r}</button>`).join(''); }
