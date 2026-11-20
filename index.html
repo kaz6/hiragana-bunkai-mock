@@ -272,6 +272,10 @@ small.en.b{display:block;margin-left:0}
 .guide::after{content:"";position:absolute;left:var(--ax,24px);width:0;height:0;border:8px solid transparent;transform:translateX(-50%)}
 .guide.below::after{bottom:100%;border-bottom-color:var(--ink)}
 .guide.above::after{top:100%;border-top-color:var(--ink)}
+.guide.rules{pointer-events:auto;max-width:min(340px,calc(100vw - 16px));padding:12px 14px} /* 最初の3行（D-057）。的を指さないので三角なし。カード自体を押しても下の札は選ばれない */
+.guide.rules::after{display:none}
+.rules3{margin:0;padding-left:1.4em}
+.rules3 li+li{margin-top:6px}
 .guide .ga{display:inline-block;margin-right:6px;font-size:calc(18px*var(--fz));line-height:1}
 .guide.bob{animation:gbob 1s ease-in-out infinite}
 @keyframes gbob{0%,100%{translate:0 0}50%{translate:0 -5px}}
@@ -355,6 +359,9 @@ small.en.b{display:block;margin-left:0}
 <div class="sheet" id="sheet" hidden>
   <div class="sheet-in">
     <div class="head"><h2>しくみ<small class="en" lang="en">How it works</small></h2><button class="link" id="btnClose" type="button">とじる<small class="en" lang="en">Close</small></button></div>
+
+    <!-- 最初に見せる3行（D-057）。中身は JS の RULES3 から作る（案内の最初のカードと同じ表） -->
+    <ol class="rules3" id="rulesHow"></ol>
 
     <!-- しくみの図（HB-014, D-039）。札の例は RECIPE・MERGE・TURN・DICT から JS で作る。手で書いた例は置かない -->
     <div class="dg" id="diagram" aria-label="しくみの図"></div>
@@ -814,7 +821,7 @@ function doThrow(){ if(locked()) return; const c=checkSel(); if(!c.word){ logFai
   render(); }
 
 /* ---- 相手 ---- */
-function schedule(){ clearTimeout(cpuT); if(!S||S.over||S.ending||!S.started||sheetOpen||isOnline()||!SPEEDS[speed].ms) return; // 通信対戦では CPU は動かない
+function schedule(){ clearTimeout(cpuT); if(!S||S.over||S.ending||!S.started||sheetOpen||isOnline()||guideHolds()||!SPEEDS[speed].ms) return; // 通信対戦では CPU は動かない
   cpuT=setTimeout(cpuAct, SPEEDS[speed].ms*(0.8+Math.random()*0.4)); }
 function cpuSteps(){ return stepsOf(S.opp.map(letterOf)); }
 function stepsOf(L){ const out=[]; // 字の並び L からの1手（割る・回す・裏返す・くっつける）。つよい の2手先でも使う（D-051）
@@ -926,7 +933,7 @@ function strongMove(t0){ const L=S.opp.map(letterOf), now=smartBest(L);
   const steps=ok;
   if(steps.length&&S.opp.length<=8) go(pick(steps));
   else { const m=steps.filter(s=>s.t==='merge'); if(m.length) cpuApply(pick(m)); else { S.say='手が出ない'; lg('op','手が出ない'); } } }
-function cpuAct(){ if(S.over||S.ending||sheetOpen) return;
+function cpuAct(){ if(S.over||S.ending||sheetOpen||guideHolds()) return;
   if(SPEEDS[speed].deep){ cpuStrong(); render(); schedule(); return; }
   if(SPEEDS[speed].smart){ cpuSmart(); render(); schedule(); return; }
   const L=S.opp.map(letterOf); const w=bestWord(L);
@@ -1038,7 +1045,13 @@ function render(){ refill(); renderOpp(); renderLog(); renderBasket(); renderCon
    見たかどうかは localStorage の hb.guide（'done'）。保存が使えなければ毎回出る */
 const GUIDE_KEY='hb.guide';
 const GUIDE_EN={1:'Tap a tile to pick it',2:'Line them up to make a word. “Throw” sends it to their basket',3:'Over 12 in theirs: you win. Over 12 in yours: you lose',4:'Rotate this bar to make ー, or join it to make a new letter',5:'Look here to see it again!'}; // 案内の英語（HB-015, D-042。仮の訳）
-const GUIDE_TEXT={1:'札をタップして選ぶ',2:'順に並べると言葉。『投げる』で相手のカゴへ',3:'12こをこえたら勝ち。自分のがこえたら負け',4:'この棒は、回すと ー、ほかの字とくっつけると別の字になる',5:'次見たかったらここ見て！'};
+const GUIDE_TEXT={1:'札をタップして選ぶ',2:'順に並べると言葉。『投げる』で相手のカゴへ',3:'相手のカゴが12こをこえたら勝ち。自分のがこえたら負け',4:'この棒は、回すと ー、ほかの字とくっつけると別の字になる',5:'次見たかったらここ見て！'};
+/* 最初に見せる3行（HB-025, D-057。作者の確定した文言）。案内の最初のカード（'r'）と「？ 遊び方」のいちばん上の両方がここから読む */
+const RULES3=[['相手のカゴが12こをこえたら勝ち。自分のカゴがこえたら負け。','Their basket goes over 12: you win. Yours does: you lose.'],
+  ['札を並べて言葉を作り、「投げる」で相手のカゴへ送る。','Line up tiles to make a word, then Throw it into their basket.'],
+  ['字は「割る・回す・裏返す・くっつける」で別の字に変えられる。','Split, rotate, flip, or join tiles to make new letters.']];
+const rulesHTML=()=>RULES3.map(([jp,en])=>`<li>${escH(jp)}${enTag(en,1)}</li>`).join('');
+$('rulesHow').innerHTML=rulesHTML();
 const G={active:false,shown:new Set(),cur:0,thrown:false};
 function guideDone(){ try{ return localStorage.getItem(GUIDE_KEY)==='done'; }catch(e){ return false; } }
 function guideMarkDone(){ try{ localStorage.setItem(GUIDE_KEY,'done'); }catch(e){} }
@@ -1053,24 +1066,32 @@ function guideTarget(n){ if(n===1){ const p=S.mine[0]; if(!p) return null; const
     const a=$('aSplit').getBoundingClientRect(), z=$('aMerge').getBoundingClientRect(); return {left:a.left,top:a.top,width:z.right-a.left,height:a.height,bottom:a.bottom}; }
   if(n===5) return $('btnHow').getBoundingClientRect(); return null; }
 /* 的の上か下に置く（上に場所がなければ下）。横は画面の中に収め、三角だけ的の真ん中を指す */
-function guidePlace(){ const el=$('guide'); if(!G.cur||el.hidden) return; const r=guideTarget(G.cur); if(!r){ guideHide(); return; }
+function guidePlace(){ const el=$('guide'); if(!G.cur||el.hidden) return;
+  if(G.cur==='r'){ const W=document.documentElement.clientWidth, H=window.innerHeight; // 3行のカードは画面の真ん中より少し上
+    el.style.left=Math.max(8,(W-el.offsetWidth)/2)+'px'; el.style.top=Math.max(8,(H-el.offsetHeight)*0.4)+'px'; return; }
+  const r=guideTarget(G.cur); if(!r){ guideHide(); return; }
   const W=document.documentElement.clientWidth, w=el.offsetWidth, h=el.offsetHeight, M=8, cx=r.left+r.width/2;
   const below=G.cur===3||G.cur===5||r.top-h-12<M;
   const x=Math.max(M,Math.min(W-M-w,cx-w/2)); el.style.left=x+'px';
   el.style.top=(below?r.bottom+10:r.top-h-10)+'px';
   el.style.setProperty('--ax',Math.max(14,Math.min(w-14,cx-x))+'px');
   el.classList.toggle('below',below); el.classList.toggle('above',!below); }
-function guideShow(n){ const el=$('guide'); G.shown.add(n); G.cur=n;
-  el.innerHTML=(n===5?'<span class="ga" aria-hidden="true">↑</span>':'')+escH(GUIDE_TEXT[n])+enTag(GUIDE_EN[n],1); el.classList.toggle('bob',n===5);
+function guideShow(n){ const el=$('guide'); G.shown.add(n); G.cur=n; el.classList.toggle('rules',n==='r'); el.classList.remove('below','above');
+  if(n==='r'){ clearTimeout(cpuT); el.innerHTML='<ol class="rules3">'+rulesHTML()+'</ol>'; el.classList.remove('bob'); } // 出ている間、ひとりでの CPU は止める（schedule が見る）
+  else el.innerHTML=(n===5?'<span class="ga" aria-hidden="true">↑</span>':'')+escH(GUIDE_TEXT[n])+enTag(GUIDE_EN[n],1); el.classList.toggle('bob',n===5);
   el.hidden=false; el.classList.remove('on'); guidePlace(); void el.offsetWidth; el.classList.add('on');
   if(n===5){ guideMarkDone(); G.active=false; } }
-function guideHide(){ const el=$('guide'); G.cur=0; el.hidden=true; el.classList.remove('on'); }
+function guideHide(){ const el=$('guide'), was=G.cur; G.cur=0; el.hidden=true; el.classList.remove('on');
+  if(was==='r'){ schedule(); setTimeout(()=>{ if(!G.cur) guideCheck(); }); } } // 3行のあとは、何も描き直されなくても案内1が続く
+function guideHolds(){ return G.cur==='r'&&!isOnline(); } // 3行のカードが出ている間は CPU を動かさない（ふたりででは止めない）
 /* 描画のたびに、出す場面になったかを見る */
 function guideCheck(){ if(!S) return;
   if(!G.active){ if(G.cur) guidePlace(); return; }
   const has=n=>G.shown.has(n);
   if(S.over){ if(!has(5)) guideShow(5); return; }
-  if(!has(1)) guideShow(1);
+  if(!has('r')) guideShow('r');
+  else if(G.cur==='r') return;
+  else if(!has(1)) guideShow(1);
   else if(!has(2)&&S.sel.length>=1) guideShow(2);
   else if(!has(3)&&G.thrown) guideShow(3);
   else if(has(3)&&!has(4)&&S.sel.length===1) guideShow(4);
