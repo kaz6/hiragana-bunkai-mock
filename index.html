@@ -400,7 +400,7 @@ small.en.b{display:block;margin-left:0}
     <div>
       <h3>割る ⇄ くっつける<small class="en" lang="en">Split ⇄ Join</small></h3>
       <div class="recipes" id="recipes"></div>
-      <p>くっつけるときだけの作り方：し＋｜→い、に＋一→た、い＋一→け、一＋め→あ、わ＋゜→ね、｜＋ま→ほ</p>
+      <p>くっつけるときだけの作り方：し＋｜→い、に＋一→た、り＋一→け、一＋め→あ、わ＋゜→ね、｜＋ま→ほ</p>
       <p>゜＋゜で濁点「゛」。字＋゛で濁音（は＋゛→ば）、字＋゜で半濁音（は＋゜→ぱ）。<span id="dropRule">濁音・半濁音の字は袋からは出ない。カゴを空にするとすぐ濁音が、1こになると半濁音が落ちてくる。</span></p><!-- 仮の文（HB-026, D-058）。作者が見て直す。落ち方の説明はここ1か所 -->
       <p>黄色い札は、まだ字になっていないもの（部品か、向きの違う字）。言葉には使えない。</p>
     </div>
@@ -476,7 +476,7 @@ small.en.b{display:block;margin-left:0}
 const CAP=12, START=5, START_PART='｜'; // 最初の手は START 枚（うち1枚は START_PART。D-034）
 // 字。後ろの16字は濁音・半濁音（HB-013, D-037）。袋（BAG）には入れない＝作るか、相手から届くだけ
 // （tools/build_meanings.py がこの行をそのまま読むので、書き方を変えないこと）
-const KANA=new Set([...'はよほにこいくへさちきめぬろるつしうねわたけすなまのあもばぱぼぽごぐべぺざぢぎづじだげずふぶぷとどせぜ']);
+const KANA=new Set([...'はよほにこいくへさちきめぬろるつしうねわたけすなまのあもばぱぼぽごぐべぺざぢぎづじだげずふぶぷとどせぜり']);
 // 部品。「∘」は見た目を半濁点「゜」にした（HB-013, D-038。中の名前は ∘ のまま＝「ち∘」の記録と合わせるため）。「゛」は濁点（∘＋∘）
 const PARTS=new Set(['｜','一','∘','十','゛','⊂']); // 部品「・」はなくした（HB-012, D-036）。「⊂」は つ を裏返した向き（HB-020, D-049）
 const SHOW_PART={'∘':'゜'}; // 画面に出すときの見た目だけ変える部品
@@ -487,15 +487,17 @@ const SYMS=new Set([]); // D-011 記号（？！）はなし
 // ほかの濁音・半濁音の字は向きで別の字にならない（回すと黄色い札になる。は と同じ）
 // 「⊂」は し を1回回した向き＝つ を裏返した向き（し,1,0）。一 が ｜ を回した向きであるのと同じ扱いの部品（HB-020, D-049）
 const ROOT={'へ':['く',1,0],'こ':['い',1,0],'一':['｜',1,0],'ち':['さ',0,1],'つ':['し',3,1],'⊂':['し',1,0],
-  'べ':['ぐ',1,0],'ぢ':['ざ',0,1],'づ':['じ',3,1]};
-const ALIAS={'く':[['く',0,0],['へ',1,0]],'い':[['い',0,0],['こ',1,0]],'｜':[['｜',0,0],['一',1,0]],
+  'べ':['ぐ',1,0],'ぢ':['ざ',0,1],'づ':['じ',3,1],
+  'り':['い',0,1]}; // り＝い を左右に裏返した向き（HB-037, D-072）
+const ALIAS={'く':[['く',0,0],['へ',1,0]],'い':[['い',0,0],['こ',1,0],['り',0,1]],'｜':[['｜',0,0],['一',1,0]],
   'さ':[['さ',0,0],['ち',0,1]],'し':[['し',0,0],['つ',3,1],['⊂',1,0]],
   'ぐ':[['ぐ',0,0],['べ',1,0]],'ざ':[['ざ',0,0],['ぢ',0,1]],'じ':[['じ',0,0],['づ',3,1]]};
 // 「゛」は回しても裏返しても変わらない（full）。ぐ は く と同じ形の対称を引き継ぐ
-const SYMM={'く':'axis','い':'half','｜':'half','∘':'full','十':'full','゛':'full','ぐ':'axis'};
+const SYMM={'く':'axis','い':'iri','｜':'half','∘':'full','十':'full','゛':'full','ぐ':'axis'};
 const RECIPE={'は':['｜','よ'],'ほ':['は','一'],'に':['｜','こ'],'き':['さ','一'],'ぬ':['め','∘'],'る':['ろ','∘'],'ね':['｜','る'],'わ':['｜','ろ'],'十':['｜','一'],'た':['十','こ'],'け':['｜','十'],'す':['十','∘'],'な':['十','よ'],'ま':['一','よ'],'め':['｜','の'],'あ':['十','の'],'も':['し','こ'],'ち':['十','つ'],'さ':['十','⊂'], // さ＝十＋⊂（HB-020, D-049）
   'い':['｜','｜'],'こ':['一','一'],'う':['一','つ'], // う＝一＋つ（HB-012, D-036。もとは ・＋つ）
   'ふ':['う','い'], // ふ＝う＋い（HB-027, D-059）。袋には入れない（作るしかない字）。向きで別の字にならない（は と同じ）
+  'り':['｜','｜'], // り＝い の裏返し。割ると い と同じ ｜＋｜（HB-037, D-072）。くっつけて作る道は MERGE に入れない（｜＋｜ は い だけ）。り＋一→け は下の MERGE
   'と':['｜','⊂'],'せ':['い','一'], // と＝｜＋⊂、せ＝い＋一（HB-033, D-069）。袋には入れない（作るしかない字）。向きで別の字にならない。い＋一 は け の別ルートと重なるので「どっち」
   // 濁点・半濁点（HB-013, D-037）。゜＋゜→゛、字＋゛→濁音、字＋゜→半濁音。割ると元に戻る
   '゛':['∘','∘'],
@@ -506,16 +508,19 @@ const RECIPE={'は':['｜','よ'],'ほ':['は','一'],'に':['｜','こ'],'き':
   'ぱ':['は','∘'],'ぽ':['ほ','∘'],'ぺ':['へ','∘'],'ぷ':['ふ','∘']};
 const key=(a,b)=>[a,b].sort().join('');
 const MERGE={};
-for(const [k,[a,b]] of Object.entries(RECIPE)){ (MERGE[key(a,b)] ||= []).push(k); }
+for(const [k,[a,b]] of Object.entries(RECIPE)){ if(k==='り') continue; /* り は割るだけ（裏返しで作る。D-072） */ (MERGE[key(a,b)] ||= []).push(k); }
 (MERGE[key('｜','し')] ||= []).push('い');
 (MERGE[key('｜','く')] ||= []).push('い'); // ｜＋く でも「い」（D-066。割ると ｜＋｜。く の向きだけ。｜＋へ は何にもならない）
 (MERGE[key('一','め')] ||= []).push('あ'); (MERGE[key('わ','∘')] ||= []).push('ね'); (MERGE[key('｜','ま')] ||= []).push('ほ');
-(MERGE[key('に','一')] ||= []).push('た'); (MERGE[key('い','一')] ||= []).push('け'); // に＋一でも「た」、い＋一でも「け」（仮置き。割ると十が出る）
+(MERGE[key('に','一')] ||= []).push('た'); (MERGE[key('り','一')] ||= []).push('け'); // に＋一でも「た」、り＋一でも「け」（仮置き。割ると十が出る。い＋一 は せ だけ。HB-037, D-072）
 // し＋｜でも「い」になる（仮置き。割ると｜＋｜）。一＋つ→う は割り方（RECIPE）から作られる
-const TURN={'く':['へ','回した'],'へ':['く','回した'],'い':['こ','回した'],'こ':['い','回した'],'｜':['一','回した'],'一':['｜','回した'],
+const TURN1={'く':['へ','回した'],'へ':['く','回した'],'い':['こ','回した'],'こ':['い','回した'],'｜':['一','回した'],'一':['｜','回した'],
   'さ':['ち','裏返した'],'ち':['さ','裏返した'],'⊂':['つ','裏返した'],'し':['つ','回して裏返した'],'つ':['し','回して裏返した'],
   // 濁音で向きの関係を引き継ぐ組（ROOT・ALIAS と同じ。CPU が使う）
   'ぐ':['べ','回した'],'べ':['ぐ','回した'],'ざ':['ぢ','裏返した'],'ぢ':['ざ','裏返した'],'じ':['づ','回して裏返した'],'づ':['じ','回して裏返した']};
+// TURN：字 → [[できる字, 一言], …]（向きで変わる先。い は こ（回す）と り（裏返す）の2つ。HB-037, D-072）。CPU とページの図が使う
+const TURN={}; for(const [k,v] of Object.entries(TURN1)) TURN[k]=[v];
+TURN['い'].push(['り','裏返した']); TURN['り']=[['い','裏返した'],['こ','回した']]; // り を回すと こ（字の形どおり。仮置き）。こ は裏返しても こ
 const BAG=[...'はははほほににこいいくくへささちききめぬろろるるつつしししううよねわたけすなまのあも'];
 const HAND=new Set(`
 はこ はし はち はる はい はく はは はつ よる よこ よい よし よく よめ よち よつ ほし ほこ ほろ ほる ほほ ほう
@@ -610,7 +615,8 @@ let uid=0;
 function mk(letter,o){ const a=ROOT[letter];
   return Object.assign({id:++uid,root:a?a[0]:letter,r:a?a[1]:0,f:a?a[2]:0,was:letter,orig:letter,base:(o&&o.note)||'',d:(o&&o.d)||letter,d0:(o&&o.d)||letter,ops:[],note:'',jit:Math.random()*6-3,spawn:null,delay:0},o||{}); }
 function norm(p){ const s=SYMM[p.root];
-  if(s==='full'){p.r=0;p.f=0} else if(s==='half'){p.f=0;p.r%=2} else if(s==='axis'&&p.f){p.r=(p.r+2)%4;p.f=0} }
+  if(s==='full'){p.r=0;p.f=0} else if(s==='half'){p.f=0;p.r%=2} else if(s==='axis'&&p.f){p.r=(p.r+2)%4;p.f=0}
+  else if(s==='iri'){ p.r%=2; if(p.r===1) p.f=0; } /* い・り・こ（HB-037, D-072）：180度回すと同じ。い⇄り は裏返し。こ は裏返しても こ（回すと い） */ }
 function letterOf(p){ const al=ALIAS[p.root]||[[p.root,0,0]]; const a=al.find(a=>a[1]===p.r&&a[2]===p.f); return a?a[0]:null; }
 function view(p){ const al=ALIAS[p.root]||[[p.root,0,0]];
   let a=al.find(a=>a[1]===p.r&&a[2]===p.f); let v;
@@ -883,13 +889,13 @@ function cpuSteps(){ return stepsOf(S.opp.map(letterOf)); }
 function stepsOf(L){ const out=[]; // 字の並び L からの1手（割る・回す・裏返す・くっつける）。つよい の2手先でも使う（D-051）
   L.forEach((l,i)=>{ const rest=()=>[...L.slice(0,i),...L.slice(i+1)];
     if(RECIPE[l]&&L.length<CAP) out.push({t:'split',i,res:[...rest(),...RECIPE[l]]});
-    if(TURN[l]) out.push({t:'turn',i,res:[...rest(),TURN[l][0]]}); });
+    (TURN[l]||[]).forEach(([to,v])=>out.push({t:'turn',i,to,v,res:[...rest(),to]})); });
   for(let i=0;i<L.length;i++) for(let j=i+1;j<L.length;j++){ const m=MERGE[key(L[i],L[j])];
     if(m) m.forEach(r=>out.push({t:'merge',i,j,r,res:[...L.filter((_,k)=>k!==i&&k!==j),r]})); }
   return out; }
 function cpuApply(s,tag){ const p=S.opp[s.i], l=letterOf(p);
   if(s.t==='split'){ S.opp.splice(s.i,1,...splitMade(p,l,RECIPE[l],{})); S.say=`「${l}」を割った`; }
-  else if(s.t==='turn'){ const [to,v]=TURN[l]; S.opp.splice(s.i,1,mk(to,{note:`「${l}」を${v}`,d:`${p.d}→${to}`,sp:p.sp,jn:p.jn})); /* 往復の印は回しても持ち越す（D-067） */ S.say=`「${l}」を${v}`; }
+  else if(s.t==='turn'){ const to=s.to, v=s.v; S.opp.splice(s.i,1,mk(to,{note:`「${l}」を${v}`,d:`${p.d}→${to}`,sp:p.sp,jn:p.jn})); /* 往復の印は回しても持ち越す（D-067） */ S.say=`「${l}」を${v}`; }
   else { const q=S.opp[s.j], lq=letterOf(q); S.opp=S.opp.filter(x=>x!==p&&x!==q); S.opp.push(mergeMade(p,q,s.r,{})); S.say=`「${l}」と「${lq}」をくっつけた`; } lg('op',S.say+(tag?`（${tag}）`:'')); }
 /* ---- 賢い相手（ふつう だけ。HB-017, D-045）----
    知っている言葉は辞書全部（WORDS）。点数＝字数＋重い字の数×HEAVY_W。重い字＝割る作り方（RECIPE）も向きの道（TURN）もない字（字のデータから作る。いまは よ・ろ・の）。
@@ -1247,7 +1253,7 @@ function buildDiagram(){ const F=[];
     if(ex.length) frame('くっつける','−1',`<div class="dg-ex">${ex.join('')}</div>`,'Join'); }
   // 4 回す・裏返す ±0：く ⟳ へ、さ ⇄ ち、｜ ⟳ ー
   { const sym=v=>v==='裏返した'?'⇄':'⟳';
-    const ex=['く','さ','｜'].filter(L=>TURN[L]).map(L=>dgEx(miniTile(L),dgOp(sym(TURN[L][1])),miniTile(TURN[L][0])));
+    const ex=['く','さ','｜'].filter(L=>TURN[L]).map(L=>dgEx(miniTile(L),dgOp(sym(TURN[L][0][1])),miniTile(TURN[L][0][0])));
     if(ex.length) frame('回す・裏返す','±0',`<div class="dg-ex">${ex.join('')}</div>`,'Rotate・Flip'); }
   // 5 ゜と゛：は ＋ ゜ → ぱ、゜ ＋ ゜ → ゛、は ＋ ゛ → ば（半濁点の部品は中の名前が ∘。見た目は view() で ゜）
   { const P=['゜','∘'].find(p=>PARTS.has(p)&&(mergeTo('は',p)||mergeTo(p,p))), D='゛'; const ex=[];

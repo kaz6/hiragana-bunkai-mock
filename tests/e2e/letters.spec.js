@@ -19,6 +19,7 @@ test('RECIPE の全部の字：割ると表どおりの2枚、その2枚をく�
   expect(keys.length).toBeGreaterThan(40);
   const bad = [];
   for (const k of keys) {
+    if (k === 'り') continue; // り は割るだけ（くっつけて作らない。下の「り」のテスト。D-072）
     await setBasket(page, [k]);
     await tapTiles(page, [0]);
     if (!(await state(page)).canSplit) { bad.push(`${k}: 割るが押せない`); continue; }
@@ -35,7 +36,7 @@ test('RECIPE の全部の字：割ると表どおりの2枚、その2枚をく�
 });
 
 // くっつけ方だけの別ルート（割ると RECIPE の割り方）。D-066 の前例の一覧と同じ
-const ALT = [['し', '｜', 'い'], ['｜', 'く', 'い'], ['一', 'め', 'あ'], ['わ', '∘', 'ね'], ['｜', 'ま', 'ほ'], ['に', '一', 'た'], ['い', '一', 'け']];
+const ALT = [['し', '｜', 'い'], ['｜', 'く', 'い'], ['一', 'め', 'あ'], ['わ', '∘', 'ね'], ['｜', 'ま', 'ほ'], ['に', '一', 'た'], ['り', '一', 'け']];
 for (const [a, b, r] of ALT) {
   test(`くっつけ方だけの別ルート：${show(a)}＋${show(b)}→${r}（どちらの順でも）`, async ({ page }) => {
     for (const order of [[a, b], [b, a]]) {
@@ -60,7 +61,8 @@ test('結果が2つあるくっつけ方は「どっち」が出て、選んだ�
     for (const [k, rs] of Object.entries(T.MERGE)) if (rs.length > 1) out.push({ parts: [...k], rs });
     return out;
   });
-  expect(multi.length).toBeGreaterThan(0); // いまは い＋一 → せ・け（D-069）
+  // い＋一 を せ だけにしたので、いまは結果が2つのくっつけ方はない（D-072。前は せ・け の「どっち」）。出るようになったら、下で字ごとに確かめる
+  expect(multi).toEqual([]);
   for (const { parts, rs } of multi) {
     for (const r of rs) {
       await setBasket(page, parts);
@@ -75,9 +77,65 @@ test('結果が2つあるくっつけ方は「どっち」が出て、選んだ�
   }
 });
 
-test('い＋一 の「どっち」は せ と け（D-069）', async ({ page }) => {
+test('い＋一 は せ だけ。「どっち」は出ない（D-072）', async ({ page }) => {
   await setBasket(page, ['い', '一']);
   await tapTiles(page, [0, 1]);
   await page.click('#aMerge');
-  await expect(page.locator('#trayPick button')).toHaveText(['せ', 'け']);
+  await expect(page.locator('#trayPick')).toBeHidden();
+  expect((await state(page)).mine).toBe('せ');
+});
+
+async function turnOnce(page, letter, btn) {
+  await setBasket(page, [letter]);
+  await tapTiles(page, [0]);
+  await press(page, btn);
+  return (await state(page)).mine;
+}
+
+test('い を裏返すと り、り を裏返すと い。回すと い⇄こ はいまのまま（D-072）', async ({ page }) => {
+  expect(await turnOnce(page, 'い', '#aFlip')).toBe('り');
+  expect(await turnOnce(page, 'り', '#aFlip')).toBe('い');
+  expect(await turnOnce(page, 'い', '#aRot')).toBe('こ');
+  expect(await turnOnce(page, 'こ', '#aRot')).toBe('い');
+  // 裏返してから回す・回してから裏返すも、字の形どおり
+  expect(await turnOnce(page, 'り', '#aRot')).toBe('こ'); // り を回した形＝こ（仮置き）
+});
+
+test('こ は裏返しても こ（D-072）', async ({ page }) => {
+  expect(await turnOnce(page, 'こ', '#aFlip')).toBe('こ');
+  // 裏返したあとに回しても い（り にはならない）
+  await press(page, '#aRot');
+  expect((await state(page)).mine).toBe('い');
+});
+
+test('り を割ると ｜＋｜（い と同じ）。｜＋｜ をくっつけると い だけ（D-072）', async ({ page }) => {
+  await setBasket(page, ['り']);
+  await tapTiles(page, [0]);
+  await press(page, '#aSplit');
+  expect((await state(page)).mine).toBe('｜｜');
+  await tapTiles(page, [0, 1]);
+  await page.click('#aMerge');
+  await expect(page.locator('#trayPick')).toBeHidden();
+  expect((await state(page)).mine).toBe('い');
+});
+
+test('り＋一→け（どちらの順でも）。割ると ｜＋十（D-072）', async ({ page }) => {
+  for (const order of [['り', '一'], ['一', 'り']]) {
+    await setBasket(page, order);
+    await tapTiles(page, [0, 1]);
+    await mergeTo(page, 'け');
+    expect((await state(page)).mine).toBe('け'); // できた字は選ばれたまま（D-070）
+    await press(page, '#aSplit');
+    expect((await state(page)).mine).toBe('｜十');
+  }
+});
+
+test('り は字の一覧（KANA）と回す・裏返す表（TURN）にあり、袋（BAG）にはない（D-072）', async ({ page }) => {
+  const r = await page.evaluate(() => { const T = window.HB_TEST; return { kana: T.KANA.has('り'), bag: T.BAG.includes('り'),
+    turnI: T.TURN['い'].map(x => x.join(':')), turnRi: T.TURN['り'].map(x => x.join(':')), turnKo: T.TURN['こ'].map(x => x.join(':')) }; });
+  expect(r.kana).toBe(true);
+  expect(r.bag).toBe(false);
+  expect(r.turnI).toEqual(['こ:回した', 'り:裏返した']);
+  expect(r.turnRi).toEqual(['い:裏返した', 'こ:回した']);
+  expect(r.turnKo).toEqual(['い:回した']);
 });
