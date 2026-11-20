@@ -473,6 +473,7 @@ small.en.b{display:block;margin-left:0}
 <script src="scenes.js"></script>
 <script src="cpu-ng.js"></script>
 <script src="nice-words.js"></script>
+<script src="scene-groups.js"></script>
 <script>
 (()=>{
 'use strict';
@@ -660,7 +661,7 @@ function logText(){ return [`ひらがな分解（仮）ログ ${new Date().toLo
 const els=new Map();
 function newGame(){
   clearTimeout(cpuT); clearTimeout(refT.me); clearTimeout(refT.op); refT={me:null,op:null}; els.forEach(el=>el.remove()); els.clear();
-  S={mine:[],opp:[],oppL:null,oppO:null,sel:[],log:[],used:new Set(),over:null,ending:false,started:false,busy:false,choose:null,
+  lastThrow=null; S={mine:[],opp:[],oppL:null,oppO:null,sel:[],log:[],used:new Set(),over:null,ending:false,started:false,busy:false,choose:null,
      say:'あなたが動いたら、動き出す'};
   TODAY=makeToday(isOnline()&&NET.matchId?seedRng('today-'+NET.matchId):null); // ふたりでは matchId から。ひとりでは毎戦ランダム
   const firstHand=()=>[...Array.from({length:START-1},()=>pick(TODAY.bag)),START_PART]; // 最初の手は袋から4枚＋部品「｜」（D-034。二人とも）
@@ -841,7 +842,20 @@ function niceFx(word){ const kind=NICE[bigForm(String(word).replace(/∘/g,''))]
     for(let i=0;i<n;i++){ const p=document.createElement('i'); p.className='pt'; p.style.left=(Math.random()*W)+'px'; p.style.background=cols[i%cols.length]; box.appendChild(p);
       const d=few?900:1100+Math.random()*250, fall=H*(few?.5:.7+Math.random()*.35), sw=Math.random()*80-40, r=Math.random()*540-270;
       p.animate([{transform:'translate(0,0) rotate(0deg)',opacity:0},{opacity:.95,offset:.1},{transform:`translate(${sw}px,${fall*.5}px) rotate(${r/2}deg)`,offset:.5},{transform:`translate(${-sw/2}px,${fall}px) rotate(${r}deg)`,opacity:0}],{duration:d,delay:few?0:Math.random()*200,easing:'linear',fill:'both'}).onfinish=()=>p.remove(); } } }
-function showMeaning(word,who){ niceFx(word); const el=$('meaning'), m=meaningBig(word); if(!el) return; const tier=tierOf(word); if(!m&&!tier){ return; } // 3字以上は意味がなくても言葉だけ出す（D-047）
+/* 場面の組（HB-039, D-074）。データは scene-groups.js。相手が最後に投げた言葉と同じ組の言葉が投げられたら、ほめる声とログ1行。勝ち負け・カゴ・★には効かない（D-022）。
+   声は工夫の声（#combo）と同じ箱。工夫の声が出ているときは、その下にもう1行足す */
+const SCENE_OF={}; for(const [g,ws] of Object.entries(window.HB_SCENE_GROUPS||{})) ws.forEach(w=>{ (SCENE_OF[bigForm(w)]=SCENE_OF[bigForm(w)]||[]).push(g); });
+let lastThrow=null, greetT=null;
+function greetBack(word,who){ const w=String(word).replace(/∘/g,''), prev=lastThrow; lastThrow={who,word:w};
+  if(!prev||prev.who===who) return; // 自分の投げが続いたとき（相手が最後ではないとき）は出ない
+  const a=SCENE_OF[bigForm(prev.word)], b=SCENE_OF[bigForm(w)]; if(!a||!b) return;
+  const g=a.find(x=>b.includes(x)); if(!g) return; const v=(window.HB_SCENE_VOICE||{})[g];
+  lg(who,`${g}返し（${wordShow(prev.word)}→${wordShow(w)}）`);
+  const el=document.getElementById('combo'); if(!el||!v) return;
+  const html=`<span class="gb">${escH(v[0])}</span>`+enTag(v[1]);
+  if(el.classList.contains('on')) el.insertAdjacentHTML('beforeend','<br>'+html); else { el.innerHTML=html; el.classList.remove('on'); void el.offsetWidth; el.classList.add('on'); }
+  clearTimeout(comboT); comboT=setTimeout(()=>el.classList.remove('on'),1100); }
+function showMeaning(word,who){ niceFx(word); greetBack(word,who); const el=$('meaning'), m=meaningBig(word); if(!el) return; const tier=tierOf(word); if(!m&&!tier){ return; } // 3字以上は意味がなくても言葉だけ出す（D-047）
   el.innerHTML=`<span class="mw">${escH(wordShow(word))}</span>${m&&m.k?`<span class="mk">${escH(m.k)}</span>`:''}${m&&m.e?`<span class="mn">${escH(m.e)}</span>`:''}`;
   el.classList.remove('t1','t2','t3'); if(tier) el.classList.add('t'+tier); el.classList.toggle('sc',!!(m&&m.sc)); el.style.setProperty('--n',[...String(word)].length);
   el.classList.toggle('op',who==='op'); const cb=$('combo'), low=cb.classList.contains('on');
@@ -1458,7 +1472,7 @@ function onOpponentLost(){ if(!S||S.over||S.ending) return; finish('win'); }
 
 /* 自動テストの窓（HB-035）。テストがページを開く前に window.HB_TEST={} を置いたときだけ、中の表と関数を渡す。ふだんの遊びでは何もしない */
 if(window.HB_TEST&&typeof window.HB_TEST==='object') Object.assign(window.HB_TEST,{CAP,KANA,PARTS,RECIPE,MERGE,TURN,BAG,logText,makeToday,seedRng,TODAY:()=>TODAY,HAND,DICT,SPEEDS,key,
-  words:()=>WORDS, S:()=>S, mk,letterOf,checkSel,splitMade,mergeMade,comboOf,cpuOk,tapTile,doSplit,doMerge,doTurn,doThrow,render,newGame,startSolo,cpuAct,cpuThrow,setSpeed});
+  words:()=>WORDS, S:()=>S, mk,letterOf,checkSel,splitMade,mergeMade,comboOf,cpuOk,tapTile,doSplit,doMerge,doTurn,doThrow,render,newGame,startSolo,cpuAct,cpuThrow,setSpeed,showMeaning,SCENE_OF});
 
 newGame();
 showMenu();

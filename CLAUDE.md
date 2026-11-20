@@ -7,7 +7,7 @@
 - ひらがなを「割る・回す・裏返す・くっつける」で作り替えて、言葉を相手のカゴに投げ合う対戦ゲームのモック（仮）
 - 公開ページ：https://kaz6.github.io/hiragana-bunkai-mock/
 - **main にマージすると、GitHub Pages がすぐ（数十秒で）公開ページを変える。** 作者と友人が遊んでいるページなので、壊したまま main に入れない
-- ページは `index.html` ひとつ（スクリプトは中の IIFE）。データは `dict-ipadic.js`（辞書 3字以上）・`meanings.js`（意味）・`scenes.js`・`cpu-ng.js`・`nice-words.js`・`config.js`（Supabase の公開キー）
+- ページは `index.html` ひとつ（スクリプトは中の IIFE）。データは `dict-ipadic.js`（辞書 3字以上）・`meanings.js`（意味）・`scenes.js`・`cpu-ng.js`・`nice-words.js`・`scene-groups.js`・`config.js`（Supabase の公開キー）
 - 辞書と意味を作る道具：`tools/build_dict.js`（IPADIC から。R-004）・`tools/build_meanings.py`（JMdict から。D-035）。材料は `.work/`（リポジトリに入れない）
 - `.github/workflows/meanings.yml` が毎日 main に「自動：足した言葉の意味を更新」をコミットすることがある
 
@@ -32,7 +32,8 @@
   | `tests/e2e/words.spec.js` | 言葉の判定（checkSel）、一度きり、はじかれた並びの送り先 |
   | `tests/e2e/stars.spec.js` | ★（工夫の数。D-031・D-067 の往復） |
   | `tests/e2e/tail.spec.js` | 選んでいる途中の割る・くっつける（D-070） |
-  | `tests/e2e/basket.spec.js` | カゴの上限（12こを超えたら負け） |
+  | `tests/e2e/scenes.spec.js` | 場面の組（挨拶返し。scene-groups.js） |
+| `tests/e2e/basket.spec.js` | カゴの上限（12こを超えたら負け） |
   | `tests/e2e/cpu.spec.js` | CPU（禁止用語 cpu-ng.js、各強さを短く回す） |
   | `tests/e2e/screen.spec.js` | 画面（390px、遊び方、ひとりでの開始、ページの語数） |
   | `tests/unit/data.test.js` | データのファイル（辞書・意味の語数、字の一覧のそろい） |
