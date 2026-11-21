@@ -22,7 +22,7 @@ test('よろしく→よろしこ で声が出て、ログに一行。カゴ・�
   const r = await run(page, [['op', 'よろしく'], ['me', 'よろしこ']]);
   expect(r[0].voice).toBe('');
   expect(r[1].voice).toContain('あいさつ返し！');
-  expect(r[1].voice).toContain('Greeting back!');
+  expect(r[1].voice).not.toContain('Greeting back!'); // 日本語のときは英語の添えを出さない（D-091）。English のときは lang.spec.js
   expect(r[1].logged).toContain('挨拶返し（よろしく→よろしこ）');
   expect(r[1].same).toBe(true);
 });
