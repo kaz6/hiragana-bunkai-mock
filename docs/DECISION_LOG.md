@@ -731,3 +731,13 @@
 - 確かめ：npm test 全部。tests/e2e/fx.spec.js（動きを許した設定で、割ると線と二つの半分が出て消える・結果は変わらない／くっつけると残像2枚と snap が付いて外れる／動きを減らす設定では出ない）。コマ並べ docs/reports/img/hb-051-fx-frames.png・動画 hb-051-fx.webm
 - 却下／やらなかったこと：文字・音・★・判定・CPU・アイコンの描き直し
 - 作業：HB-051
+
+## R-017 動詞から作る名詞の形（連用形）を、JMdict に名詞として載るものだけ辞書に足す（HB-052、D-086、作者 2026-11-21 19:03）
+
+- 決めたこと（作者）：「いったんそれで。たします」（編集の案「JMdict に名詞として載っている語だけ足す」への答え）
+- 中身（編集の仮置き）：tools/build_dict.js の3つ目の引数で候補 tools/renyo_candidates.txt を作る（IPADIC の動詞・自立・活用型が「五段・〜」・活用形が「連用形」の読みで、字が作れて3〜12字、dict-ipadic.js に無いもの。小さい字を含む読みは除く）。1,161語。tools/build_meanings.py --repo が、候補のうち JMdict に同じ読みの名詞（pos が n。pos は前の意味から引き継ぐ）がある語だけを dict-renyo.js（window.HB_RENYO）に書き、意味も meanings.js に入れる。ページは dict-renyo.js も辞書として読む（WORDS。CPU も同じ。HAND には入れない）。index.html の script 行を消すか HB_RENYO を空にすれば元に戻る。.github/workflows/meanings.yml は dict-renyo.js も変わったときにコミットする（取り寄せ先・時刻は変えない）。dict-renyo.js はいま空（この作業場から JMdict を取れず、選べなかった。毎日の更新か「Run workflow」が最初に埋める）
+- 確かめ：npm test 全部。tests/e2e/renyo.spec.js（固定の数語を返して さまよい が通る・空でも404でもページが動く）、tests/unit/data.test.js（候補に さまよい・きこし がある／あそび は無い／候補は辞書に無い語だけ／dict-renyo.js の語は候補の中だけ）。tests/counts.js に RENYO_WORDS_NOW（いまは0。埋まったら直す）
+- 気づいたこと：カードの例 あそび・ためらい は「び」「ら」が字に無く作れないので候補に出ない（候補 1,161語。カードの 2,651語は字の制限を数える前の数）。一段動詞の形は今回は入れない
+- 却下／やらなかったこと：dict-ipadic.js の変更・extra_words への書き込み・毎日の更新の取り寄せ先と時刻の変更・cpu-ng.js・小さい字を含む読みの候補
+- 作業：HB-052
+

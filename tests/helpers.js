@@ -33,15 +33,17 @@ window.__hbSent=[];
 /**
  * ページを開く。返す errors はページのエラーとコンソールのエラー（テストの最後に空であることを見る）
  * opts.guide：false なら最初の1戦の案内を見た扱いにする（初めの手で CPU が止まらないように）
+ * opts.dictRenyo：{status, body} を渡すと dict-renyo.js の返事をそれにする（HB-052。renyo.spec.js）
  */
 async function openGame(page, opts = {}) {
-  const { guide = false, extraWords = EXTRA_WORDS } = opts;
+  const { guide = false, extraWords = EXTRA_WORDS, dictRenyo = null } = opts;
   const errors = [];
   const blocked = [];
   page.on('pageerror', e => errors.push('pageerror: ' + e.message));
   page.on('console', m => { if (m.type() === 'error') errors.push('console: ' + m.text()); });
   await page.route('**/*', async route => {
     const url = route.request().url();
+    if (dictRenyo && url === ORIGIN + 'dict-renyo.js') return route.fulfill({ status: dictRenyo.status, contentType: 'text/javascript', body: dictRenyo.body });
     if (url.startsWith(ORIGIN)) {
       let rel = decodeURIComponent(new URL(url).pathname).replace(/^\/+/, '') || 'index.html';
       const file = path.join(ROOT, rel);
