@@ -126,6 +126,24 @@ test('ろ＋一→ら、ら を割ると ろ＋一。ろ＋∘→る・｜＋ろ
   expect(await page.evaluate(() => window.HB_TEST.BAG.includes('ら'))).toBe(false);
 });
 
+test('せ＋∘→む、む を割ると せ＋∘。せ＋゛→ぜ・ろ＋∘→る はいまのまま。袋に入らない（D-089）', async ({ page }) => {
+  await setBasket(page, ['せ', '∘']);
+  await tapTiles(page, [0, 1]);
+  await mergeTo(page, 'む');
+  expect((await state(page)).mine).toBe('む');
+  await press(page, '#aSplit');
+  expect((await state(page)).mine).toBe('せ∘');
+  await setBasket(page, ['せ', '゛']);
+  await tapTiles(page, [0, 1]);
+  await mergeTo(page, 'ぜ');
+  expect((await state(page)).mine).toBe('ぜ');
+  await setBasket(page, ['ろ', '∘']);
+  await tapTiles(page, [0, 1]);
+  await mergeTo(page, 'る');
+  expect((await state(page)).mine).toBe('る');
+  expect(await page.evaluate(() => window.HB_TEST.BAG.includes('む'))).toBe(false);
+});
+
 async function turnOnce(page, letter, btn) {
   await setBasket(page, [letter]);
   await tapTiles(page, [0]);
