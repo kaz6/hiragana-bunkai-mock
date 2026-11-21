@@ -395,6 +395,8 @@ small.en.b{display:block;margin-left:0}
 
     <!-- しくみの図（HB-014, D-039）。札の例は RECIPE・MERGE・TURN・DICT から JS で作る。手で書いた例は置かない -->
     <div class="dg" id="diagram" aria-label="しくみの図"></div>
+    <!-- 向きの近道（HB-049, D-083）。字の向きのデータ（ROOT・ALIAS・SYMM・MERGE_TURN）から JS で作る。手で書いた行は置かない -->
+    <div class="dg" id="shortcuts"></div>
 
     <div>
       <h3>意味を出す<small class="en" lang="en">Show meanings</small></h3>
@@ -1319,7 +1321,7 @@ $('recipes').innerHTML=Object.entries(RECIPE).map(([k,[a,b]])=>`<span>${shown(k)
    枠ごとに「操作の名前／増える・減る数／札の例」だけ。札の例は RECIPE（割る）・MERGE（くっつける）・TURN（回す・裏返す）・DICT（投げる）から引く。
    データに無い例は出さない（例が1つも無い枠は出さない。゜と゛の枠は濁点・半濁点のデータが入ると出る）。
    札はカゴと同じ見た目（view() で向きを決め、部品は黄色）。英語の一言は意味の設定が「漢字＋英語」のときだけ（renderMeanSet） */
-function miniTile(L,cls=''){ const p=mk(L); norm(p); const v=view(p), l=letterOf(p);
+function miniTile(L,cls='',t){ const p=mk(L); if(t){ p.r=t[0]; p.f=t[1]; } norm(p); const v=view(p), l=letterOf(p);
   const off=!l||(PARTS.has(l)&&l!=='一')||!KANA.has(l)&&l!=='一';
   return `<span class="mt${off?' off':''}${cls?' '+cls:''}" aria-label="${escH(L)}"><span class="g${isMark(v.g)?' mark':''}" style="transform:${tfG(v)}">${escH(v.g)}</span></span>`; }
 const dgOp=s=>`<span class="dg-op" aria-hidden="true">${s}</span>`;
@@ -1352,6 +1354,31 @@ function buildDiagram(){ const F=[];
     frame('投げる','−字数',`<div class="dg-ex">${dgEx(...[...w].map(c=>miniTile(c)),dgOp('→'),`<span class="dg-opp">あいて ＋${n}</span>`)}</div><p class="dg-t">同じ言葉は二度と投げられない</p>`,'No repeats.'); } }
   $('diagram').innerHTML=F.join(''); }
 buildDiagram();
+/* ---- 向きの近道（HB-049, D-083）----
+   回す・裏返すだけで別の字・部品になる組ごとに、いちばん短い手順を1つ。字の向きのデータ（ALIAS・norm）から幅優先で計算する（手で書かない）。
+   途中で黄色い札（名前のない向き）を通ってよい。同じ長さなら 回す を先にする。字を足して ALIAS が増えると行も増える */
+const SC_LABEL=['向きの近道','Shortcuts for turning']; // 見出しは仮（ここ1か所で直す）
+function turnSteps(root,r0,f0){ // その字の向きから、回す・裏返すだけで行ける向き（norm のあと）ごとの最短の手順
+  const at=(r,f)=>{ const p={root,r,f}; norm(p); return p; }, id=p=>p.r+','+p.f;
+  const s0=at(r0,f0), seen=new Map([[id(s0),{p:s0,ops:[]}]]), q=[s0];
+  while(q.length){ const p=q.shift(), ops=seen.get(id(p)).ops;
+    for(const k of ['回す','裏返す']){ const n=at(k==='回す'?(p.r+1)%4:(4-p.r)%4, k==='回す'?p.f:(p.f?0:1)); if(!seen.has(id(n))){ seen.set(id(n),{p:n,ops:[...ops,k]}); q.push(n); } } }
+  return seen; }
+function turnShortcuts(){ const out=[];
+  for(const [root,al] of Object.entries(ALIAS)){ if(al.length<2) continue;
+    for(const [from,r,f] of al){ const seen=turnSteps(root,r,f);
+      for(const [to] of al){ if(to===from) continue; const hit=[...seen.values()].find(v=>letterOf(v.p)===to); if(hit) out.push({from,to,ops:hit.ops}); } } }
+  return out.sort((a,b)=>a.from.localeCompare(b.from)||a.to.localeCompare(b.to)); }
+function mergeTurnBacks(){ const out=[]; // くっつけた字（MERGE_TURN）を元の字に戻す手順
+  for(const [res,[r,f]] of Object.entries(MERGE_TURN)){ const rc=RECIPE[res]; if(!rc) continue; const p0=mk(res); norm(p0);
+    const seen=turnSteps(p0.root,r,f), hit=[...seen.values()].find(v=>letterOf(v.p)===res); if(hit) out.push({res,parts:rc,t:[r,f],ops:hit.ops}); }
+  return out; }
+function buildShortcuts(){ const sym=k=>k==='裏返す'?'⇄':'⟳'; const rows=[];
+  for(const m of mergeTurnBacks()) rows.push(`<span class="dg-e" data-sc="${m.parts.join('＋')}→${m.res}|${m.ops.join(',')}|${m.res}" aria-label="${escH(m.parts.join('＋'))}でできた${escH(m.res)}を${m.ops.join('、')}で${escH(m.res)}">${dgEx(miniTile(m.parts[0]),dgOp('＋'),miniTile(m.parts[1]),dgOp('→'),miniTile(m.res,'',m.t),...m.ops.map(k=>dgOp(sym(k))),miniTile(m.res))}</span>`);
+  for(const x of turnShortcuts()) rows.push(`<span class="dg-e" data-sc="${x.from}|${x.ops.join(',')}|${x.to}" aria-label="${escH(x.from)}を${x.ops.join('、')}で${escH(x.to)}">${miniTile(x.from)}${x.ops.map(k=>dgOp(sym(k))).join('')}${miniTile(x.to)}</span>`);
+  if(!rows.length){ $('shortcuts').innerHTML=''; return; }
+  $('shortcuts').innerHTML=`<div class="dg-f"><details><summary>${SC_LABEL[0]}${enTag(SC_LABEL[1])}</summary><p class="dg-t">⟳ 回す　⇄ 裏返す</p><div class="dg-ex" id="scList">${rows.join('')}</div></details></div>`; }
+buildShortcuts();
 $('meaningsNotice').textContent=window.HB_MEANINGS_NOTICE||'（意味のデータを読み込めなかった）';
 renderMeanSet(); $('meanSet').addEventListener('click',e=>{ const b=e.target.closest('button[data-v]'); if(!b) return; meanMode=b.dataset.v; try{localStorage.setItem('hb.meaning',meanMode)}catch(_){} renderMeanSet(); logN=-1; renderLog(); });
 /* 字の大きさ（HB-018, D-046）。小さく 0.85／標準 1／大きく 1.2。この端末のブラウザ（hb.textSize）に覚える。初めは標準 */
@@ -1528,7 +1555,7 @@ function onOpponentLost(){ if(!S||S.over||S.ending) return; finish('win'); }
 /* 自動テストの窓（HB-035）。テストがページを開く前に window.HB_TEST={} を置いたときだけ、中の表と関数を渡す。ふだんの遊びでは何もしない */
 if(window.HB_TEST&&typeof window.HB_TEST==='object') Object.defineProperty(window.HB_TEST,'CAP',{get:()=>CAP,configurable:true}); // 一戦ごとに変わるので値でなく読む（HB-048）
 if(window.HB_TEST&&typeof window.HB_TEST==='object') Object.assign(window.HB_TEST,{NET,onStartMessage,KANA,PARTS,RECIPE,MERGE,MERGE_TURN,TURN,BAG,logText,makeToday,seedRng,TODAY:()=>TODAY,HAND,DICT,SPEEDS,key,
-  words:()=>WORDS, S:()=>S, mk,letterOf,checkSel,splitMade,mergeMade,comboOf,cpuOk,tapTile,doSplit,doMerge,doTurn,doThrow,render,newGame,startSolo,cpuAct,cpuThrow,setSpeed,showMeaning,SCENE_OF,exchangeCands,VOTE_TEXT});
+  words:()=>WORDS, S:()=>S, mk,letterOf,checkSel,splitMade,mergeMade,comboOf,cpuOk,tapTile,doSplit,doMerge,doTurn,doThrow,render,newGame,startSolo,cpuAct,cpuThrow,setSpeed,showMeaning,SCENE_OF,exchangeCands,VOTE_TEXT,ALIAS,turnShortcuts,mergeTurnBacks});
 
 newGame();
 showMenu();

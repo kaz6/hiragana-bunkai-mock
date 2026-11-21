@@ -77,3 +77,28 @@ test('割る・回す・裏返す・くっつける のボタンにアイコン�
   await expect(page.locator('#aRot img.ico')).toBeVisible();
   expect(await noOverflow(page)).toBe(true);
 });
+
+// しくみの「向きの近道」（HB-049, D-083）。字の向きのデータから作る
+test('しくみの「向きの近道」：⊂→つ は1手、て→ん は2手（最短）、か の戻し方、字のデータから作られている。390px ではみ出さない', async ({ page }, info) => {
+  info.ctx = await openGame(page);
+  await startSolo(page, 'ゆるゆる');
+  const T = await page.evaluate(() => ({ s: window.HB_TEST.turnShortcuts(), m: window.HB_TEST.mergeTurnBacks(), alias: null }));
+  const get = (a, b) => T.s.find(x => x.from === a && x.to === b);
+  expect(get('⊂', 'つ').ops).toEqual(['裏返す']);
+  expect(get('て', 'ん').ops).toEqual(['回す', '裏返す']); // 4手ではない
+  expect(get('し', '⊂').ops).toEqual(['回す']);
+  expect(get('い', 'こ').ops).toEqual(['回す']);
+  expect(get('こ', 'り').ops.length).toBe(2);
+  expect(T.s.every(x => x.ops.length >= 1 && x.ops.length <= 3)).toBe(true);
+  expect(T.m).toEqual([{ res: 'か', parts: ['う', '｜'], t: [1, 1], ops: ['裏返す', '回す'] }]);
+  // 字のデータから作られている：ALIAS の組の数と、画面の行の数（くっつけた字の1行を足す）が合う
+  const n = await page.evaluate(() => Object.values(window.HB_TEST.ALIAS).reduce((s, al) => s + (al.length > 1 ? al.length * (al.length - 1) : 0), 0));
+  expect(T.s.length).toBe(n);
+  await page.click('#btnHow');
+  await page.locator('#shortcuts summary').click();
+  await expect(page.locator('#scList > [data-sc]')).toHaveCount(n + 1);
+  await expect(page.locator('#scList [data-sc="⊂|裏返す|つ"]')).toBeVisible();
+  await expect(page.locator('#scList [data-sc="て|回す,裏返す|ん"]')).toBeVisible();
+  await expect(page.locator('#scList [data-sc="う＋｜→か|裏返す,回す|か"]')).toBeVisible();
+  expect(await noOverflow(page)).toBe(true);
+});
