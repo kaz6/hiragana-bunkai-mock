@@ -56,3 +56,51 @@ for (const lv of ['ゆっくり', 'ふつう', 'つよい']) {
     expect(r.throws).toBeGreaterThan(0);
   });
 }
+
+// ---- HB-050（D-084）：CPU の回す・裏返すを、人と同じ手数にそろえる ----
+test('CPU の向きの手：TURN は人の最短手順（turnShortcuts）と同じ手数・同じ一言。へ→く・し→つ・て→ん は2手、⊂→つ・い→こ・さ→ち は1手', async ({ page }) => {
+  await startSolo(page, 'とまる');
+  const r = await page.evaluate(() => { const T = window.HB_TEST, sc = T.turnShortcuts(); const bad = [];
+    let n = 0;
+    for (const [from, list] of Object.entries(T.TURN)) for (const [to, v, hands, path, ops] of list) { n++;
+      const h = sc.find(x => x.from === from && x.to === to);
+      if (!h || h.ops.length !== hands || h.ops.join() !== ops.join()) bad.push(from + '→' + to); }
+    // 人にはできて CPU の表にない組は、TURN_NOT_CPU と ＞（CPU の札にならない部品）だけ
+    const missing = sc.filter(x => !(T.TURN[x.from] || []).some(a => a[0] === x.to)).map(x => x.from + '→' + x.to)
+      .filter(k => !T.TURN_NOT_CPU.has(k) && !k.includes('＞'));
+    const hands = (a, b) => (T.TURN[a].find(x => x[0] === b) || [])[2];
+    return { n, bad, missing, h: { へく: hands('へ', 'く'), べぐ: hands('べ', 'ぐ'), しつ: hands('し', 'つ'), つし: hands('つ', 'し'), じづ: hands('じ', 'づ'), てん: hands('て', 'ん'), んて: hands('ん', 'て'),
+      '⊂つ': hands('⊂', 'つ'), いこ: hands('い', 'こ'), こい: hands('こ', 'い'), さち: hands('さ', 'ち'), くへ: hands('く', 'へ'), 縦一: hands('｜', '一') } }; });
+  expect(r.n).toBeGreaterThan(15);
+  expect(r.bad).toEqual([]);
+  expect(r.missing).toEqual([]);
+  expect(r.h).toEqual({ へく: 2, べぐ: 2, しつ: 2, つし: 2, じづ: 2, てん: 2, んて: 2, '⊂つ': 1, いこ: 1, こい: 1, さち: 1, くへ: 1, 縦一: 1 });
+});
+
+test('CPU が へ→く（2手）を打つと、ログは1手ずつ（「へ」を回した→「＞」を裏返した）で、次の手まで2回分の時間をかける。い→こ は1手', async ({ page }) => {
+  await startSolo(page, 'とまる');
+  const r = await page.evaluate(() => { const T = window.HB_TEST; const out = {};
+    for (const [from, to] of [['へ', 'く'], ['し', 'つ'], ['て', 'ん'], ['い', 'こ']]) {
+      T.newGame(); const S = T.S(); S.opp = [T.mk(from)]; const before = S.log.length;
+      const st = T.stepsOf([from]).find(x => x.t === 'turn' && x.to === to);
+      T.cpuApply(st);
+      out[from + to] = { n: st.n, hands: T.S().cpuHands, now: T.S().opp.map(T.letterOf).join(''), say: T.S().say, text: T.logText().split('\n').filter(x => x.includes('相手｜')).slice(-st.n).map(x => x.replace(/^.*相手｜/, '').replace(/　［.*$/, '')) }; }
+    return out; });
+  expect(r['へく']).toMatchObject({ n: 2, hands: 2, now: 'く', text: ['「へ」を回した', '「＞」を裏返した'] });
+  expect(r['しつ']).toMatchObject({ n: 2, hands: 2, now: 'つ', text: ['「し」を回した', '「⊂」を裏返した'] });
+  expect(r['てん']).toMatchObject({ n: 2, hands: 2, now: 'ん' });
+  expect(r['てん'].text[0]).toBe('「て」を回した');
+  expect(r['てん'].text[1]).toContain('裏返した');
+  expect(r['いこ']).toMatchObject({ n: 1, hands: 1, now: 'こ', text: ['「い」を回した'] });
+});
+
+test('CPU の2手先の読み：向きの2手は1手目で手数を使い切る（へ→く のあと、もう1手の作り替えは読まない）', async ({ page }) => {
+  await startSolo(page, 'つよい');
+  const r = await page.evaluate(() => { const T = window.HB_TEST; T.newGame(); const S = T.S(); S.started = true;
+    // へ・し・て を持つ CPU が、どの強さでも向きの手で止まらず動けること（手数のちがいでエラーにならない）
+    S.opp = ['へ', 'し', 'て', 'さ', 'い'].map(c => T.mk(c)); S.mine = Array.from({ length: 3 }, () => T.mk('よ'));
+    const acts = []; for (let i = 0; i < 20; i++) { const s = T.S(); if (s.over || s.ending) break; T.cpuAct(); acts.push(T.S().cpuHands || 1); }
+    return { acts, hands: Math.max(...acts) }; });
+  expect(r.acts.length).toBeGreaterThan(5);
+  expect(r.hands).toBeLessThanOrEqual(2);
+});

@@ -545,14 +545,10 @@ for(const [k,[a,b]] of Object.entries(RECIPE)){ if(k==='り') continue; /* り �
 (MERGE[key('一','め')] ||= []).push('あ'); (MERGE[key('わ','∘')] ||= []).push('ね'); (MERGE[key('｜','ま')] ||= []).push('ほ');
 (MERGE[key('に','一')] ||= []).push('た'); (MERGE[key('り','一')] ||= []).push('け'); // に＋一でも「た」、り＋一でも「け」（仮置き。割ると十が出る。い＋一 は せ だけ。HB-037, D-072）
 // し＋｜でも「い」になる（仮置き。割ると｜＋｜）。一＋つ→う は割り方（RECIPE）から作られる
-const TURN1={'く':['へ','回した'],'へ':['く','回した'],'い':['こ','回した'],'こ':['い','回した'],'｜':['一','回した'],'一':['｜','回した'],
-  'さ':['ち','裏返した'],'ち':['さ','裏返した'],'⊂':['つ','裏返した'],'し':['つ','回して裏返した'],'つ':['し','回して裏返した'],
-  // 濁音で向きの関係を引き継ぐ組（ROOT・ALIAS と同じ。CPU が使う）
-  'て':['ん','裏返して回した'],'ん':['て','裏返して回した'],
-  'ぐ':['べ','回した'],'べ':['ぐ','回した'],'ざ':['ぢ','裏返した'],'ぢ':['ざ','裏返した'],'じ':['づ','回して裏返した'],'づ':['じ','回して裏返した']};
-// TURN：字 → [[できる字, 一言], …]（向きで変わる先。い は こ（回す）と り（裏返す）の2つ。HB-037, D-072）。CPU とページの図が使う
-const TURN={}; for(const [k,v] of Object.entries(TURN1)) TURN[k]=[v];
-TURN['い'].push(['り','裏返した']); TURN['り']=[['い','裏返した'],['こ','回した']]; // り を回すと こ（字の形どおり。仮置き）。こ は裏返しても こ
+/* TURN：字 → [[できる字, 一言, 手数], …]（向きで変わる先。CPU とページの図が使う）。人の「回す・裏返す」のいちばん短い手順（turnShortcuts。ALIAS の向きから計算）と同じ手数・同じ一言で作る（HB-050, D-084。手で書いた TURN1 はやめた）。
+   い は こ（回す）と り（裏返す）の2つ（HB-037, D-072）。↓の組は人にはできるが、CPU の手には足さない（作者が決めていない新しい手。仮置き）。＞ は CPU の札にならない部品なので外す */
+const TURN_NOT_CPU=new Set(['こ→り','し→⊂','つ→⊂','⊂→し']);
+const TURN={}; for(const x of turnShortcuts()){ if(x.from==='＞'||x.to==='＞'||TURN_NOT_CPU.has(x.from+'→'+x.to)) continue; (TURN[x.from] ||= []).push([x.to,verb(x.ops),x.ops.length,x.path,x.ops]); }
 const BAG=[...'はははほほににこいいくくへささちききめぬろろるるつつしししううよねわたけすなまのあも'];
 /* 今日の字（HB-038, D-073。中身は編集の仮置き）：一戦の始めに袋の配合を変える。多め2〜3字は袋に＋2枚、少なめ1〜2字（袋に2枚以上ある字）は1枚に減らす（消さない）。
    BAG は土台のまま。一戦で引く袋は TODAY.bag。ふたりででは matchId から決めるので二人とも同じ（作るしかない字・濁音・半濁音は BAG に無いので入らない） */
@@ -948,19 +944,28 @@ function doThrow(){ if(locked()) return; const c=checkSel(); if(!c.word){ logFai
 
 /* ---- 相手 ---- */
 function schedule(){ clearTimeout(cpuT); if(!S||S.over||S.ending||!S.started||sheetOpen||isOnline()||guideHolds()||!SPEEDS[speed].ms) return; // 通信対戦では CPU は動かない
-  cpuT=setTimeout(cpuAct, SPEEDS[speed].ms*(0.8+Math.random()*0.4)); }
+  const hands=S.cpuHands||1; S.cpuHands=1; /* 向きの手は手数ぶん時間をかける（HB-050, D-084） */
+  cpuT=setTimeout(cpuAct, SPEEDS[speed].ms*hands*(0.8+Math.random()*0.4)); }
+/* 同じ点数の手は、手数の少ない方から選ぶ（向きの2手は1手より時間がかかる。HB-050） */
+const pickCheap=L=>{ const m=Math.min(...L.map(s=>s.n||1)); return pick(L.filter(s=>(s.n||1)===m)); };
 function cpuSteps(){ return stepsOf(S.opp.map(letterOf)); }
 function stepsOf(L){ const out=[]; // 字の並び L からの1手（割る・回す・裏返す・くっつける）。つよい の2手先でも使う（D-051）
   L.forEach((l,i)=>{ const rest=()=>[...L.slice(0,i),...L.slice(i+1)];
     if(RECIPE[l]&&L.length<CAP) out.push({t:'split',i,res:[...rest(),...RECIPE[l]]});
-    (TURN[l]||[]).forEach(([to,v])=>out.push({t:'turn',i,to,v,res:[...rest(),to]})); });
+    (TURN[l]||[]).forEach(([to,v,n,path,ops])=>out.push({t:'turn',i,to,v,n,path,ops,res:[...rest(),to]})); });
   for(let i=0;i<L.length;i++) for(let j=i+1;j<L.length;j++){ const m=MERGE[key(L[i],L[j])];
     if(m) m.forEach(r=>out.push({t:'merge',i,j,r,res:[...L.filter((_,k)=>k!==i&&k!==j),r]})); }
   return out; }
 function cpuApply(s,tag){ const p=S.opp[s.i], l=letterOf(p);
   if(s.t==='split'){ S.opp.splice(s.i,1,...splitMade(p,l,RECIPE[l],{})); S.say=`「${l}」を割った`; }
-  else if(s.t==='turn'){ const to=s.to, v=s.v; S.opp.splice(s.i,1,mk(to,{note:`「${l}」を${v}`,d:`${p.d}→${to}`,sp:p.sp,jn:p.jn})); /* 往復の印は回しても持ち越す（D-067） */ S.say=`「${l}」を${v}`; }
+  else if(s.t==='turn'){ const to=s.to, v=s.v; S.opp.splice(s.i,1,mk(to,{note:`「${l}」を${v}`,d:`${p.d}→${to}`,sp:p.sp,jn:p.jn})); /* 往復の印は回しても持ち越す（D-067） */
+    const lines=turnLines(l,s); S.say=lines[lines.length-1]; S.cpuHands=s.n||1; /* 札は最後の向きにすぐ変える。時間は手数ぶんかける（schedule）。ログは1手ずつ（HB-050, D-084） */
+    lines.slice(0,-1).forEach(m=>lg('op',m)); }
   else { const q=S.opp[s.j], lq=letterOf(q); S.opp=S.opp.filter(x=>x!==p&&x!==q); S.opp.push(mergeMade(p,q,s.r,{})); S.say=`「${l}」と「${lq}」をくっつけた`; } lg('op',S.say+(tag?`（${tag}）`:'')); }
+/* 向きの手のログ：1手ずつ「「へ」を回した」「「＞」を裏返した」。途中が字にならない札は「て（向きずれ）」と書く */
+function turnLines(l,s){ const out=[];
+  for(let k=0;k<(s.n||1);k++){ const nm=k===0?l:(letterOf(s.path[k])||`${l}（向きずれ）`); out.push(`「${nm}」を${s.ops[k]==='回す'?'回した':'裏返した'}`); }
+  return out; }
 /* ---- 賢い相手（ふつう だけ。HB-017, D-045）----
    知っている言葉は辞書全部（WORDS）。点数＝字数＋重い字の数×HEAVY_W。重い字＝割る作り方（RECIPE）も向きの道（TURN）もない字（字のデータから作る。いまは よ・ろ・の）。
    投げられる言葉がない、または1手（割る・回す・裏返す・くっつける）で点数がもっと高い言葉が作れるなら、その1手。読むのは1手先まで。
@@ -999,7 +1004,7 @@ function cpuSmart(){ const L=S.opp.map(letterOf), now=smartBest(L); oppMemo(L);
   const all=cpuSteps().filter(st=>!(heavy&&st.t==='split'&&!smartBest(st.res))); // 重いときは、割ってすぐ投げられない割り方はしない
   let best=[], bs=now?now.sc:0;
   for(const st of all){ const b=smartBest(st.res); if(!b) continue; if(b.sc>bs){ bs=b.sc; best=[st]; } else if(b.sc===bs&&best.length) best.push(st); }
-  if(best.length){ go(pick(best)); return; }
+  if(best.length){ go(pickCheap(best)); return; }
   if(now){ cpuThrow(now.w); return; }
   const steps=all; // どの1手でも言葉にならないときは、今までの相手と同じく適当に動く（重いときの割り方は上で除いた）。戻るだけの手は除く（D-061）
   if(steps.length&&S.opp.length<=8) go(pick(fresh(steps)));
@@ -1041,7 +1046,7 @@ function longBest(letters){ const pool={}; let len=0; letters.forEach(l=>{ if(!l
 const STRONG_BUDGET=30;
 function strongPlan(L,base,firsts1,t0){ let best=base, firsts=[], word=null; const seen=new Map();
   for(const s1 of firsts1){ if(performance.now()-t0>STRONG_BUDGET) break;
-    for(const s2 of stepsOf(s1.res)){ const key=s2.res.map(asWord).sort().join('');
+    for(const s2 of stepsOf(s1.res)){ if((s1.n||1)+(s2.n||1)>2) continue; /* 2手先は手数2まで（向きの2手は1手目だけで使い切る。HB-050） */ const key=s2.res.map(asWord).sort().join('');
       let x; if(seen.has(key)) x=seen.get(key); else { x=topAbove(s2.res, firsts.length?best-1:best); seen.set(key,x); }
       if(!x) continue;
       if(x.sc>best){ best=x.sc; firsts=[s1]; word=x.w; } else if(x.sc===best&&!firsts.includes(s1)) firsts.push(s1); } }
@@ -1060,8 +1065,8 @@ function strongMove(t0){ const L=S.opp.map(letterOf), now=smartBest(L); oppMemo(
   const ok=all.filter(st=>!(heavy&&st.t==='split'&&!st.top));
   let best=[], bs=now?now.sc:0;
   for(const st of ok){ const b=st.top; if(!b) continue; if(b.sc>bs){ bs=b.sc; best=[st]; } else if(b.sc===bs&&best.length) best.push(st); }
-  if(!heavy){ const order=ok.slice().sort((a,b)=>(b.top?b.top.sc:0)-(a.top?a.top.sc:0)); const p=strongPlan(L,bs,order,t0); if(p){ go(pick(p.firsts),`2手先「${p.w}」${p.sc}点`); return; } }
-  if(best.length){ go(pick(best)); return; }
+  if(!heavy){ const order=ok.slice().sort((a,b)=>(b.top?b.top.sc:0)-(a.top?a.top.sc:0)); const p=strongPlan(L,bs,order,t0); if(p){ go(pickCheap(p.firsts),`2手先「${p.w}」${p.sc}点`); return; } }
+  if(best.length){ go(pickCheap(best)); return; }
   if(now){ cpuThrow(now.w); return; }
   const steps=ok; // 戻るだけの手は除く（D-061）
   if(steps.length&&S.opp.length<=8) go(pick(fresh(steps)));
@@ -1360,14 +1365,14 @@ buildDiagram();
 const SC_LABEL=['向きの近道','Shortcuts for turning']; // 見出しは仮（ここ1か所で直す）
 function turnSteps(root,r0,f0){ // その字の向きから、回す・裏返すだけで行ける向き（norm のあと）ごとの最短の手順
   const at=(r,f)=>{ const p={root,r,f}; norm(p); return p; }, id=p=>p.r+','+p.f;
-  const s0=at(r0,f0), seen=new Map([[id(s0),{p:s0,ops:[]}]]), q=[s0];
-  while(q.length){ const p=q.shift(), ops=seen.get(id(p)).ops;
-    for(const k of ['回す','裏返す']){ const n=at(k==='回す'?(p.r+1)%4:(4-p.r)%4, k==='回す'?p.f:(p.f?0:1)); if(!seen.has(id(n))){ seen.set(id(n),{p:n,ops:[...ops,k]}); q.push(n); } } }
+  const s0=at(r0,f0), seen=new Map([[id(s0),{p:s0,ops:[],path:[s0]}]]), q=[s0];
+  while(q.length){ const p=q.shift(), {ops,path}=seen.get(id(p));
+    for(const k of ['回す','裏返す']){ const n=at(k==='回す'?(p.r+1)%4:(4-p.r)%4, k==='回す'?p.f:(p.f?0:1)); if(!seen.has(id(n))){ seen.set(id(n),{p:n,ops:[...ops,k],path:[...path,n]}); q.push(n); } } }
   return seen; }
 function turnShortcuts(){ const out=[];
   for(const [root,al] of Object.entries(ALIAS)){ if(al.length<2) continue;
     for(const [from,r,f] of al){ const seen=turnSteps(root,r,f);
-      for(const [to] of al){ if(to===from) continue; const hit=[...seen.values()].find(v=>letterOf(v.p)===to); if(hit) out.push({from,to,ops:hit.ops}); } } }
+      for(const [to] of al){ if(to===from) continue; const hit=[...seen.values()].find(v=>letterOf(v.p)===to); if(hit) out.push({from,to,ops:hit.ops,path:hit.path}); } } }
   return out.sort((a,b)=>a.from.localeCompare(b.from)||a.to.localeCompare(b.to)); }
 function mergeTurnBacks(){ const out=[]; // くっつけた字（MERGE_TURN）を元の字に戻す手順
   for(const [res,[r,f]] of Object.entries(MERGE_TURN)){ const rc=RECIPE[res]; if(!rc) continue; const p0=mk(res); norm(p0);
@@ -1555,7 +1560,7 @@ function onOpponentLost(){ if(!S||S.over||S.ending) return; finish('win'); }
 /* 自動テストの窓（HB-035）。テストがページを開く前に window.HB_TEST={} を置いたときだけ、中の表と関数を渡す。ふだんの遊びでは何もしない */
 if(window.HB_TEST&&typeof window.HB_TEST==='object') Object.defineProperty(window.HB_TEST,'CAP',{get:()=>CAP,configurable:true}); // 一戦ごとに変わるので値でなく読む（HB-048）
 if(window.HB_TEST&&typeof window.HB_TEST==='object') Object.assign(window.HB_TEST,{NET,onStartMessage,KANA,PARTS,RECIPE,MERGE,MERGE_TURN,TURN,BAG,logText,makeToday,seedRng,TODAY:()=>TODAY,HAND,DICT,SPEEDS,key,
-  words:()=>WORDS, S:()=>S, mk,letterOf,checkSel,splitMade,mergeMade,comboOf,cpuOk,tapTile,doSplit,doMerge,doTurn,doThrow,render,newGame,startSolo,cpuAct,cpuThrow,setSpeed,showMeaning,SCENE_OF,exchangeCands,VOTE_TEXT,ALIAS,turnShortcuts,mergeTurnBacks});
+  words:()=>WORDS, S:()=>S, mk,letterOf,checkSel,splitMade,mergeMade,comboOf,cpuOk,tapTile,doSplit,doMerge,doTurn,doThrow,render,newGame,startSolo,cpuAct,cpuThrow,setSpeed,showMeaning,SCENE_OF,exchangeCands,VOTE_TEXT,ALIAS,turnShortcuts,mergeTurnBacks,stepsOf,cpuApply,TURN_NOT_CPU});
 
 newGame();
 showMenu();
