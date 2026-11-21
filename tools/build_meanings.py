@@ -7,7 +7,10 @@
   （ページを開き、読み込み後の WORDS を書き出す。HB-007 では Playwright で書き出した）
 - --repo：words.json の代わりに、リポジトリの index.html の手選び（HAND）と字（KANA）、dict-ipadic.js、
   Supabase の extra_words（config.js の URL と公開キーで読む）から、ページと同じ決まりで WORDS を作る。
-  extra_words が読めなければ止まる（読めないまま作ると、足した言葉の意味が消えるため）"""
+  extra_words が読めなければ止まる（読めないまま作ると、足した言葉の意味が消えるため）
+- HB-052（D-086）：tools/renyo_candidates.txt（tools/build_dict.js が作る、動詞から作る名詞の形の候補）のうち、
+  JMdict に同じ読みの名詞（pos が n）がある語だけを選び、dict-renyo.js（window.HB_RENYO）に書く（--repo のときだけ。意味も meanings.js に入る）。
+  候補のファイルが無い・--repo でないときは何もしない（dict-renyo.js は触らない）"""
 import gzip, json, os, sys, re, urllib.request
 import xml.etree.ElementTree as ET
 
@@ -33,6 +36,13 @@ def repo_words(root='.'):
 
 src, wordsf, out = sys.argv[1:4]
 words = repo_words() if wordsf == '--repo' else set(json.load(open(wordsf, encoding='utf-8')))
+# HB-052：連用形（動詞から作る名詞の形）の候補。辞書（dict-ipadic.js）に無い語だけが入っている。JMdict で名詞と分かったものだけ、あとで残す
+CAND_FILE = os.path.join('tools', 'renyo_candidates.txt')
+cands = set()
+if wordsf == '--repo' and os.path.exists(CAND_FILE):
+    cands = {w for w in open(CAND_FILE, encoding='utf-8').read().split() if w}
+    words |= cands
+noun_hit = set()   # 候補のうち、JMdict に名詞（pos が n）として載っていたもの
 # 小さい字の言葉（HB-016, D-043）：辞書には大きい字の形（ちよこ）で入り、見せる形（ちょこ）は dict-ipadic.js の HB_SMALL
 _ipa = open('dict-ipadic.js', encoding='utf-8').read()
 _m = re.search(r'window\.HB_SMALL=(\{.*?\});', _ipa)
@@ -75,14 +85,23 @@ for e in root.iter('entry'):
         kanji = [k[0] for k in ks]
         if not kanji and reb != rh: kanji = [reb]   # かなだけの語でカタカナの書き方があれば出す（ヨーヨー）
         senses = []
+        pos_now = set()   # JMdict は pos を前の意味から引き継ぐ（書かれていない意味は同じ）
         for s in e.findall('sense'):
+            ps = {x.text for x in s.findall('pos')}
+            if ps: pos_now = ps
             stagr = {x.text for x in s.findall('stagr')}
             if stagr and reb not in stagr: continue
             g = [x.text for x in s.findall('gloss') if x.text]
-            if g: senses.append(g)
+            if g:
+                senses.append(g)
+                if w in cands and 'n' in pos_now: noun_hit.add(w)
         if not senses: continue
         hits.setdefault(w, []).append((rcommon, nf, seq, kanji, senses))
 
+# HB-052：名詞として載っていない候補は、意味の表にも入れない
+renyo_ok = sorted(noun_hit)
+for w in list(hits):
+    if w in cands and w not in noun_hit: del hits[w]
 out_map = {}
 for w, es in hits.items():
     es.sort(key=lambda x: (not x[0], x[1], x[2]))   # よく使う項目を先に。次に nf の段、同じなら JMdict の順
@@ -111,6 +130,13 @@ notice = f'''/* 投げた言葉の意味（漢字の書き方・英語）。HB-0
 src_js = notice + 'window.HB_MEANINGS_NOTICE=' + json.dumps('意味（漢字・英語）は JMdict（EDRDG, https://www.edrdg.org/wiki/index.php/JMdict-EDICT_Dictionary_Project）から。CC BY-SA 4.0（https://creativecommons.org/licenses/by-sa/4.0/）。意味のデータ（meanings.js）も同じ条件で使える。JMdict_e ' + (created.group(1) if created else '') + ' 作成版。', ensure_ascii=False) + ';\n'
 src_js += 'window.HB_MEANINGS=' + json.dumps(dict(sorted(out_map.items())), ensure_ascii=False, separators=(',', ':')) + ';\n'
 open(out, 'w', encoding='utf-8').write(src_js)
+if cands:
+    renyo_js = ('/* 動詞から作る名詞の形（連用形。あそび・さまよい など）の辞書（HB-052, D-086）。tools/build_meanings.py --repo が毎日作り直す。\n'
+                '   候補は tools/renyo_candidates.txt（IPADIC の五段動詞の連用形で、dict-ipadic.js に無い3字以上）。そのうち JMdict に同じ読みの名詞（pos が n）がある語だけ。\n'
+                '   外すとき：このファイルの HB_RENYO を空にするか、index.html の script 行を消す（無くてもページは動く） */\n'
+                'window.HB_RENYO=' + json.dumps(' '.join(renyo_ok), ensure_ascii=False) + ';\n')
+    open('dict-renyo.js', 'w', encoding='utf-8').write(renyo_js)
+    print('renyo candidates', len(cands), 'selected', len(renyo_ok), 'e.g.', renyo_ok[:20], 'dropped e.g.', sorted(cands - noun_hit)[:20])
 print('words', len(words), 'with', len(out_map), 'without', len(words) - len(out_map))
 print('small words with meaning', sum(1 for w in out_map if w in SMALL_SHOW), 'of', len(SMALL_SHOW))
 for t in ['ちよこ', 'しよう', 'すつぱい', 'もつたいない', 'まつくろい', 'はし', 'よーよー', 'つよい', 'すこ', 'あほ', 'すめし', 'いき', 'はこね', 'めーる', 'しし']:

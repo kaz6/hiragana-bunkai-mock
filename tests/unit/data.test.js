@@ -4,7 +4,7 @@ const assert = require('node:assert');
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
-const { DICT_WORDS_NOW, MEANINGS_NOW, MIN_RATIO } = require('../counts');
+const { DICT_WORDS_NOW, MEANINGS_NOW, RENYO_WORDS_NOW, MIN_RATIO } = require('../counts');
 
 const ROOT = path.join(__dirname, '..', '..');
 // ブラウザ用の data ファイルを読み、window に入ったものを返す
@@ -62,4 +62,19 @@ test('cpu-ng.js・nice-words.js・scenes.js が読める', () => {
 test('config.js には公開キー（publishable）だけ', () => {
   const c = load('config.js').HB_SUPABASE;
   assert.match(c.key, /^sb_publishable_/);
+});
+
+test('動詞から作る名詞の形（HB-052）：候補に さまよい・きこし がある／dict-renyo.js の語は候補の中で、辞書に無く、字で書け、語数が減っていない', () => {
+  const cands = fs.readFileSync(path.join(ROOT, 'tools', 'renyo_candidates.txt'), 'utf8').split(/\s+/).filter(Boolean);
+  assert.ok(cands.includes('さまよい') && cands.includes('きこし'));
+  assert.ok(!cands.includes('あそび'), 'あそび は 字（び）が作れないので候補に出ない');
+  const dict = new Set(String(load('dict-ipadic.js').HB_IPADIC).split(/\s+/));
+  assert.deepStrictEqual(cands.filter(w => dict.has(w)).slice(0, 5), [], '候補は辞書に無い語だけ');
+  assert.ok(cands.every(w => { const cs = [...w]; return cs.length >= 3 && cs.length <= 12 && cs[0] !== 'ー' && cs.every(c => c === 'ー' || KANA.has(c)); }));
+  const r = String(load('dict-renyo.js').HB_RENYO).split(/\s+/).filter(Boolean);
+  const cs = new Set(cands);
+  assert.deepStrictEqual(r.filter(w => !cs.has(w)).slice(0, 5), [], 'dict-renyo.js の語は候補の中だけ');
+  assert.strictEqual(new Set(r).size, r.length);
+  assert.ok(r.length >= Math.floor(RENYO_WORDS_NOW * MIN_RATIO), `語数 ${r.length}（記録 ${RENYO_WORDS_NOW}）`);
+  assert.ok(html.includes('<script src="dict-renyo.js"></script>'));
 });

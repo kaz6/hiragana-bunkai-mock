@@ -493,6 +493,7 @@ small.en.b{display:block;margin-left:0}
 <script src="config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="dict-ipadic.js"></script>
+<script src="dict-renyo.js"></script>
 <script src="meanings.js"></script>
 <script src="meanings-author.js"></script>
 <script src="scenes.js"></script>
@@ -637,7 +638,7 @@ const HAND=new Set(`
 こぐ くだ べろ すべ ざま じつ ぼる ろぐ ぐず いぎ ぎじ ちご じち ばー ぱー
 `.trim().split(/\s+/));
 // 自動の相手は HAND（手選び）だけを使う。こちらは IPADIC も通る
-const WORDS=[...new Set([...HAND].concat(String(window.HB_IPADIC||'').split(/\s+/)))].filter(w=>w && w[0]!=='ー' && [...w].length>=2 && [...w].every(c=>c==='ー'||KANA.has(c)));
+const WORDS=[...new Set([...HAND].concat(String(window.HB_IPADIC||'').split(/\s+/),String(window.HB_RENYO||'').split(/\s+/)))] /* HB_RENYO：動詞から作る名詞の形（dict-renyo.js。HB-052, D-086） */.filter(w=>w && w[0]!=='ー' && [...w].length>=2 && [...w].every(c=>c==='ー'||KANA.has(c)));
 const DICT=new Set(WORDS);
 /* CPU が投げない語（HB-029, D-064）。一覧は cpu-ng.js。比べる形は辞書と同じ（小さい字→大きい字。D-043）。人の側の判定には使わない */
 const bigForm=w=>String(w).normalize('NFC').replace(/[ぁぃぅぇぉっゃゅょゎ]/g,c=>String.fromCharCode(c.charCodeAt(0)+1));

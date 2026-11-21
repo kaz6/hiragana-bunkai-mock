@@ -4,5 +4,6 @@ module.exports = {
   DICT_WORDS_NOW: 31286,  // dict-ipadic.js（3字以上。HB-042 で て・で・そ・ぞ・ん・え を足した作り直しのあと。前は 17809）
   PAGE_WORDS_NOW: 18193,  // ページの WORDS（手選び＋dict-ipadic.js＋テストの固定 extra_words）
   MEANINGS_NOW: 11151,    // meanings.js の意味のある語
+  RENYO_WORDS_NOW: 0,     // dict-renyo.js（HB-052）の語数。JMdict を取れる毎日の更新が最初に埋めるまでは 0。埋まったら記録を直す（0 のあいだは減りの見張りをしない）
   MIN_RATIO: 0.9,
 };

@@ -49,7 +49,8 @@ jobs:
       - name: 意味のデータが変わったときだけコミットして push
         run: |
           new="$RUNNER_TEMP/meanings.js"
-          if cmp -s <(grep '^window.HB_MEANINGS=' "$new") <(grep '^window.HB_MEANINGS=' meanings.js); then
+          # HB-052：build_meanings.py は dict-renyo.js（動詞から作る名詞の形）もこの作業場に書き直す。意味も辞書も変わっていなければ何もしない
+          if cmp -s <(grep '^window.HB_MEANINGS=' "$new") <(grep '^window.HB_MEANINGS=' meanings.js) && git diff --quiet -- dict-renyo.js; then
             echo "変化なし。何もしない"
             exit 0
           fi
@@ -64,8 +65,8 @@ jobs:
           cp "$new" meanings.js
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add meanings.js
-          git commit -m "自動：足した言葉の意味を更新" -m "GitHub Actions（.github/workflows/meanings.yml）が JMdict_e と extra_words から作り直した"
+          git add meanings.js dict-renyo.js
+          git commit -m "自動：足した言葉の意味を更新" -m "GitHub Actions（.github/workflows/meanings.yml）が JMdict_e と extra_words から作り直した（動詞から作る名詞の形 dict-renyo.js も）"
           for i in 1 2 3 4; do
             git pull --rebase origin main && git push origin HEAD:main && exit 0
             sleep $((2**i))
