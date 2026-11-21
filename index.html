@@ -515,6 +515,7 @@ small.en.b{display:block;margin-left:0}
 <script src="cpu-ng.js"></script>
 <script src="nice-words.js"></script>
 <script src="scene-groups.js"></script>
+<script src="lang-ko.js"></script>
 <script>
 (()=>{
 'use strict';
@@ -954,8 +955,8 @@ function renderMeanSet(){ document.querySelectorAll('#meanSet button').forEach(b
   const ri=$('roomInput'); if(ri) ri.placeholder=LANG==='ja'?'合言葉':LANG==='ko'?(koOf('合言葉')||'Room code'):'Room code'; }
 /* ---- 画面の言葉の切り替え（HB-057, D-091）----
    英語は <small class="en"> として日本語の文のあとに付いている。日本語の文（その前の兄弟）を span.jp で包み、English・한국어 のときは .jp を消して英語を主にする。
-   動きで作り直される所も多いので、MutationObserver で足された small.en を包む。한국어の表（KO_FIX・KO_PAT。日本語の文を鍵にする）は HB-058 で入れる。表に無い文は English */
-const KO_FIX={}, KO_PAT=[];
+   動きで作り直される所も多いので、MutationObserver で足された small.en を包む。한국어の表（KO_FIX・KO_PAT。日本語の文を鍵にする。しくみの図の英語の一言は KO_DG。lang-ko.js。HB-058）。表に無い文は English */
+const KO_FIX=(window.HB_KO&&window.HB_KO.FIX)||{}, KO_PAT=(window.HB_KO&&window.HB_KO.PAT)||[], KO_DG=(window.HB_KO&&window.HB_KO.DG)||[]; // 表は lang-ko.js（HB-058）
 function koOf(jp){ if(!jp) return ''; if(KO_FIX[jp]) return KO_FIX[jp]; for(const [re,f] of KO_PAT){ const m=String(jp).match(re); if(m) return f(m); } return ''; }
 function wrapJp(root){ if(!root||root.nodeType!==1) return;
   const list=[...(root.matches('small.en')?[root]:[]),...root.querySelectorAll('small.en')];
@@ -966,11 +967,13 @@ function wrapJp(root){ if(!root||root.nodeType!==1) return;
     if(nodes.some(n=>n.nodeType===1||n.textContent.trim())){ const j=document.createElement('j-p'); j.className='jp'; /* span ではなく独自の名前の要素：CSS の「.rim span」などに当たらない */ anchor.parentNode.insertBefore(j,nodes[0]); nodes.forEach(n=>j.appendChild(n)); en.dataset.jp=j.textContent.trim(); }
     else if(p&&p.id&&/En$/.test(p.id)){ const pj=document.getElementById(p.id.replace(/En$/,'')); if(pj) en.dataset.jp=pj.textContent.trim(); }
     applyKo(en); } }
+function koDg(en){ for(const [re,f] of KO_DG){ const m=String(en).match(re); if(m) return f(m); } return ''; }
+function applyDg(p){ if(p.dataset.en==null) p.dataset.en=p.textContent; const k=LANG==='ko'?koDg(p.dataset.en):''; const t=k||p.dataset.en; if(p.textContent!==t) p.textContent=t; p.lang=k?'ko':'en'; } // しくみの図の英語の一言（p.dg-en）
 function applyKo(en){ if(en.dataset.en==null) return; const k=LANG==='ko'?koOf(en.dataset.jp||''):''; const t=k||en.dataset.en; if(en.textContent!==t) en.textContent=t; en.lang=k?'ko':'en'; }
-new MutationObserver(ms=>{ for(const m of ms) m.addedNodes.forEach(wrapJp); }).observe(document.body,{childList:true,subtree:true});
+new MutationObserver(ms=>{ for(const m of ms) m.addedNodes.forEach(n=>{ wrapJp(n); if(n.nodeType===1){ if(n.matches('.dg-en')) applyDg(n); n.querySelectorAll('.dg-en').forEach(applyDg); } }); }).observe(document.body,{childList:true,subtree:true});
 function applyLang(){ const h=document.documentElement;
   h.classList.toggle('no-en',LANG==='ja'); h.classList.toggle('en-main',LANG!=='ja'); h.lang=LANG;
-  wrapJp(document.body); document.querySelectorAll('small.en').forEach(applyKo);
+  wrapJp(document.body); document.querySelectorAll('small.en').forEach(applyKo); document.querySelectorAll('.dg-en').forEach(applyDg);
   document.querySelectorAll('.langBtn').forEach(b=>{ b.textContent=LANG_UI[LANG][0]; b.setAttribute('aria-label',LANGS.map(l=>LANG_UI[l][1]).join(' / ')); });
   document.querySelectorAll('.langSet').forEach(el=>{ if(!el.firstChild) el.innerHTML=LANGS.map(l=>`<button type="button" data-lang="${l}" lang="${l}">${LANG_UI[l][1]}</button>`).join(''); el.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.lang===LANG))); });
   renderMeanSet(); }
