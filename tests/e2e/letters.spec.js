@@ -155,7 +155,7 @@ test('り＋一→け（どちらの順でも）。割ると ｜＋十（D-072�
 
 test('り は字の一覧（KANA）と回す・裏返す表（TURN）にあり、袋（BAG）にはない（D-072）', async ({ page }) => {
   const r = await page.evaluate(() => { const T = window.HB_TEST; return { kana: T.KANA.has('り'), bag: T.BAG.includes('り'),
-    turnI: T.TURN['い'].map(x => x.join(':')), turnRi: T.TURN['り'].map(x => x.join(':')), turnKo: T.TURN['こ'].map(x => x.join(':')) }; });
+    turnI: T.TURN['い'].map(x => x.slice(0, 2).join(':')), turnRi: T.TURN['り'].map(x => x.slice(0, 2).join(':')), turnKo: T.TURN['こ'].map(x => x.slice(0, 2).join(':')) }; });
   expect(r.kana).toBe(true);
   expect(r.bag).toBe(false);
   expect(r.turnI).toEqual(['こ:回した', 'り:裏返した']);
