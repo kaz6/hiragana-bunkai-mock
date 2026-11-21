@@ -15,6 +15,19 @@ test('390px で開いてエラーがない。はじめの画面に ひとりで�
   expect(await noOverflow(page)).toBe(true);
 });
 
+test('はじめの画面の ひとりで・入室 は var(--me) の塗り。▶ が付く（HB-056, D-090）', async ({ page }, info) => {
+  info.ctx = await openGame(page);
+  const bg = await page.evaluate(() => {
+    const probe = document.createElement('div'); probe.style.background = 'var(--me)'; document.body.appendChild(probe);
+    const me = getComputedStyle(probe).backgroundColor; probe.remove();
+    return { me, solo: getComputedStyle(document.getElementById('btnSolo')).backgroundColor, join: getComputedStyle(document.getElementById('btnJoin')).backgroundColor };
+  });
+  expect(bg.solo).toBe(bg.me);
+  expect(bg.join).toBe(bg.me);
+  await expect(page.locator('#btnSolo')).toContainText('▶ ひとりで（CPU）');
+  expect(await noOverflow(page)).toBe(true);
+});
+
 test('「？ 遊び方」が開いて、ルールの3行がある。とじるで閉じる', async ({ page }, info) => {
   info.ctx = await openGame(page);
   await startSolo(page, 'ゆるゆる');
