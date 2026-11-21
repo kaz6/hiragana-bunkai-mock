@@ -52,14 +52,47 @@ test.describe('en-US：English が主。日本語の画面の文は出ない（�
   });
 });
 
-test.describe('ko-KR：한국어の表がまだ空なので English で出る', () => {
+test.describe('ko-KR：한국어が主。表に無い文は English（HB-058）', () => {
   test.use({ locale: 'ko-KR' });
-  test('ボタンは KO。表に無い文は English', async ({ page }, info) => {
+  test('はじめの画面・遊ぶ画面・しくみが韓国語で出る。日本語の画面の文は出ない（札・言葉はひらがな）', async ({ page }, info) => {
     info.ctx = await openGame(page);
     expect(await page.evaluate(() => document.documentElement.lang)).toBe('ko');
     await expect(page.locator('#btnLangMenu')).toHaveText('KO');
-    expect((await page.locator('#btnSolo').innerText()).replace(/\s+/g, ' ')).toBe('Solo vs CPU');
+    expect((await page.locator('#btnSolo').innerText()).replace(/\s+/g, ' ')).toBe('혼자서 (CPU)');
+    expect(await page.locator('#roomInput').getAttribute('placeholder')).toBe('방 코드');
+    await startSolo(page, 'ゆるゆる');
+    expect((await page.locator('#btnHelp').innerText()).trim()).toBe('작동 방식');
+    expect((await page.locator('#btnHow').innerText()).trim()).toBe('? 게임 방법');
+    expect(await page.locator('#aSplit').innerText()).toMatch(/쪼개기/);
+    expect(await page.locator('#aSplit').innerText()).not.toMatch(/Split|割る/);
+    expect(await page.locator('#aMerge').innerText()).toMatch(/붙이기/);
+    expect(await page.locator('#basket .tile').first().innerText()).toMatch(/[ぁ-ん一｜十ー∘゛゜]/);
+    expect(await page.locator('#today').innerText()).toMatch(/^오늘의 글자 많이: .+ \/ 적게: .+$/);
     expect(await noOverflow(page)).toBe(true);
+  });
+  test('声・しくみの図の一言・結果の画面も韓国語。表に無い文は English のまま', async ({ page }, info) => {
+    info.ctx = await openGame(page);
+    await startSolo(page, 'ゆるゆる');
+    await page.evaluate(() => { const T = window.HB_TEST; T.showMeaning('よろしく', 'op'); T.showMeaning('よろしこ', 'me'); });
+    expect(await page.evaluate(() => document.getElementById('combo').innerText)).toContain('인사로 답례!');
+    await page.click('#btnHelp');
+    const dg = await page.locator('#diagram .dg-en').allInnerTexts();
+    expect(dg).toContain('쪼개기');
+    expect(dg.some(t => /^단어를 던져 상대 바구니를 채워요/.test(t))).toBe(true);
+    expect(await page.locator('#diagram .dg-en').first().getAttribute('lang')).toBe('ko');
+    await page.click('#btnClose');
+    await page.evaluate(() => { const T = window.HB_TEST, S = T.S(); S.log = [{ who: 'op', word: 'ほしよう' }, { who: 'me', word: 'ぶしよう', k: 2 }]; S.over = 'win'; T.render(); });
+    await expect(page.locator('#resBig')).toContainText('상대 바구니가 넘쳤어요. 승리');
+    expect((await page.locator('#resVotes button[data-v="good"]').first().innerText()).trim()).toBe('좋아요'); // 日本語の文は見えない（textContent には残る）
+    await expect(page.locator('#resSub')).toContainText('던진 단어: 나 1, 상대 1');
+    expect(await noOverflow(page)).toBe(true);
+    // 韓国語の表に無い文は English（空にしない）
+    expect(await page.evaluate(() => { const e = document.createElement('div'); e.innerHTML = '表に無い文<small class="en" lang="en">Not in the table</small>'; document.body.appendChild(e); return new Promise(r => setTimeout(() => r(e.querySelector('small.en').textContent), 50)); })).toBe('Not in the table');
+  });
+  test('韓国語の字が出る（□にならない）：ハングルの字の幅が見える', async ({ page }, info) => {
+    info.ctx = await openGame(page);
+    const w = await page.evaluate(() => { const s = document.createElement('span'); s.style.cssText = 'font:16px var(--f-ui);position:absolute'; s.textContent = '쪼개기 돌리기 뒤집기 붙이기'; document.body.appendChild(s); const r = s.getBoundingClientRect().width; s.remove(); return r; });
+    expect(w).toBeGreaterThan(60);
   });
 });
 

@@ -78,3 +78,14 @@ test('動詞から作る名詞の形（HB-052）：候補に さまよい・き�
   assert.ok(r.length >= Math.floor(RENYO_WORDS_NOW * MIN_RATIO), `語数 ${r.length}（記録 ${RENYO_WORDS_NOW}）`);
   assert.ok(html.includes('<script src="dict-renyo.js"></script>'));
 });
+
+test('韓国語の表（lang-ko.js。HB-058）：読める・index.html が読み込む・英語の表（EN_FIX・案内・はじめの3行）の文は全部ある', () => {
+  const ko = load('lang-ko.js').HB_KO;
+  assert.ok(ko && ko.FIX && Array.isArray(ko.PAT) && Array.isArray(ko.DG));
+  assert.ok(Object.values(ko.FIX).every(v => typeof v === 'string' && v));
+  assert.ok(html.includes('<script src="lang-ko.js"></script>'));
+  const grab = re => vm.runInNewContext('(' + html.match(re)[0].replace(/^const \w+=/, '').replace(/;$/, '') + ')');
+  const missing = [...Object.keys(grab(/const EN_FIX=\{[\s\S]*?\};/)), ...Object.values(grab(/const GUIDE_TEXT=\{[\s\S]*?\};/)), ...grab(/const RULES3=\[[\s\S]*?\]\];/).map(r => r[0])]
+    .filter(jp => !ko.FIX[jp] && !ko.FIX['↑' + jp]);
+  assert.deepStrictEqual(missing, []);
+});
