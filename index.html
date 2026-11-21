@@ -144,7 +144,17 @@ button:focus-visible{outline:2px solid var(--me);outline-offset:2px}
 .g{display:block;transition:transform .17s ease-out}
 .g.mark{font-size:1.9em;line-height:1;translate:.18em .12em} /* ゜と゛は字のままだと小さく左上に寄るので、大きくして真ん中へ（HB-013） */
 .ord{position:absolute;right:4px;top:3px;font:700 12px/1 var(--f-ui);color:var(--me-ink)}
-.tile.crack .face{animation:crack .26s ease-in}
+.tile.crack .face{animation:none}
+/* 割る・くっつける の動き（HB-051, D-085）。数字は JS の FX にまとめてある。見た目は作者が目で決める */
+.tile.cut .face{opacity:0}
+.tile .half{position:absolute;inset:0;border-radius:7px;background:var(--tile);color:var(--ink);display:grid;place-items:center;font:600 30px/1 var(--f-kana);pointer-events:none;
+  transition:transform var(--fx-split,.26s) cubic-bezier(.2,.8,.3,1)}
+.tile .half.sel{background:var(--me);color:var(--me-ink)}
+.tile .slash{position:absolute;left:50%;top:50%;width:150%;height:3px;margin:-1.5px 0 0 -75%;transform:rotate(-57deg) scaleX(0);background:#fff;border-radius:2px;box-shadow:0 0 6px 1px rgba(255,255,255,.9);
+  pointer-events:none;opacity:0}
+.tile.snap .face{animation:snap var(--fx-snap,.34s) var(--fx-pull,.16s) both}
+.ghost{position:absolute;left:0;top:0;pointer-events:none;z-index:5}
+@keyframes snap{0%{transform:scale(1,1)}30%{transform:scale(1.28,.72)}65%{transform:translateY(calc(var(--s)*-.2)) scale(.92,1.1)}100%{transform:scale(1,1)}}
 /* 濁音が落ちてきたときのキラキラ（HB-026, D-058）。.kira は札の最初の子なので .face の下に虹の縁だけが見える */
 .kira{position:absolute;inset:-3px;border-radius:10px;pointer-events:none;
   background:conic-gradient(#ff5a5a,#ffb23f,#ffe14a,#5fd35f,#4ac8ff,#6a7bff,#d36bff,#ff5a5a);animation:kiraRing 1.2s .3s ease-out both}
@@ -155,7 +165,6 @@ button:focus-visible{outline:2px solid var(--me);outline-offset:2px}
   35%{opacity:1;transform:translate(calc(var(--x)*var(--s)),calc(var(--y)*var(--s))) scale(1.1) rotate(45deg)}
   100%{opacity:0;transform:translate(calc(var(--x)*var(--s)*1.15),calc(var(--y)*var(--s)*1.15)) scale(.6) rotate(90deg)}}
 @media (prefers-reduced-motion: reduce){ .kira{animation:none} } /* 動きを減らす設定：縁の色だけ（約1.2秒で消す） */
-@keyframes crack{0%{transform:translateY(0)}45%{transform:translateY(-24px)}85%{transform:translateY(3px)}100%{transform:translateY(0) scale(1.06)}}
 
 /* 台 */
 .tray{display:flex;align-items:center;gap:10px;min-height:44px}
@@ -308,7 +317,7 @@ small.en.b{display:block;margin-left:0}
 @keyframes gbob{0%,100%{translate:0 0}50%{translate:0 -5px}}
 .guide.above.bob{animation-name:gbob2} @keyframes gbob2{0%,100%{translate:0 0}50%{translate:0 5px}}
 .guideSet button{font:600 calc(14px*var(--fz))/1 var(--f-ui);padding:8px 12px;border-radius:999px;border:1px solid var(--sub);background:transparent;color:inherit;margin-top:6px}
-@media (prefers-reduced-motion: reduce){ .tile,.g{transition:none} .tile.crack .face{animation:none} .guide.bob{animation:none} }
+@media (prefers-reduced-motion: reduce){ .tile,.g{transition:none} .tile.crack .face{animation:none} .guide.bob{animation:none} .tile.snap .face{animation:none} }
 </style>
 
 <div class="app">
@@ -735,12 +744,33 @@ function locked(){ return S.over||S.ending||S.busy; }
 function tapTile(id){ if(locked()) return; const i=S.sel.indexOf(id); if(i>=0) S.sel.splice(i,1); else S.sel.push(id); S.choose=null; render(); }
 function one(){ const ps=selPieces(); return ps.length===1?ps[0]:null; }
 
+/* 割る・くっつける の動き（HB-051, D-085。自分のカゴだけ）。数字はここだけ。動きを減らす設定では何も出さない */
+const FX={ angle:57,      // 斬る線の角度（度。割るのアイコン img/icons/split.png の割れ目に合わせた。右上がり）
+  slashMs:120,            // 線が走る時間
+  splitMs:260,            // 二つに分かれて動く時間（割るの待ち 0.26 秒のまま）
+  splitPx:14,             // 分かれる距離（px。線に直角に、左右へ）
+  pullMs:160,             // 2枚が引き寄せられて重なる時間
+  snapMs:340,             // できた札がつぶれて跳ねる時間
+  squashX:1.28, squashY:.72, hop:.2 }; // つぶれ方（横・縦）、跳ねの高さ（札の大きさの割合）
+function fxSplit(el,p){ if(reduced||!el) return; const a=FX.angle*Math.PI/180, dx=Math.cos(a), dy=-Math.sin(a), nx=-dy, ny=dx; // 線の向き（右上がり）と、線に直角の向き
+  const face=el.querySelector('.face'); const pt=(x,y)=>`${(50+x*120).toFixed(1)}% ${(50+y*120).toFixed(1)}%`;
+  const sel=el.classList.contains('sel'); el.classList.add('cut'); el.style.setProperty('--fx-split',FX.splitMs+'ms');
+  const mkHalf=side=>{ const h=face.cloneNode(true); h.className='half'+(sel?' sel':''); const q=side;
+    h.style.clipPath=`polygon(${pt(dx,dy)}, ${pt(-dx,-dy)}, ${pt(-dx+q*nx,-dy+q*ny)}, ${pt(dx+q*nx,dy+q*ny)})`; el.insertBefore(h,el.firstChild); return h; };
+  const h1=mkHalf(1), h2=mkHalf(-1), line=document.createElement('i'); line.className='slash'; el.appendChild(line);
+  line.animate([{transform:`rotate(${-FX.angle}deg) scaleX(0)`,opacity:1},{transform:`rotate(${-FX.angle}deg) scaleX(1)`,opacity:1,offset:.8},{transform:`rotate(${-FX.angle}deg) scaleX(1)`,opacity:0}],{duration:FX.splitMs,easing:'ease-out',fill:'forwards'});
+  setTimeout(()=>{ h1.style.transform=`translate(${nx*FX.splitPx}px,${ny*FX.splitPx}px)`; h2.style.transform=`translate(${-nx*FX.splitPx}px,${-ny*FX.splitPx}px)`; },FX.slashMs); }
+function fxGhosts(list){ if(reduced) return []; return list.map(p=>{ const el=els.get(p.id); if(!el) return null; const g=el.cloneNode(true); g.className='ghost'; g.style.cssText=`transform:translate(${p.x}px,${p.y}px);transition:none`; return g; }).filter(Boolean); }
+function fxMerge(ghosts,n){ if(reduced||!ghosts.length) return; const el=els.get(n.id); if(!el) return;
+  ghosts.forEach(g=>{ basket.appendChild(g); void g.offsetWidth; g.style.transition=`transform ${FX.pullMs}ms ease-in,opacity ${FX.pullMs}ms ease-in`; g.style.transform=`translate(${n.x}px,${n.y}px)`; g.style.opacity='.9'; setTimeout(()=>g.remove(),FX.pullMs+30); });
+  el.style.setProperty('--fx-pull',FX.pullMs+'ms'); el.style.setProperty('--fx-snap',FX.snapMs+'ms');
+  el.classList.remove('snap'); void el.offsetWidth; el.classList.add('snap'); setTimeout(()=>el.classList.remove('snap'),FX.pullMs+FX.snapMs+40); }
 function doSplit(){ const ps0=selPieces(); const p=ps0[ps0.length-1]; if(!p||locked()) return; /* 割るのは選んだ最後の1枚（HB-034, D-070） */ const L=letterOf(p); const parts=RECIPE[L]; if(!parts||S.mine.length>=CAP) return;
-  begin(); S.busy=true; const el=els.get(p.id); if(el) el.classList.add('crack');
+  begin(); S.busy=true; const el=els.get(p.id); if(el){ el.classList.add('crack'); fxSplit(el,p); }
   setTimeout(()=>{ S.busy=false; if(S.over||S.ending){ render(); return; } // 動きの間に勝ち負けが決まったら、割らない（D-054）
     const i=S.mine.indexOf(p);
     const made=splitMade(p,L,parts,{spawn:{x:p.x,y:p.y}}); // 戻すだけの往復は数えない（D-067）
-    S.mine.splice(i,1,...made); S.sel=S.sel.filter(id=>id!==p.id); /* 割った2つは選ばない。前に選んだ札はそのまま（D-070） */ lg('me',`割る ${L}→${parts.join('＋')}`); render(); }, reduced?0:260); }
+    S.mine.splice(i,1,...made); S.sel=S.sel.filter(id=>id!==p.id); /* 割った2つは選ばない。前に選んだ札はそのまま（D-070） */ lg('me',`割る ${L}→${parts.join('＋')}`); render(); }, reduced?0:FX.splitMs); }
 
 function doTurn(kind){ const ps0=selPieces(); const p=ps0[ps0.length-1]; if(!p||locked()) return; begin(); const before=letterOf(p)||'〓';
   const el=els.get(p.id), g=el&&el.querySelector('.g');
@@ -754,8 +784,8 @@ function doTurn(kind){ const ps0=selPieces(); const p=ps0[ps0.length-1]; if(!p||
 
 function doMerge(res){ const ps=selPieces(); if(ps.length<2||locked()) return; begin();
   const [a,b]=ps.slice(-2), la=letterOf(a), lb=letterOf(b); const i=Math.min(S.mine.indexOf(a),S.mine.indexOf(b));
-  const n=mergeMade(a,b,res,{spawn:{x:a.x,y:a.y}},true); // 戻すだけの往復は数えない（D-067）。true＝できた字を MERGE_TURN の向きで出す（自分だけ）
-  S.mine=S.mine.filter(p=>p!==a&&p!==b); S.mine.splice(i,0,n); S.sel=S.sel.filter(id=>id!==a.id&&id!==b.id).concat(n.id); /* できた字はその位置で選ばれたまま（D-070） */ S.choose=null; lg('me',`くっつける ${la}＋${lb}→${res}`+(letterOf(n)!==res?`（${res}の裏返して回した向き）`:'')); render(); }
+  const gh=fxGhosts([a,b]); const n=mergeMade(a,b,res,{spawn:{x:a.x,y:a.y}},true); // 戻すだけの往復は数えない（D-067）。true＝できた字を MERGE_TURN の向きで出す（自分だけ）
+  S.mine=S.mine.filter(p=>p!==a&&p!==b); S.mine.splice(i,0,n); S.sel=S.sel.filter(id=>id!==a.id&&id!==b.id).concat(n.id); /* できた字はその位置で選ばれたまま（D-070） */ S.choose=null; lg('me',`くっつける ${la}＋${lb}→${res}`+(letterOf(n)!==res?`（${res}の裏返して回した向き）`:'')); render(); fxMerge(gh,n); }
 
 function doDraw(){ if(locked()||S.mine.length>=CAP) return; begin(); const n=mk(pick(TODAY.bag)); S.mine.push(n); lg('me','引く '+letterOf(n)); render(); }
 
@@ -1559,7 +1589,7 @@ function onOpponentLost(){ if(!S||S.over||S.ending) return; finish('win'); }
 
 /* 自動テストの窓（HB-035）。テストがページを開く前に window.HB_TEST={} を置いたときだけ、中の表と関数を渡す。ふだんの遊びでは何もしない */
 if(window.HB_TEST&&typeof window.HB_TEST==='object') Object.defineProperty(window.HB_TEST,'CAP',{get:()=>CAP,configurable:true}); // 一戦ごとに変わるので値でなく読む（HB-048）
-if(window.HB_TEST&&typeof window.HB_TEST==='object') Object.assign(window.HB_TEST,{NET,onStartMessage,KANA,PARTS,RECIPE,MERGE,MERGE_TURN,TURN,BAG,logText,makeToday,seedRng,TODAY:()=>TODAY,HAND,DICT,SPEEDS,key,
+if(window.HB_TEST&&typeof window.HB_TEST==='object') Object.assign(window.HB_TEST,{FX,NET,onStartMessage,KANA,PARTS,RECIPE,MERGE,MERGE_TURN,TURN,BAG,logText,makeToday,seedRng,TODAY:()=>TODAY,HAND,DICT,SPEEDS,key,
   words:()=>WORDS, S:()=>S, mk,letterOf,checkSel,splitMade,mergeMade,comboOf,cpuOk,tapTile,doSplit,doMerge,doTurn,doThrow,render,newGame,startSolo,cpuAct,cpuThrow,setSpeed,showMeaning,SCENE_OF,exchangeCands,VOTE_TEXT,ALIAS,turnShortcuts,mergeTurnBacks,stepsOf,cpuApply,TURN_NOT_CPU});
 
 newGame();
