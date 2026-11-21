@@ -33,10 +33,11 @@ window.__hbSent=[];
 /**
  * ページを開く。返す errors はページのエラーとコンソールのエラー（テストの最後に空であることを見る）
  * opts.guide：false なら最初の1戦の案内を見た扱いにする（初めの手で CPU が止まらないように）
+ * opts.tutorial：false なら最初の一戦のチュートリアルを済んだ扱いにする（HB-059。tutorial.spec.js だけ true）
  * opts.dictRenyo：{status, body} を渡すと dict-renyo.js の返事をそれにする（HB-052。renyo.spec.js）
  */
 async function openGame(page, opts = {}) {
-  const { guide = false, extraWords = EXTRA_WORDS, dictRenyo = null } = opts;
+  const { guide = false, tutorial = false, extraWords = EXTRA_WORDS, dictRenyo = null } = opts;
   const errors = [];
   const blocked = [];
   page.on('pageerror', e => errors.push('pageerror: ' + e.message));
@@ -55,11 +56,11 @@ async function openGame(page, opts = {}) {
     blocked.push(url);
     return route.fulfill({ status: 503, body: '' }); // 外へは出さない（abort だとコンソールにエラーが出るので、空の返事にする）
   });
-  await page.addInitScript(({ guide, extraWords }) => {
+  await page.addInitScript(({ guide, tutorial, extraWords }) => {
     window.HB_TEST = {};            // index.html の「自動テストの窓」を開ける
     window.__HB_EXTRA = extraWords;
-    try { if (!guide) localStorage.setItem('hb.guide', 'done'); } catch (e) {}
-  }, { guide, extraWords });
+    try { if (!guide) localStorage.setItem('hb.guide', 'done'); if (!tutorial) localStorage.setItem('hb.tutorial', 'done'); } catch (e) {}
+  }, { guide, tutorial, extraWords });
   await page.goto(ORIGIN);
   await page.waitForFunction(() => window.HB_TEST && window.HB_TEST.S && window.HB_TEST.S());
   // extra_words の読み込み（Promise の後）を待つ

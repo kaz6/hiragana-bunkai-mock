@@ -327,10 +327,16 @@ small.en.b{display:block;margin-left:0}
 .rules3 li+li{margin-top:6px}
 .guide .ga{display:inline-block;margin-right:6px;font-size:calc(18px*var(--fz));line-height:1}
 .guide.bob{animation:gbob 1s ease-in-out infinite}
+/* チュートリアル（HB-059, D-092）。一言は案内と同じ部品。次に押す札とボタンは var(--me) の縁で光らせる（新しい色は足さない） */
+.guide.tut{max-width:min(320px,calc(100vw - 16px))} .guide.tut.on{opacity:1}
+.guide.tut .tutGo{pointer-events:auto;display:block;margin:8px 0 0;font:700 calc(15px*var(--fz))/1 var(--f-ui);padding:10px 14px;border-radius:10px;border:0;background:var(--me);color:var(--me-ink);cursor:pointer}
+.tile.tutGlow .face{box-shadow:0 0 0 3px var(--me);animation:tutGlow 1s ease-in-out infinite}
+.act.tutGlow{box-shadow:0 0 0 3px var(--me);animation:tutGlow 1s ease-in-out infinite}
+@keyframes tutGlow{0%,100%{box-shadow:0 0 0 2px var(--me)}50%{box-shadow:0 0 0 6px color-mix(in srgb,var(--me) 40%,transparent)}}
 @keyframes gbob{0%,100%{translate:0 0}50%{translate:0 -5px}}
 .guide.above.bob{animation-name:gbob2} @keyframes gbob2{0%,100%{translate:0 0}50%{translate:0 5px}}
 .guideSet button{font:600 calc(14px*var(--fz))/1 var(--f-ui);padding:8px 12px;border-radius:999px;border:1px solid var(--sub);background:transparent;color:inherit;margin-top:6px}
-@media (prefers-reduced-motion: reduce){ .tile,.g{transition:none} .tile.crack .face{animation:none} .guide.bob{animation:none} .tile.snap .face{animation:none} }
+@media (prefers-reduced-motion: reduce){ .tile.tutGlow .face,.act.tutGlow{animation:none} .tile,.g{transition:none} .tile.crack .face{animation:none} .guide.bob{animation:none} .tile.snap .face{animation:none} }
 </style>
 
 <div class="app">
@@ -409,6 +415,7 @@ small.en.b{display:block;margin-left:0}
 </div>
 
 <div class="guide" id="guide" role="status" aria-live="polite" hidden></div>
+<div class="guide tut" id="tutBox" role="status" aria-live="polite" hidden></div> <!-- チュートリアルの一言（HB-059, D-092）。最初の案内（#guide）と同じ見た目 -->
 
 <div class="sheet" id="sheet" hidden>
   <div class="sheet-in">
@@ -437,6 +444,7 @@ small.en.b{display:block;margin-left:0}
       <h3>案内<small class="en" lang="en">Guide</small></h3>
       <p>はじめての1戦では、触る場所の横に一言ずつ案内が出る。</p>
       <div class="guideSet"><button type="button" id="btnGuideAgain">案内をもう一度<small class="en" lang="en">Show the guide again</small></button></div>
+      <div class="guideSet"><button type="button" id="btnTutAgain">チュートリアルをもう一度<small class="en" lang="en">Replay the tutorial</small></button></div>
     </div>
 
     <div>
@@ -516,6 +524,7 @@ small.en.b{display:block;margin-left:0}
 <script src="nice-words.js"></script>
 <script src="scene-groups.js"></script>
 <script src="lang-ko.js"></script>
+<script src="tutorial.js"></script>
 <script>
 (()=>{
 'use strict';
@@ -702,6 +711,16 @@ function verb(ops){ const r=ops.includes('回す'), f=ops.includes('裏返す');
 
 /* ---- 状態 ---- */
 let S, cpuT=null, sheetOpen=false, games=0;
+/* 最初の一戦のチュートリアル（HB-059, D-092）。on の間は、CPU は動かず、落ちてくる字は止まり（最後の濁音だけ落とす）、決まった手順の札とボタンだけが押せる。
+   step：arrive（したく が届くのを待つ）→ split → turn → flip → merge → throw → end。済んだ印は localStorage の hb.tutorial（'done'）。ふたりででは出さない */
+const TUT_KEY='hb.tutorial';
+const TUT={on:false,step:'',t:null};
+const TUT_SEQ={split:['た'],turn:['し'],flip:['⊂'],merge:['つ','十'],throw:['ち','こ','く']}; // 手ごとに、選ぶ札の字を順に（回す・裏返す・くっつけるの前に選びが残っている）
+const TUT_BTN={split:'aSplit',turn:'aRot',flip:'aFlip',merge:'aMerge',throw:'aThrow'};
+const TUT_NEXT={split:'turn',turn:'flip',flip:'merge',merge:'throw',throw:'end'};
+const TUT_WORD='したく', TUT_ARRIVE_MS=900;
+function tutDone(){ try{ return localStorage.getItem(TUT_KEY)==='done'; }catch(e){ return false; } }
+function tutMarkDone(){ try{ localStorage.setItem(TUT_KEY,'done'); }catch(e){} }
 let LOG=[], t0=0, lastNg='', tried=new Set(), sentRejects=new Set();
 function oppCount(){ return isOnline()?(S.oppL?S.oppL.length:'？'):S.opp.length; } // ふたりででは届いた数（まだ届いていなければ ？）
 /* 勝ち負けが決まったあとの自分の手は残さない（D-054） */
@@ -711,7 +730,8 @@ function logText(){ return [`ひらがな分解（仮）ログ ${new Date().toLo
     ? `ふたりで（合言葉の部屋「${NET.pass}」）　今日の字 多め:${TODAY.more.join('')} 少なめ:${TODAY.less.join('')}　一度きり:${once?'あり':'なし'}　辞書:${WORDS.length}語　上限:${CAP}　引く:なし（${FLOOR}こまで1こずつ。0こ→すぐ濁音・1こ→${REFILL_MS/1000}秒後に半濁音・2こ→${REFILL_MS/1000}秒後にふつう）`
     : `ひとりで（CPU）　速さ:${SPEEDS[speed].name}　今日の字 多め:${TODAY.more.join('')} 少なめ:${TODAY.less.join('')}　一度きり:${once?'あり':'なし'}　辞書:${WORDS.length}語　上限:${CAP}　相手の語:${SPEEDS[speed].deep?'辞書全部・2手先まで読む（つよい。D-051）':SPEEDS[speed].smart?'辞書全部（賢い。D-045）':cpuMax()+'字まで'}　引く:なし（${FLOOR}こまで1こずつ。0こ→すぐ濁音・1こ→${REFILL_MS/1000}秒後に半濁音・2こ→${REFILL_MS/1000}秒後にふつう）`].concat(LOG).join('\n'); }
 const els=new Map();
-function newGame(){
+function newGame(tut){
+  clearTimeout(TUT.t); TUT.on=tut===true; TUT.step=TUT.on?'arrive':''; // tut＝true のときだけチュートリアルの一戦（HB-059）
   clearTimeout(cpuT); clearTimeout(refT.me); clearTimeout(refT.op); refT={me:null,op:null}; els.forEach(el=>el.remove()); els.clear();
   CAP=isOnline()&&NET.cap?NET.cap:capSetting; // 一戦の始めに決める（HB-048）
   lastThrow=null; S={mine:[],opp:[],oppL:null,oppO:null,sel:[],log:[],used:new Set(),over:null,ending:false,started:false,busy:false,choose:null,
@@ -720,11 +740,12 @@ function newGame(){
   const firstHand=()=>[...Array.from({length:START-1},()=>pick(TODAY.bag)),START_PART]; // 最初の手は袋から4枚＋部品「｜」（D-034。二人とも）
   const first=firstHand();
   games++;
-  first.forEach((l,i)=>S.mine.push(mk(l,{delay:i*70})));
-  firstHand().forEach(l=>S.opp.push(mk(l)));
+  if(!TUT.on){ first.forEach((l,i)=>S.mine.push(mk(l,{delay:i*70})));
+  firstHand().forEach(l=>S.opp.push(mk(l))); } // チュートリアルはカゴが空から
   LOG=[]; t0=Date.now(); lastNg=''; tried=new Set(); sentRejects=new Set();
-  lg('me','今日の字 多め：'+TODAY.more.join('')+' 少なめ：'+TODAY.less.join('')); lg('me','はじめの手 '+S.mine.map(letterOf).join('')); if(!isOnline()) lg('op','はじめの手 '+S.opp.map(letterOf).join('')); // ふたりでの相手の手は届いてから
-  NET.sentSig=null; guideNewGame();
+  lg('me','今日の字 多め：'+TODAY.more.join('')+' 少なめ：'+TODAY.less.join('')); if(TUT.on) lg('me','チュートリアル'); else { lg('me','はじめの手 '+S.mine.map(letterOf).join('')); if(!isOnline()) lg('op','はじめの手 '+S.opp.map(letterOf).join('')); } // ふたりでの相手の手は届いてから
+  NET.sentSig=null; guideNewGame(); if(TUT.on){ G.active=false; TUT.t=setTimeout(tutArrive,reduced?0:TUT_ARRIVE_MS); }
+  $('today').hidden=TUT.on; // チュートリアルでは袋を使わない
   $('today').innerHTML=`今日の字　多め：${TODAY.more.join('')}　少なめ：${TODAY.less.join('')}<small class="en" lang="en"> Today: more ${TODAY.more.join('')} / fewer ${TODAY.less.join('')}</small>`;
   render();
 }
@@ -760,7 +781,7 @@ function checkSel(){
 /* ---- 自分の手 ---- */
 function begin(){ if(!S.started){ S.started=true; S.say='考えている'; schedule(); } }
 function locked(){ return S.over||S.ending||S.busy; }
-function tapTile(id){ if(locked()) return; const i=S.sel.indexOf(id); if(i>=0) S.sel.splice(i,1); else S.sel.push(id); S.choose=null; render(); }
+function tapTile(id){ if(locked()) return; if(TUT.on&&!tutTapOk(id)) return; const i=S.sel.indexOf(id); if(i>=0) S.sel.splice(i,1); else S.sel.push(id); S.choose=null; render(); }
 function one(){ const ps=selPieces(); return ps.length===1?ps[0]:null; }
 
 /* 割る・くっつける の動き（HB-051, D-085。自分のカゴだけ）。数字はここだけ。動きを減らす設定では何も出さない */
@@ -784,27 +805,27 @@ function fxMerge(ghosts,n){ if(reduced||!ghosts.length) return; const el=els.get
   ghosts.forEach(g=>{ basket.appendChild(g); void g.offsetWidth; g.style.transition=`transform ${FX.pullMs}ms ease-in,opacity ${FX.pullMs}ms ease-in`; g.style.transform=`translate(${n.x}px,${n.y}px)`; g.style.opacity='.9'; setTimeout(()=>g.remove(),FX.pullMs+30); });
   el.style.setProperty('--fx-pull',FX.pullMs+'ms'); el.style.setProperty('--fx-snap',FX.snapMs+'ms');
   el.classList.remove('snap'); void el.offsetWidth; el.classList.add('snap'); setTimeout(()=>el.classList.remove('snap'),FX.pullMs+FX.snapMs+40); }
-function doSplit(){ const ps0=selPieces(); const p=ps0[ps0.length-1]; if(!p||locked()) return; /* 割るのは選んだ最後の1枚（HB-034, D-070） */ const L=letterOf(p); const parts=RECIPE[L]; if(!parts||S.mine.length>=CAP) return;
+function doSplit(){ const ps0=selPieces(); const p=ps0[ps0.length-1]; if(!p||locked()) return; /* 割るのは選んだ最後の1枚（HB-034, D-070） */ const L=letterOf(p); const parts=RECIPE[L]; if(!parts||S.mine.length>=CAP) return; if(TUT.on&&!tutOk('split')) return;
   begin(); S.busy=true; const el=els.get(p.id); if(el){ el.classList.add('crack'); fxSplit(el,p); }
   setTimeout(()=>{ S.busy=false; if(S.over||S.ending){ render(); return; } // 動きの間に勝ち負けが決まったら、割らない（D-054）
     const i=S.mine.indexOf(p);
     const made=splitMade(p,L,parts,{spawn:{x:p.x,y:p.y}}); // 戻すだけの往復は数えない（D-067）
-    S.mine.splice(i,1,...made); S.sel=S.sel.filter(id=>id!==p.id); /* 割った2つは選ばない。前に選んだ札はそのまま（D-070） */ lg('me',`割る ${L}→${parts.join('＋')}`); render(); }, reduced?0:FX.splitMs); }
+    S.mine.splice(i,1,...made); S.sel=S.sel.filter(id=>id!==p.id); /* 割った2つは選ばない。前に選んだ札はそのまま（D-070） */ lg('me',`割る ${L}→${parts.join('＋')}`); tutAdvance('split'); render(); }, reduced?0:FX.splitMs); }
 
-function doTurn(kind){ const ps0=selPieces(); const p=ps0[ps0.length-1]; if(!p||locked()) return; begin(); const before=letterOf(p)||'〓';
+function doTurn(kind){ const ps0=selPieces(); const p=ps0[ps0.length-1]; if(!p||locked()) return; if(TUT.on&&!tutOk(kind==='回す'?'turn':'flip')) return; begin(); const before=letterOf(p)||'〓';
   const el=els.get(p.id), g=el&&el.querySelector('.g');
   const apply=()=>{ if(S.over||S.ending){ S.busy=false; render(); return; } // 動きの間に勝ち負けが決まったら、向きを変えない（D-054）
     if(kind==='回す'){ p.r=(p.r+1)%4; } else { p.r=(4-p.r)%4; p.f=p.f?0:1; } norm(p);
     p.ops.push(kind); const now=letterOf(p); lg('me',`${kind} ${before}→${now||'〓'}`);
     if(now){ p.d=now===p.orig?p.d0:`${p.d0}→${now}`; if(now===p.orig){ p.note=p.base; p.was=now; } else if(now!==p.was){ p.note=`「${p.was}」を${verb(p.ops)}`; p.was=now; } p.ops=[]; }
-    if(g){ g.style.transition='none'; } S.busy=false; render(); if(g){ void g.offsetWidth; g.style.transition=''; } };
+    if(g){ g.style.transition='none'; } S.busy=false; tutAdvance(kind==='回す'?'turn':'flip'); render(); if(g){ void g.offsetWidth; g.style.transition=''; } };
   if(reduced||!g){ apply(); return; }
   S.busy=true; g.style.transform=(kind==='回す'?'rotate(90deg) ':'scaleX(-1) ')+g.style.transform; setTimeout(apply,180); }
 
-function doMerge(res){ const ps=selPieces(); if(ps.length<2||locked()) return; begin();
+function doMerge(res){ const ps=selPieces(); if(ps.length<2||locked()) return; if(TUT.on&&!tutOk('merge')) return; begin();
   const [a,b]=ps.slice(-2), la=letterOf(a), lb=letterOf(b); const i=Math.min(S.mine.indexOf(a),S.mine.indexOf(b));
   const gh=fxGhosts([a,b]); const n=mergeMade(a,b,res,{spawn:{x:a.x,y:a.y}},true); // 戻すだけの往復は数えない（D-067）。true＝できた字を MERGE_TURN の向きで出す（自分だけ）
-  S.mine=S.mine.filter(p=>p!==a&&p!==b); S.mine.splice(i,0,n); S.sel=S.sel.filter(id=>id!==a.id&&id!==b.id).concat(n.id); /* できた字はその位置で選ばれたまま（D-070） */ S.choose=null; lg('me',`くっつける ${la}＋${lb}→${res}`+(letterOf(n)!==res?`（${res}の裏返して回した向き）`:'')); render(); fxMerge(gh,n); }
+  S.mine=S.mine.filter(p=>p!==a&&p!==b); S.mine.splice(i,0,n); S.sel=S.sel.filter(id=>id!==a.id&&id!==b.id).concat(n.id); /* できた字はその位置で選ばれたまま（D-070） */ S.choose=null; lg('me',`くっつける ${la}＋${lb}→${res}`+(letterOf(n)!==res?`（${res}の裏返して回した向き）`:'')); tutAdvance('merge'); render(); fxMerge(gh,n); }
 
 function doDraw(){ if(locked()||S.mine.length>=CAP) return; begin(); const n=mk(pick(TODAY.bag)); S.mine.push(n); lg('me','引く '+letterOf(n)); render(); }
 
@@ -977,7 +998,7 @@ function applyLang(){ const h=document.documentElement;
   document.querySelectorAll('.langBtn').forEach(b=>{ b.textContent=LANG_UI[LANG][0]; b.setAttribute('aria-label',LANGS.map(l=>LANG_UI[l][1]).join(' / ')); });
   document.querySelectorAll('.langSet').forEach(el=>{ if(!el.firstChild) el.innerHTML=LANGS.map(l=>`<button type="button" data-lang="${l}" lang="${l}">${LANG_UI[l][1]}</button>`).join(''); el.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.lang===LANG))); });
   renderMeanSet(); }
-function setLang(l){ if(!LANGS.includes(l)) return; LANG=l; try{ localStorage.setItem('hb.lang',l); }catch(e){} applyLang(); logN=-1; if(S){ renderLog(); renderOpp(); } if($('zukan')&&!$('zukan').hidden) renderZukan(); }
+function setLang(l){ if(!LANGS.includes(l)) return; LANG=l; try{ localStorage.setItem('hb.lang',l); }catch(e){} applyLang(); logN=-1; if(S){ renderLog(); renderOpp(); tutPaint(); } if($('zukan')&&!$('zukan').hidden) renderZukan(); }
 document.querySelectorAll('.langBtn').forEach(b=>b.addEventListener('click',e=>{ e.stopPropagation(); const set=$(b.dataset.set); const open=set.hidden; document.querySelectorAll('.langSet').forEach(x=>x.hidden=true); document.querySelectorAll('.langBtn').forEach(x=>x.setAttribute('aria-expanded','false')); set.hidden=!open; b.setAttribute('aria-expanded',String(open)); }));
 document.querySelectorAll('.langSet').forEach(set=>set.addEventListener('click',e=>{ e.stopPropagation(); const b=e.target.closest('button[data-lang]'); if(!b) return; setLang(b.dataset.lang); set.hidden=true; document.querySelectorAll('.langBtn').forEach(x=>x.setAttribute('aria-expanded','false')); }));
 document.addEventListener('click',()=>{ document.querySelectorAll('.langSet').forEach(x=>x.hidden=true); document.querySelectorAll('.langBtn').forEach(x=>x.setAttribute('aria-expanded','false')); });
@@ -1009,7 +1030,7 @@ function renderZukan(){ const ws=Object.keys(ZK.words).sort((a,b)=>zkColl?zkColl
       +`<span class="zd">${e.trail?`<span class="ztrf"><b>道すじ</b>${escH(e.trail)}</span><br>`:''}<b>最初に開いた日</b>${escH(e.first)}<br><b>投げられた回数</b>${e.n}回<br><b>出会い</b>${[e.made?'自分で作った':'',e.seen?'相手から見た':''].filter(Boolean).join('・')}</span></button>`; }).join('')
     :'<p class="zk-note">まだ何も載っていない。言葉を投げるか、相手から届くと載る。</p>'; }
 /* 投げた言葉を自分の記録に入れる（リストは後で相手と同じ形で出る） */
-function recordMyThrow(c,ps){ G.thrown=true; S.used.add(c.core); S.log.push({who:'me',word:c.word,note:notesOf(ps),k:comboOf(ps),trail:trailOf(ps)}); zkRecord(c.core,'me',comboOf(ps),trailOf(ps)); }
+function recordMyThrow(c,ps){ G.thrown=true; S.used.add(c.core); S.log.push({who:'me',word:c.word,note:notesOf(ps),k:comboOf(ps),trail:trailOf(ps)}); if(!TUT.on) zkRecord(c.core,'me',comboOf(ps),trailOf(ps)); } // チュートリアルの言葉は辞書の記録に入れない（HB-059）
 /* 投げた札を自分のカゴから消す（消える動きつき） */
 function removeMyPieces(ps){ ps.forEach(p=>{ const el=els.get(p.id); if(el){ els.delete(p.id); el.style.transitionDelay='0ms'; el.style.transform=`translate(${p.x}px,-90px)`; el.style.opacity='0'; setTimeout(()=>el.remove(),280);} });
   S.mine=S.mine.filter(p=>!ps.includes(p)); S.sel=[]; S.choose=null; }
@@ -1020,17 +1041,17 @@ function logMyThrow(c,ps,bonusLetter){ const nt=notesOf(ps), k=comboOf(ps);
 let lastTry='';
 /* 投げられない並びで「投げる」を押したら、何がだめだったかをログに残す（出来そうでできなかった言葉を後で見られるように） */
 function logFailedThrow(c){ if(!c.text||c.cls==='ok') return; const k=c.text+'|'+c.msg; if(k===lastTry) return; lastTry=k; lg('me',`投げようとした「${c.text}」（${c.msg}）`); }
-function doThrow(){ if(locked()) return; const c=checkSel(); if(!c.word){ logFailedThrow(c); return; } lastTry=''; begin();
+function doThrow(){ if(locked()) return; if(TUT.on&&!tutOk('throw')) return; const c=checkSel(); if(!c.word){ logFailedThrow(c); return; } lastTry=''; begin();
   if(isOnline()){ throwOnline(c); return; }
   const ps=selPieces(); recordMyThrow(c,ps); removeMyPieces(ps); oppBump(c.word);
   [...c.word].forEach(ch=>S.opp.push(mk(ch==='ー'?'一':ch)));
-  let bx=''; if(bonus){ const b=mk(pick(TODAY.bag)); S.opp.push(b); bx=letterOf(b); }
+  let bx=''; if(bonus&&!TUT.on){ const b=mk(pick(TODAY.bag)); S.opp.push(b); bx=letterOf(b); }
   logMyThrow(c,ps,bx);
   if(S.opp.length>CAP) finish('win');
-  render(); }
+  tutAdvance('throw'); render(); }
 
 /* ---- 相手 ---- */
-function schedule(){ clearTimeout(cpuT); if(!S||S.over||S.ending||!S.started||sheetOpen||isOnline()||guideHolds()||!SPEEDS[speed].ms) return; // 通信対戦では CPU は動かない
+function schedule(){ clearTimeout(cpuT); if(!S||S.over||S.ending||!S.started||sheetOpen||isOnline()||guideHolds()||TUT.on||!SPEEDS[speed].ms) return; // 通信対戦では CPU は動かない。チュートリアルでも動かない
   const hands=S.cpuHands||1; S.cpuHands=1; /* 向きの手は手数ぶん時間をかける（HB-050, D-084） */
   cpuT=setTimeout(cpuAct, SPEEDS[speed].ms*hands*(0.8+Math.random()*0.4)); }
 /* 同じ点数の手は、手数の少ない方から選ぶ（向きの2手は1手より時間がかかる。HB-050） */
@@ -1158,7 +1179,7 @@ function strongMove(t0){ const L=S.opp.map(letterOf), now=smartBest(L); oppMemo(
   const steps=ok; // 戻るだけの手は除く（D-061）
   if(steps.length&&S.opp.length<=8) go(pick(fresh(steps)));
   else { const m=steps.filter(s=>s.t==='merge'); if(m.length) cpuApply(pick(fresh(m))); else { S.say='手が出ない'; lg('op','手が出ない'); } } }
-function cpuAct(){ if(S.over||S.ending||sheetOpen||guideHolds()) return;
+function cpuAct(){ if(S.over||S.ending||sheetOpen||guideHolds()||TUT.on) return;
   if(SPEEDS[speed].deep){ cpuStrong(); render(); schedule(); return; }
   if(SPEEDS[speed].smart){ cpuSmart(); render(); schedule(); return; }
   const L=S.opp.map(letterOf); const w=bestWord(L);
@@ -1269,8 +1290,8 @@ function renderControls(){ const over=!!S.over; $('controls').hidden=over; $('re
   const c=checkSel(), ps=selPieces(), p=ps.length?ps[ps.length-1]:null, L=p&&letterOf(p); // 割るは選んだ最後の1枚（D-070）
   { const logEl=$('log'), hitW=(c.msg&&c.msg.startsWith('もうリストに出た言葉'))?c.text:'';
     logEl.querySelectorAll('.row').forEach(e=>{ const on=!!hitW&&e.dataset.w===hitW; if(on&&!e.classList.contains('hit')){ e.classList.add('hit'); try{ e.scrollIntoView({block:'nearest',behavior:reduced?'auto':'smooth'}); }catch(_){} } else if(!on) e.classList.remove('hit'); }); }
-  if(c.msg==='ことばの表にない') sendReject(c.text);
-  if(c.msg==='ことばの表にない'&&[...c.text].length>=3&&c.text!==lastNg){ lastNg=c.text; lg('me',`はじかれた「${c.text}」（ことばの表にない）`); }
+  if(c.msg==='ことばの表にない'&&!TUT.on) sendReject(c.text); // チュートリアルの途中の並びは rejects に送らない
+  if(c.msg==='ことばの表にない'&&!TUT.on&&[...c.text].length>=3&&c.text!==lastNg){ lastNg=c.text; lg('me',`はじかれた「${c.text}」（ことばの表にない）`); }
   if(ps.length>=2&&!(ps.length===2&&c.merge)&&(c.msg.endsWith('言葉には使えない')||c.msg==='向きの違う札がまじっている'||c.msg==='のばす音は頭に置けない')){ const k=ps.map(q=>letterOf(q)||('〓'+q.root)).join('＋'); /* 区切りは＋（部品の「・」と紛れないように。HB-012） */ if(!tried.has(k)){ tried.add(k); lg('me',`ためした「${k}」（字にも言葉にもならない）`); } }
   $('trayWord').textContent=c.text?`「${c.word?c.word.replace(/∘/g,'。'):shown(c.text)}」`:''; // 「ち∘」は「ち。」、ほかの ∘ は ゜ で見せる
   const pickEl=$('trayPick'), stat=$('trayStat');
@@ -1282,7 +1303,8 @@ function renderControls(){ const over=!!S.over; $('controls').hidden=over; $('re
   $('aRot').disabled=lock||!ps.length; $('aFlip').disabled=lock||!ps.length;
   $('aMerge').disabled=lock||!c.merge;
   
-  $('aThrow').disabled=lock; $('aThrow').classList.toggle('off',!c.word); $('throwN').textContent=c.word?`−${[...c.word].length}`:''; }
+  $('aThrow').disabled=lock; $('aThrow').classList.toggle('off',!c.word); $('throwN').textContent=c.word?`−${[...c.word].length}`:'';
+  if(TUT.on){ for(const [st,id] of Object.entries(TUT_BTN)) $(id).disabled=$(id).disabled||!tutOk(st); $('btnClear').hidden=true; } } // チュートリアル：いまの手のボタンだけ押せる
 const FLOOR=3; // D-014 引くはなし。カゴが2こ以下になったら、3こになるまで落ちてくる（二人とも）
 const REFILL_MS=5000; // 1こ・2こになってから落ちてくるまでの待ち（作者の案、仮の5秒）
 /* 落ちてくるのは1こずつ。何が落ちるかは落ちるときのカゴの数で決める（HB-026, D-058）
@@ -1296,10 +1318,11 @@ function dropOne(side){ const a=side==='me'?S.mine:S.opp; if(a.length>=FLOOR) re
   a.push(n); lg(side,'落ちてきた '+letterOf(n)+(t.tag?`（${t.tag}）`:'')); }
 function refill(){ if(!S||S.over||S.ending) return;
   for(const side of isOnline()?['me']:['me','op']){ const cur=side==='me'?S.mine:S.opp; // ふたりででは相手のカゴは相手の端末が動かす
+    if(TUT.on){ if(TUT.step==='end'&&side==='me'&&cur.length===0) dropOne('me'); continue; } // チュートリアルは、最後に空になったときの濁音1つだけ（HB-059）
     if(cur.length===0){ clearTimeout(refT[side]); refT[side]=null; dropOne(side); } // 空になったら待たずに濁音。待っている途中でも、その待ちはやめる
     if(cur.length<FLOOR && !refT[side]){ refT[side]=setTimeout(()=>{ refT[side]=null; if(!S||S.over||S.ending) return;
       dropOne(side); render(); }, REFILL_MS); } } }
-function render(){ refill(); renderOpp(); renderLog(); renderBasket(); renderControls(); queueBasket(); guideCheck(); }
+function render(){ refill(); renderOpp(); renderLog(); renderBasket(); renderControls(); queueBasket(); guideCheck(); tutPaint(); }
 
 /* ---- 最初の1戦の案内（HB-010, D-032）----
    はじめての1戦だけ、その場面で触る場所の横に一言ずつ出す。順は 1 始まり → 2 最初に選ぶ → 3 最初に投げる → 4 そのあと初めて1枚だけ選ぶ → 5 終わった画面。
@@ -1362,6 +1385,43 @@ document.addEventListener('pointerdown',()=>{ if(G.cur) guideHide(); },true); //
 window.addEventListener('resize',()=>guidePlace());
 $('btnGuideAgain').onclick=()=>{ try{ localStorage.removeItem(GUIDE_KEY); }catch(e){} G.active=false; $('btnGuideAgain').innerHTML=withEn('次の1戦でまた出ます'); };
 
+/* ---- 最初の一戦のチュートリアル（HB-059, D-092）----
+   一言の表は tutorial.js（日本語・English・한국어）。次に押す札とボタンを var(--me) の縁で光らせ、一言の吹き出しは最初の案内（#guide）と同じ部品（#tutBox）。
+   ここで決めるのは手順（TUT_SEQ・TUT_NEXT）だけ。ふつうの一戦の決まり（★・勝ち負け・やりとりの候補・辞書の記録）には入れない */
+const tutLetters=()=>selPieces().map(letterOf);
+const tutSeqOk=(step,full)=>{ const seq=TUT_SEQ[step]; if(!seq) return false; const ls=tutLetters(); return ls.length<=seq.length&&ls.every((l,i)=>l===seq[i])&&(!full||ls.length===seq.length); };
+const tutOk=step=>!TUT.on||(TUT.step===step&&tutSeqOk(step,true)); // いまの手で、選びがそろっているか（ボタンが効く）
+function tutTapOk(id){ const seq=TUT_SEQ[TUT.step]; if(!seq||S.sel.includes(id)) return false; const p=S.mine.find(q=>q.id===id); const ls=tutLetters(); // 札は、いまの手の次の字だけ選べる。選んだ札は外せない
+  return !!p&&tutSeqOk(TUT.step,false)&&ls.length<seq.length&&letterOf(p)===seq[ls.length]; }
+function tutAdvance(from){ if(!TUT.on||TUT.step!==from) return; TUT.step=TUT_NEXT[from]; if(TUT.step==='end'){ tutMarkDone(); guideMarkDone(); } } // 済んだら最初の1戦の案内（D-032）も出さない
+/* 相手が「したく」を投げてきて、自分のカゴに し・た・く が届く（CPU の投げと同じ見え方。辞書の記録・やりとりの候補には入れない） */
+function tutArrive(){ if(!TUT.on||TUT.step!=='arrive'||!S||S.over) return; const w=TUT_WORD;
+  S.log.push({who:'op',word:w,note:'',k:0,trail:''}); [...w].forEach((ch,k)=>S.mine.push(mk(ch,{delay:k*110,drop:tierOf(w)}))); S.say=`「${wordShow(w)}」を投げてきた`; landFx(w);
+  lg('op',`投げる「${w}」`); showMeaning(w,'op'); TUT.step='split'; render(); }
+function tutText(step){ const o=((window.HB_TUTORIAL||{}).steps||{})[step]; if(!o) return ''; for(const k of ({ja:['ja'],en:['en','ja'],ko:['ko','en','ja']})[LANG]||['en','ja']) if(o[k]) return o[k]; return ''; }
+function tutTarget(){ const seq=TUT_SEQ[TUT.step]; if(!seq) return null;
+  if(tutSeqOk(TUT.step,true)){ const b=$(TUT_BTN[TUT.step]); return {el:b,rect:b.getBoundingClientRect()}; }
+  const ls=tutLetters(), want=seq[ls.length]; const p=tutSeqOk(TUT.step,false)?S.mine.find(q=>!S.sel.includes(q.id)&&letterOf(q)===want):null; if(!p) return null;
+  const b=basket.getBoundingClientRect(); return {el:els.get(p.id),rect:{left:b.left+p.x,top:b.top+p.y,width:TILE,height:TILE,bottom:b.top+p.y+TILE}}; }
+function tutPaint(){ const box=$('tutBox'); if(!box) return;
+  els.forEach(el=>el.classList.remove('tutGlow')); Object.values(TUT_BTN).forEach(id=>$(id).classList.remove('tutGlow'));
+  const step=TUT.step;
+  if(!TUT.on||!S||S.over||!$('menu').hidden||step==='arrive'){ box.hidden=true; return; }
+  const tg=step==='end'?null:tutTarget(); if(tg&&tg.el) tg.el.classList.add('tutGlow');
+  const text=(step==='split'?tutText('arrive')+'\n':'')+tutText(step), btn=step==='end'?(((window.HB_TUTORIAL||{}).button||{})[LANG]||((window.HB_TUTORIAL||{}).button||{}).en||'OK'):'';
+  const sig=LANG+'|'+step+'|'+text+'|'+btn; if(box.dataset.sig!==sig){ box.dataset.sig=sig; box.lang=LANG;
+    box.innerHTML=text.split('\n').map(t=>`<p style="margin:0 0 4px">${escH(t)}</p>`).join('')+(btn?`<button type="button" class="tutGo">${escH(btn)}</button>`:''); }
+  const first=box.hidden; box.hidden=false; box.classList.toggle('bob',false); tutPlace(tg&&tg.rect); if(first){ box.classList.remove('on'); void box.offsetWidth; } box.classList.add('on'); }
+/* 的の上か下（上に場所がなければ下）。的がなければ（最後の一言）画面の真ん中より少し上 */
+function tutPlace(r){ const el=$('tutBox'), W=document.documentElement.clientWidth, H=window.innerHeight, w=el.offsetWidth, h=el.offsetHeight, M=8;
+  if(!r){ el.classList.remove('below','above'); el.style.left=Math.max(M,(W-w)/2)+'px'; el.style.top=Math.max(M,(H-h)*0.4)+'px'; return; }
+  const cx=r.left+r.width/2, below=r.top-h-12<M, x=Math.max(M,Math.min(W-M-w,cx-w/2));
+  el.style.left=x+'px'; el.style.top=(below?r.bottom+10:r.top-h-10)+'px'; el.style.setProperty('--ax',Math.max(14,Math.min(w-14,cx-x))+'px');
+  el.classList.toggle('below',below); el.classList.toggle('above',!below); }
+window.addEventListener('resize',()=>{ if(TUT.on) tutPaint(); });
+$('tutBox').addEventListener('click',e=>{ if(e.target.closest('.tutGo')){ logN=-1; newGame(); } }); // 最後の「ひとりで遊ぶ」：次はふつうの一戦
+$('btnTutAgain').onclick=()=>{ if(isOnline()) return; closeSheet(); logN=-1; newGame(true); }; // もう一度やる入口（しくみの中）
+
 /* ---- ふたりでの相手のカゴ（HB-010, D-033）----
    自分のカゴの札の並びが変わったら、最後の変化から0.2秒後に1回、broadcast（basket）で相手に送る。
    描画のたびに並びを比べるので、割る・回す・裏返す・くっつける・投げる・届く・落ちてくるのどれでも送られる */
@@ -1376,7 +1436,7 @@ function onOppBasket(pl){ if(!S||!isOnline()||!pl||!Array.isArray(pl.l)||pl.l.le
 
 /* ---- つなぎ ---- */
 $('aSplit').onclick=doSplit; $('aRot').onclick=()=>doTurn('回す'); $('aFlip').onclick=()=>doTurn('裏返す');
-$('aMerge').onclick=()=>{ const c=checkSel(); if(!c.merge||locked()) return; if(c.merge.length>1){ S.choose=c.merge; render(); } else doMerge(c.merge[0]); };
+$('aMerge').onclick=()=>{ const c=checkSel(); if(!c.merge||locked()) return; if(TUT.on&&!tutOk('merge')) return; if(c.merge.length>1){ S.choose=c.merge; render(); } else doMerge(c.merge[0]); };
 $('trayPick').addEventListener('click',e=>{ const r=e.target.closest('button'); if(r) doMerge(r.dataset.r); });
 $('aThrow').onclick=doThrow;
 function fb(t){ try{ const a=document.createElement('textarea'); a.value=t; a.style.position='fixed'; a.style.opacity='0'; document.body.appendChild(a); a.select(); const ok=document.execCommand('copy'); a.remove(); return ok; }catch(e){ return false; } }
@@ -1384,8 +1444,8 @@ function copyLog(btn){ const t=logText(), o=btn.innerHTML; const done=m=>{ btn.i
   const no=()=>done(fb(t)?'コピーした':'コピーできず');
   if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(()=>done('コピーした'),no); else no(); }
 $('btnLog').onclick=()=>copyLog($('btnLog')); $('btnCopy').onclick=()=>copyLog($('btnCopy'));
-$('btnClear').onclick=()=>{ if(locked()) return; S.sel=[]; S.choose=null; render(); };
-$('btnReset').onclick=()=>{ if(isOnline()) return leaveOnline(); logN=-1; newGame(); }; $('btnAgain').onclick=()=>{ if(isOnline()) return leaveOnline(); logN=-1; newGame(); };
+$('btnClear').onclick=()=>{ if(locked()||TUT.on) return; S.sel=[]; S.choose=null; render(); };
+$('btnReset').onclick=()=>{ if(isOnline()) return leaveOnline(); logN=-1; newGame(TUT.on); }; // チュートリアルの途中のやりなおしは、チュートリアルをはじめから $('btnAgain').onclick=()=>{ if(isOnline()) return leaveOnline(); logN=-1; newGame(); };
 function setSpeed(i){ speed=i; speedSaved=true; try{localStorage.setItem('hb.speedName',SPEEDS[speed].name)}catch(e){} }
 $('btnSpeed').onclick=()=>{ setSpeed((speed+1)%SPEEDS.length); renderOpp(); schedule(); };
 let sheetOpener=null, sheetEl=null;
@@ -1547,7 +1607,7 @@ function closeNet(){ const client=NET.client;
   if(client){ if(NET.lobby) client.removeChannel(NET.lobby); if(NET.match) client.removeChannel(NET.match); }
   NET.lobby=null; NET.match=null; NET.starting=false; NET.mode='cpu'; $('btnLeave').hidden=true; }
 function leaveOnline(){ closeNet(); guideHide(); setLobbyText(''); showMenu(); }
-function startSolo(){ closeNet(); hideMenu(); newGame(); }
+function startSolo(){ closeNet(); hideMenu(); newGame(!tutDone()); } // はじめての「ひとりで」はチュートリアル（HB-059）
 
 /* 合言葉で入室。lobby の channel に入って、相手がいるかは presence（在室）で見る */
 function joinRoom(){ const pass=$('roomInput').value.trim();
@@ -1647,7 +1707,7 @@ function onOpponentLost(){ if(!S||S.over||S.ending) return; finish('win'); }
 /* 自動テストの窓（HB-035）。テストがページを開く前に window.HB_TEST={} を置いたときだけ、中の表と関数を渡す。ふだんの遊びでは何もしない */
 if(window.HB_TEST&&typeof window.HB_TEST==='object') Object.defineProperty(window.HB_TEST,'CAP',{get:()=>CAP,configurable:true}); // 一戦ごとに変わるので値でなく読む（HB-048）
 if(window.HB_TEST&&typeof window.HB_TEST==='object') Object.assign(window.HB_TEST,{FX,NET,onStartMessage,KANA,PARTS,RECIPE,MERGE,MERGE_TURN,TURN,BAG,logText,makeToday,seedRng,TODAY:()=>TODAY,HAND,DICT,SPEEDS,key,
-  words:()=>WORDS, S:()=>S, mk,letterOf,checkSel,splitMade,mergeMade,comboOf,cpuOk,tapTile,doSplit,doMerge,doTurn,doThrow,render,newGame,startSolo,cpuAct,cpuThrow,setSpeed,showMeaning,SCENE_OF,exchangeCands,VOTE_TEXT,ALIAS,turnShortcuts,mergeTurnBacks,stepsOf,cpuApply,TURN_NOT_CPU});
+  words:()=>WORDS, S:()=>S, mk,letterOf,checkSel,splitMade,mergeMade,comboOf,cpuOk,tapTile,doSplit,doMerge,doTurn,doThrow,render,newGame,TUT,TUT_SEQ,tutDone,startSolo,cpuAct,cpuThrow,setSpeed,showMeaning,SCENE_OF,exchangeCands,VOTE_TEXT,ALIAS,turnShortcuts,mergeTurnBacks,stepsOf,cpuApply,TURN_NOT_CPU});
 
 newGame();
 showMenu();
