@@ -51,7 +51,7 @@ test('cpu-ng.js・nice-words.js・scenes.js が読める', () => {
   const ng = load('cpu-ng.js').HB_CPU_NG;
   assert.ok(Array.isArray(ng) && ng.length > 0 && ng.every(x => typeof x === 'string' && x));
   const nice = load('nice-words.js').HB_NICE;
-  assert.ok(Object.values(nice).every(k => k === 'heart' || k === 'petals' || k === 'rainbow'));
+  assert.ok(Object.values(nice).every(k => k === 'heart' || k === 'petals' || k === 'rainbow' || (k && typeof k === 'object' && typeof k.color === 'string'))) // 色の言葉（HB-053）は {color:…};
   const sc = load('scenes.js').HB_SCENES;
   assert.ok(Object.keys(sc).length > 0);
   const g = load('scene-groups.js'); // 場面の組（HB-039）

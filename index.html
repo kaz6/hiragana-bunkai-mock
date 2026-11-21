@@ -887,8 +887,14 @@ function burst(who){ if(reduced) return; const app=document.querySelector('.app'
     p.animate([{transform:'translate(-50%,-50%) rotate(0deg)',opacity:1},{transform:`translate(calc(-50% + ${dx}px),calc(-50% + ${dy}px)) rotate(${r/2}deg)`,opacity:1,offset:.45},{transform:`translate(calc(-50% + ${dx*1.2}px),calc(-50% + ${dy+220}px)) rotate(${r}deg)`,opacity:0}],{duration:1400+Math.random()*300,easing:'cubic-bezier(.2,.7,.4,1)'}).onfinish=()=>p.remove(); } }
 /* 素敵な言葉の演出（HB-030, D-065）。一覧は nice-words.js。比べる形は辞書と同じ（小さい字→大きい字。D-043）。
    声・意味・長い言葉の演出（D-020・D-028・D-047）とは別の層で、重なってよい。約1.5秒で消える。動きを減らす設定では数を減らし短く */
-const NICE={}; for(const [w,k] of Object.entries(window.HB_NICE||{})) NICE[bigForm(w)]=k;
-function isRainbow(word){ return NICE[bigForm(String(word).replace(/∘/g,''))]==='rainbow'; }
+const NICE={}, INK={}; for(const [w,k] of Object.entries(window.HB_NICE||{})){ if(typeof k==='string') NICE[bigForm(w)]=k; else if(k&&k.color) INK[bigForm(w)]=k; }
+function isRainbow(word){ const b=bigForm(String(word).replace(/∘/g,'')); return NICE[b]==='rainbow'||(INK[b]&&INK[b].color==='rainbow'); }
+/* 色の言葉（HB-053, D-087）。nice-words.js の {color:'#…', edge:true}（edge に色の文字列を書けばその色の縁）。字の色だけで演出は出さない。edge＝白い縁（暗い地で見えにくい色）。color に 'rainbow'＝虹色、'linear-gradient(…)'＝グラデーション */
+function inkAttr(word){ const b=bigForm(String(word).replace(/∘/g,'')), k=INK[b], rb=isRainbow(word);
+  if(!k||rb) return {cls:rb?' rb':'',style:''};
+  const grad=/^linear-gradient/.test(k.color), edge=k.edge?`-webkit-text-stroke:3px ${typeof k.edge==='string'?k.edge:'#fff'};paint-order:stroke fill;`:'';
+  return {cls:'',style:(grad?`background:${k.color};-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent;`:`color:${k.color};`)+edge+'text-shadow:none;'}; }
+function inkSpan(word,cls,inner){ const a=inkAttr(word); return `<span class="${cls}${a.cls}"${a.style?` style="${a.style}"`:''}>${inner}</span>`; }
 function niceFx(word){ const kind=NICE[bigForm(String(word).replace(/∘/g,''))]; if(!kind) return;
   let box=$('niceFx'); if(!box){ box=document.createElement('div'); box.id='niceFx'; box.setAttribute('aria-hidden','true'); document.body.appendChild(box); }
   const W=innerWidth, H=innerHeight, few=reduced;
@@ -915,7 +921,7 @@ function greetBack(word,who){ const w=String(word).replace(/∘/g,''), prev=last
   if(el.classList.contains('on')) el.insertAdjacentHTML('beforeend','<br>'+html); else { el.innerHTML=html; el.classList.remove('on'); void el.offsetWidth; el.classList.add('on'); }
   clearTimeout(comboT); comboT=setTimeout(()=>el.classList.remove('on'),1100); }
 function showMeaning(word,who){ niceFx(word); greetBack(word,who); const el=$('meaning'), m=meaningBig(word); if(!el) return; const tier=tierOf(word); if(!m&&!tier){ return; } // 3字以上は意味がなくても言葉だけ出す（D-047）
-  el.innerHTML=`<span class="mw${isRainbow(word)?' rb':''}">${escH(wordShow(word))}</span>${m&&m.k?`<span class="mk">${escH(m.k)}</span>`:''}${m&&m.e?`<span class="mn">${escH(m.e)}</span>`:''}`;
+  el.innerHTML=`${inkSpan(word,'mw',escH(wordShow(word)))}${m&&m.k?`<span class="mk">${escH(m.k)}</span>`:''}${m&&m.e?`<span class="mn">${escH(m.e)}</span>`:''}`;
   el.classList.remove('t1','t2','t3'); if(tier) el.classList.add('t'+tier); el.classList.toggle('sc',!!(m&&m.sc)); el.style.setProperty('--n',[...String(word)].length);
   el.classList.toggle('op',who==='op'); const cb=$('combo'), low=cb.classList.contains('on');
   el.classList.toggle('low',low); el.style.top=low?`${Math.round(cb.offsetTop+cb.offsetHeight/2+4)}px`:''; // 声は translate(-50%,-50%) なので、下端＝中心＋高さの半分
@@ -1190,7 +1196,7 @@ document.addEventListener('click',e=>{ const b=e.target.closest&&e.target.closes
 let logN=-1;
 function renderLog(){ const el=$('log'); if(logN===S.log.length) return; logN=S.log.length;
   if(!S.log.length){ el.innerHTML='<p class="empty">投げた言葉は、ここに二人ぶん残る。'+enTag('Words you both throw stay here.',1)+'相手から届いた言葉は、こっちのカゴの材料になる。'+enTag('Words you receive become tiles in your basket.',1)+'</p>'; return; }
-  el.innerHTML=S.log.map(r=>`<div class="row ${r.who}" data-w="${r.word}"><span class="w">${isRainbow(r.word)?`<span class="rb">${escH(wordShow(r.word))}</span>`:escH(wordShow(r.word))}${r.k?`<span class="st" aria-label="工夫${r.k}">${'★'.repeat(starsOf(r.k))}</span>`:''}</span>${r.note?`<span class="n">${r.note}</span>`:''}${(m=>m?`<span class="m">${escH([m.k,m.e].filter(Boolean).join('　'))}</span>`:'')(meaningOf(r.word))}</div>`).join('');
+  el.innerHTML=S.log.map(r=>`<div class="row ${r.who}" data-w="${r.word}"><span class="w">${(inkAttr(r.word).cls||inkAttr(r.word).style)?inkSpan(r.word,'ink',escH(wordShow(r.word))):escH(wordShow(r.word))}${r.k?`<span class="st" aria-label="工夫${r.k}">${'★'.repeat(starsOf(r.k))}</span>`:''}</span>${r.note?`<span class="n">${r.note}</span>`:''}${(m=>m?`<span class="m">${escH([m.k,m.e].filter(Boolean).join('　'))}</span>`:'')(meaningOf(r.word))}</div>`).join('');
   el.scrollTop=el.scrollHeight; }
 function renderControls(){ const over=!!S.over; $('controls').hidden=over; $('result').hidden=!over;
   if(over){ const mine=S.log.filter(r=>r.who==='me').length, theirs=S.log.length-mine; const b=$('resBig');
