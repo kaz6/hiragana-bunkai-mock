@@ -10,6 +10,7 @@ module.exports = defineConfig({
   reporter: process.env.CI ? [['list'], ['github']] : 'list',
   use: {
     browserName: 'chromium',
+    locale: 'ja-JP',                       // 画面の言葉の初期値は端末の言語（D-091）。いまのテストは日本語にそろえる
     viewport: { width: 390, height: 844 }, // これまでの確かめと同じ 390px
     reducedMotion: 'reduce',               // 動きを減らす設定：割る・回すの待ちが 0 になり、テストが速く安定する
     trace: 'off',

@@ -37,6 +37,7 @@
 | `tests/e2e/basket.spec.js` | カゴの上限（12こを超えたら負け） |
   | `tests/e2e/cpu.spec.js` | CPU（禁止用語 cpu-ng.js、各強さを短く回す） |
   | `tests/e2e/screen.spec.js` | 画面（390px、遊び方、ひとりでの開始、ページの語数） |
+  | `tests/e2e/lang.spec.js` | 画面の言葉の切り替え（日本語・English・한국어。D-091） |
   | `tests/unit/data.test.js` | データのファイル（辞書・意味の語数、字の一覧のそろい） |
   | `tests/counts.js` | 辞書・意味の語数の記録（大きく減ったら落ちる） |
 

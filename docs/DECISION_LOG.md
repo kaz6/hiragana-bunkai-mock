@@ -776,3 +776,12 @@
 - 確かめ：npm test 全部（114件）。tests/e2e/screen.spec.js に塗り・▶・390px の確認を足した（期待の書き換えなし）。画像 docs/reports/img/hb-056-menu-light.png・hb-056-menu-dark.png
 - 却下／やらなかったこと：新しい色・並びや大きさの変更
 - 作業：HB-056
+
+## R-022 画面の言葉を 日本語／English／한국어 で切り替える（HB-057、D-091、作者 2026-11-21 21:04・21:18・21:20）
+
+- きっかけ：友人の「ルールのところで疲れた」（画面の言葉に英語が添えてあり、字がほぼ倍）。漢字の読めない遊び手が諦めた
+- 中身：設定 LANG（'ja'｜'en'｜'ko'。端末の hb.lang に覚える。無ければ navigator.languages の先頭：ja→日本語、ko→한국어、それ以外→English）。日本語＝英語の添え・しくみの英語の一言・言葉の意味の英語を出さない。English＝日本語の文（`<j-p class="jp">` で包んだもの）を消し、英語を主の大きさで出す（札・言葉はひらがな）。英語の無い文は包まれないので日本語のまま。한국어＝入れ物だけ（KO_FIX・KO_PAT。いまは空。表に無い文は English）。HB-058 で埋める
+- 作り：英語は `<small class="en">` が日本語の文のあとに付いている作りのまま。index.html の wrapJp が（MutationObserver で動きで作り直された所も）その前の日本語を j-p で包む。切り替えのボタンは遊ぶ画面の「？ 遊び方」「辞書」の右（#btnLang）とはじめの画面の題の右（#btnLangMenu）。押すと 日本語／English／한국어 から選ぶ
+- 確かめ：npm test 全部（120件）。tests/e2e/lang.spec.js（新規。ja・en・ko の各言葉・切り替え・覚える・390px）。tests/e2e/scenes.spec.js は「Greeting back!」を見る1行を「日本語では英語を出さない」に直した（日本語のときは英語の添えを出さない決まりに合わせた）。playwright.config.js に locale ja-JP を足した（いまのテストは日本語にそろえる）。画像 docs/reports/img/hb-057-*.png。英語の無い文の一覧 docs/reports/hb-057-no-english.txt
+- 却下／やらなかったこと：日本語と英語を同時に出す選び方（編集の判断）／韓国語の文を作ること（HB-058）／日本語・英語の文を変えること
+- 作業：HB-057

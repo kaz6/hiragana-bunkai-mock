@@ -243,6 +243,17 @@ details summary{cursor:pointer;font-weight:700;padding-block:6px}
 small.en{font:500 calc(11px*var(--fz))/1.3 var(--f-ui);color:var(--sub);margin-left:4px;letter-spacing:0;font-variant-numeric:tabular-nums}
 small.en.b{display:block;margin-left:0}
 .no-en small.en,.no-en .dg-en{display:none!important}
+/* 画面の言葉（HB-057, D-091）。日本語＝英語の添えを出さない（no-en）。English・한국어＝日本語の文（.jp）を消し、英語（韓国語）を主の大きさで出す（en-main）。英語の無い文は .jp で包まれないので日本語のまま */
+.en-main .jp{display:none}
+.en-main small.en{font-size:inherit!important;line-height:inherit;font-weight:inherit;color:inherit!important;opacity:1!important;margin:0!important;font-variant-numeric:inherit}
+.en-main .act small:has(>small.en){font-size:inherit;color:inherit;font-weight:inherit}
+.en-main #oppSay:has(+ #oppSayEn small.en){display:none}
+.en-main .dg-f:has(.dg-en) .dg-h>span:first-child,.en-main .dg-f:has(.dg-en) .dg-t{display:none} /* しくみの図：英語の一言（.dg-en）がある枠は、日本語の見出し・説明を消して英語を主に */
+.en-main .dg-en{margin:0;font-size:calc(13px*var(--fz));color:inherit}
+.en-main .top .link small.en{font-size:inherit!important}
+.langBtn{min-width:48px;justify-content:center;letter-spacing:.02em}
+.langSet{margin:0 0 6px}
+.menu-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .top .link small.en{display:block;margin:0;font-size:calc(10px*var(--fz));line-height:1.2}
 .act small.en{margin:0 3px 0 0;font-size:calc(11px*var(--fz))}
 .act.throw small.en,.guide small.en{color:inherit;opacity:.75}
@@ -329,7 +340,8 @@ small.en.b{display:block;margin-left:0}
     <button class="link" id="btnLog" type="button">ログ<small class="en" lang="en">Log</small></button>
     <button class="link" id="btnReset" type="button">やりなおし<small class="en" lang="en">Restart</small></button>
   </header>
-  <div class="hows"><button class="how" id="btnHow" type="button">？ 遊び方<small class="en" lang="en">How to play</small></button><button class="how" id="btnZukan" type="button">辞書<small class="en" lang="en">Dictionary</small></button></div>
+  <div class="hows"><button class="how" id="btnHow" type="button">？ 遊び方<small class="en" lang="en">How to play</small></button><button class="how" id="btnZukan" type="button">辞書<small class="en" lang="en">Dictionary</small></button><button class="how langBtn" id="btnLang" data-set="langSet" type="button" aria-haspopup="true" aria-expanded="false"></button></div>
+  <div class="meanSet langSet" id="langSet" role="group" aria-label="言葉 / Language" hidden></div>
 
   <p class="today" id="today" aria-label="今日の字"></p>
 
@@ -378,7 +390,8 @@ small.en.b{display:block;margin-left:0}
 
 <div class="menu" id="menu">
   <div class="menu-in">
-    <h2>ひらがな分解（仮）</h2>
+    <div class="menu-head"><h2>ひらがな分解（仮）</h2><button class="how langBtn" id="btnLangMenu" data-set="langSetMenu" type="button" aria-haspopup="true" aria-expanded="false"></button></div>
+    <div class="meanSet langSet" id="langSetMenu" role="group" aria-label="言葉 / Language" hidden></div>
     <button class="act menu-solo" id="btnSolo" type="button">▶ ひとりで（CPU）<small class="en" lang="en">Solo vs CPU</small></button>
     <!-- ひとりでの相手の強さを、始める前に選ぶ（HB-014 追加, D-041）。中身は JS で SPEEDS から作る -->
     <div class="solo-pick" id="soloPick" role="group" aria-label="相手の強さ" hidden></div>
@@ -826,14 +839,19 @@ function showCombo(k){ const el=document.getElementById('combo'); if(!el||starsO
 /* ---- 投げた言葉の意味（HB-007, D-028）。データは meanings.js（JMdict, CC BY-SA 4.0）。意味が付かない語は何も出さない。
    作者が書いた意味（meanings-author.js, HB-046）は JMdict より先（同じ語は作者の行で上書き）---- */
 const MEAN=Object.assign({},window.HB_MEANINGS||{},window.HB_MEANINGS_AUTHOR||{}); const MEAN_MODES=['none','kanji','both'];
+/* 画面の言葉（HB-057, D-091）：'ja'｜'en'｜'ko'。端末に hb.lang で覚える。無ければ端末の言語（navigator.languages の先頭。ja→日本語、ko→한국어、それ以外→English） */
+const LANGS=['ja','en','ko'];
+const LANG_UI={ja:['JP','日本語'],en:['EN','English'],ko:['KO','한국어']}; // [ボタンの短い字, 選ぶときの名前（それぞれの言葉）]。1か所で直せる
+const defaultLang=()=>{ const l=String((navigator.languages&&navigator.languages[0])||navigator.language||'').toLowerCase(); return l.startsWith('ja')?'ja':l.startsWith('ko')?'ko':'en'; };
+let LANG=defaultLang(); try{ const v=localStorage.getItem('hb.lang'); if(LANGS.includes(v)) LANG=v; }catch(e){}
 let meanMode='both'; try{ const v=localStorage.getItem('hb.meaning'); if(MEAN_MODES.includes(v)) meanMode=v; }catch(e){}
 let meanT=null;
 function meaningOf(word){ if(meanMode==='none') return null; const m=MEAN[String(word).replace(/∘/g,'')]; if(!m) return null;
-  const k=m[0]||'', e=meanMode==='both'?(m[1]||''):''; return (k||e)?{k,e}:null; }
+  const k=m[0]||'', e=meanMode==='both'&&LANG!=='ja'?(m[1]||''):''; return (k||e)?{k,e}:null; }
 /* 声の語の「使う場面」（HB-023, D-054）。データは scenes.js。投げた瞬間の表示と辞書だけ、JMdict より先に出す（リストの小さい意味は meaningOf のまま） */
 const SCENE=window.HB_SCENES||{};
 function sceneOf(word){ if(meanMode==='none') return null; const s=SCENE[String(word).replace(/∘/g,'')]; if(!s) return null;
-  const k=s[0]||'', e=meanMode==='both'?(s[1]||''):''; return (k||e)?{k,e,sc:true}:null; }
+  const k=s[0]||'', e=meanMode==='both'&&LANG!=='ja'?(s[1]||''):''; return (k||e)?{k,e,sc:true}:null; }
 const meaningBig=w=>sceneOf(w)||meaningOf(w);
 /* 言葉を見せる形（HB-016, D-043）。中で持つ言葉（throws・辞書の保存・使った言葉）は大きい字の形（ちよこ）のまま。
    見せるとき（リスト・声・辞書・終わった画面・相手の一言）だけ、HB_SMALL で小さい字の形（ちょこ）にし、「ち∘」は「ち。」にする */
@@ -841,7 +859,7 @@ const SMALL_SHOW=window.HB_SMALL||{};
 const wordShow=w=>{ w=String(w); return (SMALL_SHOW[w]||w).replace(/∘/g,'。'); };
 const escH=t=>String(t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 /* ---- 画面の言葉に添える英語（HB-015, D-042）----
-   日本語は変えず、<small class="en" lang="en"> を後ろに足すだけ。出す・消すは html の no-en（renderMeanSet。意味の設定が「漢字＋英語」のときだけ出る）。
+   日本語は変えず、<small class="en" lang="en"> を後ろに足すだけ。出す・消すは html の no-en（applyLang。画面の言葉が日本語のときは出さない。D-091）。
    表（EN_FIX）は日本語の文そのままを鍵にする。中に言葉や数が入る文は EN_PAT で作る。どちらにも無い文は英語を付けない */
 const EN_FIX={
   'あなたが動いたら、動き出す':'Starts when you move','考えている':'Thinking…','手が出ない':'No move',
@@ -933,8 +951,33 @@ function showMeaning(word,who){ niceFx(word); greetBack(word,who); const el=$('m
   if(tier===3) burst(who); }
 function renderMeanSet(){ document.querySelectorAll('#meanSet button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.v===meanMode)));
   // しくみの図の英語（D-039）と画面の言葉の英語（D-042）は、「漢字＋英語」のときだけ。html の no-en ひとつでまとめて切り替える（はじめの画面の強さボタン D-041 は別。いつも出す）
-  document.documentElement.classList.toggle('no-en',meanMode!=='both');
-  const ri=$('roomInput'); if(ri) ri.placeholder=meanMode==='both'?'合言葉 Room code':'合言葉'; }
+  const ri=$('roomInput'); if(ri) ri.placeholder=LANG==='ja'?'合言葉':LANG==='ko'?(koOf('合言葉')||'Room code'):'Room code'; }
+/* ---- 画面の言葉の切り替え（HB-057, D-091）----
+   英語は <small class="en"> として日本語の文のあとに付いている。日本語の文（その前の兄弟）を span.jp で包み、English・한국어 のときは .jp を消して英語を主にする。
+   動きで作り直される所も多いので、MutationObserver で足された small.en を包む。한국어の表（KO_FIX・KO_PAT。日本語の文を鍵にする）は HB-058 で入れる。表に無い文は English */
+const KO_FIX={}, KO_PAT=[];
+function koOf(jp){ if(!jp) return ''; if(KO_FIX[jp]) return KO_FIX[jp]; for(const [re,f] of KO_PAT){ const m=String(jp).match(re); if(m) return f(m); } return ''; }
+function wrapJp(root){ if(!root||root.nodeType!==1) return;
+  const list=[...(root.matches('small.en')?[root]:[]),...root.querySelectorAll('small.en')];
+  for(const en of list){ if(en.dataset.w) continue; en.dataset.w='1'; en.dataset.en=en.textContent;
+    let anchor=en; const p=en.parentElement; if(p&&p.tagName==='SMALL'&&!p.className&&p.parentElement&&p.parentElement.classList.contains('act')) anchor=p; // 割る＋1 の形（<small><small.en>Split</small>+1</small>）
+    const nodes=[]; let sb=anchor.previousSibling;
+    while(sb&&!(sb.nodeType===1&&(sb.matches('small.en,img,.jp')||sb.querySelector('img,small.en')))){ nodes.unshift(sb); sb=sb.previousSibling; }
+    if(nodes.some(n=>n.nodeType===1||n.textContent.trim())){ const j=document.createElement('j-p'); j.className='jp'; /* span ではなく独自の名前の要素：CSS の「.rim span」などに当たらない */ anchor.parentNode.insertBefore(j,nodes[0]); nodes.forEach(n=>j.appendChild(n)); en.dataset.jp=j.textContent.trim(); }
+    else if(p&&p.id&&/En$/.test(p.id)){ const pj=document.getElementById(p.id.replace(/En$/,'')); if(pj) en.dataset.jp=pj.textContent.trim(); }
+    applyKo(en); } }
+function applyKo(en){ if(en.dataset.en==null) return; const k=LANG==='ko'?koOf(en.dataset.jp||''):''; const t=k||en.dataset.en; if(en.textContent!==t) en.textContent=t; en.lang=k?'ko':'en'; }
+new MutationObserver(ms=>{ for(const m of ms) m.addedNodes.forEach(wrapJp); }).observe(document.body,{childList:true,subtree:true});
+function applyLang(){ const h=document.documentElement;
+  h.classList.toggle('no-en',LANG==='ja'); h.classList.toggle('en-main',LANG!=='ja'); h.lang=LANG;
+  wrapJp(document.body); document.querySelectorAll('small.en').forEach(applyKo);
+  document.querySelectorAll('.langBtn').forEach(b=>{ b.textContent=LANG_UI[LANG][0]; b.setAttribute('aria-label',LANGS.map(l=>LANG_UI[l][1]).join(' / ')); });
+  document.querySelectorAll('.langSet').forEach(el=>{ if(!el.firstChild) el.innerHTML=LANGS.map(l=>`<button type="button" data-lang="${l}" lang="${l}">${LANG_UI[l][1]}</button>`).join(''); el.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.lang===LANG))); });
+  renderMeanSet(); }
+function setLang(l){ if(!LANGS.includes(l)) return; LANG=l; try{ localStorage.setItem('hb.lang',l); }catch(e){} applyLang(); logN=-1; if(S){ renderLog(); renderOpp(); } if($('zukan')&&!$('zukan').hidden) renderZukan(); }
+document.querySelectorAll('.langBtn').forEach(b=>b.addEventListener('click',e=>{ e.stopPropagation(); const set=$(b.dataset.set); const open=set.hidden; document.querySelectorAll('.langSet').forEach(x=>x.hidden=true); document.querySelectorAll('.langBtn').forEach(x=>x.setAttribute('aria-expanded','false')); set.hidden=!open; b.setAttribute('aria-expanded',String(open)); }));
+document.querySelectorAll('.langSet').forEach(set=>set.addEventListener('click',e=>{ e.stopPropagation(); const b=e.target.closest('button[data-lang]'); if(!b) return; setLang(b.dataset.lang); set.hidden=true; document.querySelectorAll('.langBtn').forEach(x=>x.setAttribute('aria-expanded','false')); }));
+document.addEventListener('click',()=>{ document.querySelectorAll('.langSet').forEach(x=>x.hidden=true); document.querySelectorAll('.langBtn').forEach(x=>x.setAttribute('aria-expanded','false')); });
 
 /* ---- ゲーム内辞書（HB-008, D-029）。遊ぶと開いていく型 ----
    投げた言葉・相手から届いた言葉（ひとりで・ふたりでとも）を、この端末のブラウザ（localStorage の hb.zukan）に残す。
@@ -1426,7 +1469,7 @@ function buildShortcuts(){ const sym=k=>k==='裏返す'?'⇄':'⟳'; const rows=
   $('shortcuts').innerHTML=`<div class="dg-f"><details><summary>${SC_LABEL[0]}${enTag(SC_LABEL[1])}</summary><p class="dg-t">⟳ 回す　⇄ 裏返す</p><div class="dg-ex" id="scList">${rows.join('')}</div></details></div>`; }
 buildShortcuts();
 $('meaningsNotice').textContent=window.HB_MEANINGS_NOTICE||'（意味のデータを読み込めなかった）';
-renderMeanSet(); $('meanSet').addEventListener('click',e=>{ const b=e.target.closest('button[data-v]'); if(!b) return; meanMode=b.dataset.v; try{localStorage.setItem('hb.meaning',meanMode)}catch(_){} renderMeanSet(); logN=-1; renderLog(); });
+applyLang(); $('meanSet').addEventListener('click',e=>{ const b=e.target.closest('button[data-v]'); if(!b) return; meanMode=b.dataset.v; try{localStorage.setItem('hb.meaning',meanMode)}catch(_){} renderMeanSet(); logN=-1; renderLog(); });
 /* 字の大きさ（HB-018, D-046）。小さく 0.85／標準 1／大きく 1.2。この端末のブラウザ（hb.textSize）に覚える。初めは標準 */
 const FZ={s:0.85,m:1,l:1.2}; let fzMode='m'; try{ const v=localStorage.getItem('hb.textSize'); if(FZ[v]) fzMode=v; }catch(e){}
 function renderSize(){ const r=document.documentElement; r.style.setProperty('--fz',String(FZ[fzMode])); r.classList.toggle('fz-l',fzMode==='l');
@@ -1483,10 +1526,10 @@ function getClient(){ if(NET.client) return NET.client; if(!window.supabase||!wi
 function setLobbyText(text){ $('lobbyText').innerHTML=withEn(text,1); }
 function showMenu(){ $('menu').hidden=false; soloPickClose(); }
 /* ひとりでの相手の強さを、始める前に選ぶ（HB-014 追加, D-041）。「とまる」は出さない（右上の「速さ」からは選べる）。
-   英語はいつも出す（はじめの画面では意味の設定をまだ触っていないため）。前に選んだ強さに印。選ぶとすぐ始まる */
+   英語の出す・出さないは画面の言葉の設定（D-091）に従う。前に選んだ強さに印。選ぶとすぐ始まる */
 const SOLO_LEVELS=[['ゆるゆる','Very easy'],['のんびり','Easy'],['ゆっくり','Normal'],['ふつう','Hard'],['つよい','Very hard']]; // 一言は英語だけ（D-041 の直し、作者 23:29）
 function soloPickOpen(){ const cur=speedSaved?SPEEDS[speed].name:'';
-  $('soloPick').innerHTML='<h3>相手の強さ <small lang="en" style="font-weight:500;color:var(--sub)">CPU level</small></h3>'+SOLO_LEVELS.map(([n,en])=>`<button type="button" class="lv" data-n="${n}"${n===cur?' aria-current="true"':''}><b>${n}<small lang="en">${en}</small></b>${n===cur?'<span class="mark">前回</span>':''}</button>`).join('')
+  $('soloPick').innerHTML='<h3>相手の強さ '+enTag('CPU level')+'</h3>'+SOLO_LEVELS.map(([n,en])=>`<button type="button" class="lv" data-n="${n}"${n===cur?' aria-current="true"':''}><b>${n}${enTag(en)}</b>${n===cur?'<span class="mark">前回</span>':''}</button>`).join('')
     +'<button type="button" class="link" id="btnSoloBack" style="align-self:flex-start">もどる'+enTag('Back')+'</button>';
   $('btnSolo').hidden=true; $('menuOnline').hidden=true; $('soloPick').hidden=false; const f=$('soloPick').querySelector('[aria-current="true"]')||$('soloPick').querySelector('.lv'); if(f) f.focus(); }
 function soloPickClose(){ $('soloPick').hidden=true; $('btnSolo').hidden=false; $('menuOnline').hidden=false; }
