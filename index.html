@@ -276,7 +276,7 @@ small.en.b{display:block;margin-left:0}
 #resBest .len{font-size:calc(12px*var(--fz));color:var(--sub);margin:0 4px}
 
 /* ゲーム内辞書（HB-008, D-029）。投げた・届いた言葉が載っていく */
-.hows{display:flex;gap:8px;align-self:flex-start}
+.hows{display:flex;flex-wrap:wrap;gap:8px;align-self:flex-start}
 .zk-n{margin:0;font:700 calc(15px*var(--fz))/1.4 var(--f-ui);font-variant-numeric:tabular-nums}
 .zk-n b{font-size:calc(22px*var(--fz));color:var(--me)}
 .zk-note{margin:0;font-size:calc(12px*var(--fz));line-height:1.6;color:var(--sub)}
@@ -334,11 +334,19 @@ small.en.b{display:block;margin-left:0}
 .guide.tut .tutGo{pointer-events:auto;display:block;margin:8px 0 0;font:700 calc(15px*var(--fz))/1 var(--f-ui);padding:10px 14px;border-radius:10px;border:0;background:var(--me);color:var(--me-ink);cursor:pointer}
 .tile.tutGlow .face{box-shadow:0 0 0 3px var(--me);animation:tutGlow 1s ease-in-out infinite}
 .act.tutGlow{box-shadow:0 0 0 3px var(--me);animation:tutGlow 1s ease-in-out infinite}
+.tile.hintGlow .face{box-shadow:0 0 0 3px var(--me);animation:tutGlow 1s ease-in-out infinite}
+.act.hintGlow{box-shadow:0 0 0 3px var(--me);animation:tutGlow 1s ease-in-out infinite}
+.hintMsg{margin:4px 0 0;font-size:calc(14px*var(--fz));font-weight:700;color:var(--me)}
+.hintMsg b{font:600 calc(22px*var(--fz))/1.3 var(--f-kana);margin:0 2px}
+#resHints .vh{font-weight:700;margin:10px 0 4px}
+#resHints .hf{display:flex;align-items:baseline;gap:8px;margin:2px 0}
+#resHints .hf b{font:600 calc(20px*var(--fz))/1.3 var(--f-kana);color:var(--me)}
+#resHints .hf span{font-size:calc(12px*var(--fz));color:var(--sub)}
 @keyframes tutGlow{0%,100%{box-shadow:0 0 0 2px var(--me)}50%{box-shadow:0 0 0 6px color-mix(in srgb,var(--me) 40%,transparent)}}
 @keyframes gbob{0%,100%{translate:0 0}50%{translate:0 -5px}}
 .guide.above.bob{animation-name:gbob2} @keyframes gbob2{0%,100%{translate:0 0}50%{translate:0 5px}}
 .guideSet button{font:600 calc(14px*var(--fz))/1 var(--f-ui);padding:8px 12px;border-radius:999px;border:1px solid var(--sub);background:transparent;color:inherit;margin-top:6px}
-@media (prefers-reduced-motion: reduce){ .tile.tutGlow .face,.act.tutGlow{animation:none} .tile,.g{transition:none} .tile.crack .face{animation:none} .guide.bob{animation:none} .tile.snap .face{animation:none} }
+@media (prefers-reduced-motion: reduce){ .tile.tutGlow .face,.act.tutGlow,.tile.hintGlow .face,.act.hintGlow{animation:none} .tile,.g{transition:none} .tile.crack .face{animation:none} .guide.bob{animation:none} .tile.snap .face{animation:none} }
 </style>
 
 <div class="app">
@@ -348,8 +356,9 @@ small.en.b{display:block;margin-left:0}
     <button class="link" id="btnLog" type="button">ログ<small class="en" lang="en">Log</small></button>
     <button class="link" id="btnReset" type="button">やりなおし<small class="en" lang="en">Restart</small></button>
   </header>
-  <div class="hows"><button class="how" id="btnHow" type="button">？ 遊び方<small class="en" lang="en">How to play</small></button><button class="how" id="btnZukan" type="button">辞書<small class="en" lang="en">Dictionary</small></button><button class="how langBtn" id="btnLang" data-set="langSet" type="button" aria-haspopup="true" aria-expanded="false"></button></div>
+  <div class="hows"><button class="how" id="btnHow" type="button">？ 遊び方<small class="en" lang="en">How to play</small></button><button class="how" id="btnZukan" type="button">辞書<small class="en" lang="en">Dictionary</small></button><button class="how" id="btnHint" type="button" hidden></button><button class="how langBtn" id="btnLang" data-set="langSet" type="button" aria-haspopup="true" aria-expanded="false"></button></div>
   <div class="meanSet langSet" id="langSet" role="group" aria-label="言葉 / Language" hidden></div>
+  <p class="hintMsg" id="hintMsg" role="status" aria-live="polite" hidden></p><!-- ヒントの3段目の言葉・見つからない一言（HB-062, D-095） -->
 
   <p class="today" id="today" aria-label="今日の字"></p>
 
@@ -389,7 +398,7 @@ small.en.b{display:block;margin-left:0}
 
   <div class="result" id="result" hidden>
     <p class="big" id="resBig"></p>
-    <p id="resSub"></p><div id="resBest"></div><div id="resVotes" hidden></div>
+    <p id="resSub"></p><div id="resBest"></div><div id="resVotes" hidden></div><div id="resHints" hidden></div>
     <p class="again-note" id="resWait" role="status" hidden></p><!-- ふたりでの再戦（HB-061, D-094）：待ち・相手の「もう一回」・数えの一言。結果の画面のふたりでのときだけ -->
     <button class="act" id="btnAgain" type="button">もう一回<small class="en" lang="en">Play again</small></button>
     <button class="act sub" id="btnCopy" type="button">ログをコピー<small class="en" lang="en">Copy log</small></button>
@@ -735,10 +744,10 @@ function logText(){ return [`ひらがな分解（仮）ログ ${new Date().toLo
     : `ひとりで（CPU）　速さ:${SPEEDS[speed].name}　今日の字 多め:${TODAY.more.join('')} 少なめ:${TODAY.less.join('')}　一度きり:${once?'あり':'なし'}　辞書:${WORDS.length}語　上限:${CAP}　相手の語:${SPEEDS[speed].deep?'辞書全部・2手先まで読む（つよい。D-051）':SPEEDS[speed].smart?'辞書全部（賢い。D-045）':cpuMax()+'字まで'}　引く:なし（${FLOOR}こまで1こずつ。0こ→すぐ濁音・1こ→${REFILL_MS/1000}秒後に半濁音・2こ→${REFILL_MS/1000}秒後にふつう）`].concat(LOG).join('\n'); }
 const els=new Map();
 function newGame(tut){
-  clearTimeout(TUT.t); TUT.on=tut===true; TUT.step=TUT.on?'arrive':''; // tut＝true のときだけチュートリアルの一戦（HB-059）
+  HINT=null; clearTimeout(TUT.t); TUT.on=tut===true; TUT.step=TUT.on?'arrive':''; // tut＝true のときだけチュートリアルの一戦（HB-059）
   clearTimeout(cpuT); clearTimeout(refT.me); clearTimeout(refT.op); refT={me:null,op:null}; els.forEach(el=>el.remove()); els.clear();
   CAP=isOnline()&&NET.cap?NET.cap:capSetting; // 一戦の始めに決める（HB-048）
-  lastThrow=null; S={mine:[],opp:[],oppL:null,oppO:null,sel:[],log:[],used:new Set(),over:null,ending:false,started:false,busy:false,choose:null,
+  lastThrow=null; S={mine:[],opp:[],oppL:null,oppO:null,sel:[],log:[],hintFound:[],used:new Set(),over:null,ending:false,started:false,busy:false,choose:null,
      say:'あなたが動いたら、動き出す'};
   TODAY=makeToday(isOnline()&&NET.matchId?seedRng('today-'+NET.matchId):null); // ふたりでは matchId から。ひとりでは毎戦ランダム
   const firstHand=()=>[...Array.from({length:START-1},()=>pick(TODAY.bag)),START_PART]; // 最初の手は袋から4枚＋部品「｜」（D-034。二人とも）
@@ -1268,6 +1277,76 @@ function renderVotes(){ const el=$('resVotes'); if(!S||!S.over){ el.hidden=true;
 }
 document.addEventListener('click',e=>{ const b=e.target.closest&&e.target.closest('#resVotes button[data-v]'); if(!b||!S||!S.over||!S.cands) return;
   const i=+b.dataset.i, c=S.cands[i]; if(!c||S.votes[i]) return; S.votes[i]=b.dataset.v; sendVote(c,b.dataset.v); renderVotes(); });
+/* ---- ヒント（HB-062, D-095）----
+   押すたびに一段ずつ：① 触る札が明滅 ② 押すボタンも明滅 ③ 作れる言葉を出す。まずは「ひとりで」だけ（ふたりで・チュートリアルでは出さない）。
+   探し方：自分のカゴ（S.mine）の字から、CPU と同じ stepsOf（手数は向きの2手を2と数える。HB-050）と topAbove（禁止用語 cpu-ng.js の語・もうリストに出た語は辞書の表から外してある）で、
+   手数0（すぐ投げられる）→ 1 → 2 の順に見る（字にならない向きの札は、字になる最短の回す・裏返すを手に数える。くっつけて か になる手は自分では向きがずれるので数えない）。同じ手数なら字数の多い言葉、それも同じなら点数の高い方、それも同じなら先に見つかった方。
+   札を勝手に動かさない（光らせるだけ）。カゴの札が変わったら（自分の手・相手から届いた・落ちてきた）消えて1回目からに戻る。★・勝ち負け・やりとりの候補には効かない */
+const HINT_TEXT={btn:['ヒント','Hint'], none:['いまは見つからない','No hint right now'], head:['ヒントで見つけた言葉','Found with hints'], thrown:['投げた','Thrown'], notThrown:['投げていない','Not thrown']}; // 仮。ここで直す（韓国語は lang-ko.js）
+const HINT_BTN={split:'aSplit',turn:'aRot',flip:'aFlip',merge:'aMerge',throw:'aThrow'};
+let HINT=null; // {sig, level 0〜3, plan（null＝見つからない）}
+const hintSig=()=>S.mine.map(p=>p.id+'.'+p.r+'.'+p.f).join(','); // 札の字・向きが変わったら（回す・裏返すも）消える
+const hintAvail=()=>!!S&&!S.over&&!S.ending&&!isOnline()&&!TUT.on&&$('menu').hidden;
+/* 向きずれ（字にならない）札は、回す・裏返すで字になる最短の手順（2手まで）を手に数える。stepsOf は字の並びしか見ないので、ここで足す（札の r・f から。doTurn と同じ計算） */
+function hintNullSteps(L){ const out=[];
+  L.forEach((l,i)=>{ if(l&&l!=='＞'&&l!=='⊂') return; /* ＞・⊂ は CPU の表（TURN）に出入りが無い・足りない部品。人は回す・裏返すで字にできる */ const p0=S.mine[i], seen=new Map(); let front=[{r:p0.r,f:p0.f,ops:[]}];
+    for(let d=1;d<=2;d++){ const next=[];
+      for(const st of front) for(const kind of ['回す','裏返す']){ const q={...p0,r:st.r,f:st.f}; if(kind==='回す') q.r=(q.r+1)%4; else { q.r=(4-q.r)%4; q.f=q.f?0:1; } norm(q);
+        const ops=[...st.ops,kind], to=letterOf(q); if(to&&to!==l){ if(!seen.has(to)){ seen.set(to,1); const rest=[...L.slice(0,i),...L.slice(i+1)]; out.push({t:'turn',i,to,n:d,ops,res:[...rest,to]}); } } else next.push({r:q.r,f:q.f,ops}); }
+      front=next; } });
+  return out; }
+/* letters で作れる言葉のうち、字数がいちばん多いもの（同じなら点数の高い方、それも同じなら表の先）。topAbove と同じ表・ふるい */
+function longWord(letters){ const T=strongList(), idx=T.idx, pool={}, pm=[0,0,0,0]; let len=0;
+  for(const l of letters){ if(!l) continue; const c=asWord(l); pool[c]=(pool[c]||0)+1; len++; const b=idx[c]; if(b!==undefined&&b<128) pm[b>>5]|=1<<(b&31); }
+  let best=null;
+  for(const y of T){ const x=y.x; if(x.cs.length>len) continue; if(best&&(x.cs.length<best.cs.length||(x.cs.length===best.cs.length&&x.sc<=best.sc))) continue;
+    if(!y.wide&&((y.m[0]&~pm[0])|(y.m[1]&~pm[1])|(y.m[2]&~pm[2])|(y.m[3]&~pm[3]))) continue;
+    const need={}; let ok=true; for(const c of x.cs){ need[c]=(need[c]||0)+1; if(need[c]>(pool[c]||0)){ ok=false; break; } }
+    if(ok&&!(once&&S.used.has(x.w))) best=x; }
+  return best; }
+const HINT_BUDGET=250; // ms。字数で選び直すのに使う時間の上限（遅い端末で止まって見えないように）
+function hintFind(){
+  const L=S.mine.map(letterOf), t0=performance.now();
+  const tilesOf=w=>{ const used=[]; for(const ch of w){ const k=S.mine.findIndex((p,i)=>!used.includes(i)&&asWord(letterOf(p))===ch); used.push(k); } return used; };
+  if(topAbove(L,0)){ const x=longWord(L); return {hands:0,word:x.w,tiles:tilesOf(x.w),btn:'throw'}; }
+  const first=s=>s.t==='split'?{tiles:[s.i],btn:'split'}:s.t==='turn'?{tiles:[s.i],btn:s.ops[0]==='回す'?'turn':'flip'}:{tiles:[s.i,s.j],btn:'merge'};
+  const okStep=s=>!(s.t==='merge'&&MERGE_TURN[s.r]); // 自分がくっつけた か は向きがずれて出る（D-079）。字に戻すのに裏返す・回すが要り、2手に収まらない
+  const S1=[...stepsOf(L),...hintNullSteps(L)].filter(s=>(s.n||1)<=2&&okStep(s));
+  const feas=new Map(), top=res=>{ const k=res.map(l=>l?asWord(l):'?').sort().join(''); if(!feas.has(k)) feas.set(k,!!topAbove(res,0)); return feas.get(k); };
+  let cands=[];
+  for(const s1 of S1){ if((s1.n||1)===1&&top(s1.res)) cands.push({hands:1,s1,res:s1.res}); }
+  if(!cands.length){
+    for(const s1 of S1){ if((s1.n||1)===2&&top(s1.res)) cands.push({hands:2,s1,res:s1.res}); }
+    for(const s1 of S1){ if((s1.n||1)!==1) continue; for(const s2 of stepsOf(s1.res)){ if((s2.n||1)!==1||!okStep(s2)) continue; if(top(s2.res)) cands.push({hands:2,s1,res:s2.res}); } } }
+  if(!cands.length) return null;
+  const longs=new Map(); let best=null, bx=null;
+  for(const c of cands){ const k=c.res.map(l=>l?asWord(l):'?').sort().join(''); if(!longs.has(k)){ if(best&&performance.now()-t0>HINT_BUDGET) continue; longs.set(k,longWord(c.res)); }
+    const x=longs.get(k); if(!x) continue; if(!best||x.cs.length>bx.cs.length||(x.cs.length===bx.cs.length&&x.sc>bx.sc)){ best=c; bx=x; } }
+  if(!best){ best=cands[0]; bx=longWord(best.res); }
+  return {hands:best.hands,word:bx.w,...first(best.s1)}; }
+function hintPress(){ if(!hintAvail()) return;
+  if(HINT&&HINT.sig!==hintSig()) HINT=null;
+  if(!HINT){ HINT={sig:hintSig(),level:0,plan:hintFind()}; if(!HINT.plan){ lg('me','ヒント なし'); hintPaint(); return; } }
+  const pl=HINT.plan; if(!pl){ hintPaint(); return; }
+  if(HINT.level<3){ HINT.level++;
+    if(HINT.level===1) lg('me','ヒント① '+pl.tiles.map(i=>shown(letterOf(S.mine[i])||'〓')).join('・'));
+    else if(HINT.level===2) lg('me','ヒント② '+({split:'割る',turn:'回す',flip:'裏返す',merge:'くっつける',throw:'投げる'})[pl.btn]);
+    else { lg('me','ヒント③ '+wordShow(pl.word)); if(!S.hintFound.some(h=>h.word===pl.word)) S.hintFound.push({word:pl.word}); } }
+  hintPaint(); }
+function hintPaint(){ const b=$('btnHint'), msg=$('hintMsg'); if(!b) return;
+  Object.values(HINT_BTN).forEach(id=>$(id).classList.remove('hintGlow')); els.forEach(el=>el.classList.remove('hintGlow'));
+  const on=hintAvail(); b.hidden=!on;
+  if(HINT&&(HINT.sig!==(S?hintSig():'')||!on)) HINT=null;
+  if(!on||!HINT){ msg.hidden=true; msg.innerHTML=''; return; }
+  const pl=HINT.plan;
+  if(!pl){ msg.hidden=false; msg.innerHTML=escH(HINT_TEXT.none[0])+enTag(HINT_TEXT.none[1]); return; }
+  if(HINT.level>=1) pl.tiles.forEach(i=>{ const p=S.mine[i], el=p&&els.get(p.id); if(el) el.classList.add('hintGlow'); });
+  if(HINT.level>=2) $(HINT_BTN[pl.btn]).classList.add('hintGlow');
+  if(HINT.level>=3){ msg.hidden=false; msg.innerHTML=`<b>${escH(wordShow(pl.word))}</b>`; } else { msg.hidden=true; msg.innerHTML=''; } }
+function renderHintFound(){ const el=$('resHints'); if(!S||!S.over||!S.hintFound||!S.hintFound.length){ el.hidden=true; el.innerHTML=''; return; }
+  const t=HINT_TEXT, thrown=w=>S.log.some(r=>r.who==='me'&&r.word===w);
+  el.hidden=false; el.innerHTML=`<div class="vh">${escH(t.head[0])}${enTag(t.head[1])}</div>`+S.hintFound.map(h=>`<div class="hf"><b>${escH(wordShow(h.word))}</b><span>${thrown(h.word)?escH(t.thrown[0])+enTag(t.thrown[1]):escH(t.notThrown[0])+enTag(t.notThrown[1])}</span></div>`).join(''); }
+$('btnHint').innerHTML=escH(HINT_TEXT.btn[0])+enTag(HINT_TEXT.btn[1]); $('btnHint').onclick=hintPress;
 let logN=-1;
 function renderLog(){ const el=$('log'); if(logN===S.log.length) return; logN=S.log.length;
   if(!S.log.length){ el.innerHTML='<p class="empty">投げた言葉は、ここに二人ぶん残る。'+enTag('Words you both throw stay here.',1)+'相手から届いた言葉は、こっちのカゴの材料になる。'+enTag('Words you receive become tiles in your basket.',1)+'</p>'; return; }
@@ -1290,7 +1369,7 @@ function renderControls(){ const over=!!S.over; $('controls').hidden=over; $('re
         const best=b?`<div class="best ${who}"><span class="lb">${label}の${b===l?'いちばん長くて、いちばん★':'今日の一語'}${enTag(b===l?`${W} longest, most ★ word`:`${W} word of the day`)}</span>${word(b.word)}<span class="st">${'★'.repeat(starsOf(b.k))}</span>${b===l?`<span class="len">${[...b.word].length}字</span>`:''}${mean(b.word)}${b.trail?`<span class="tr">${b.trail}</span>`:''}</div>`:'';
         const long=l&&l!==b?`<div class="best long ${who}"><span class="lb">${label}のいちばん長い言葉${enTag(`${W} longest word`)}</span>${word(l.word)}<span class="len">${[...l.word].length}字</span>${l.k?`<span class="st">${'★'.repeat(starsOf(l.k))}</span>`:''}${mean(l.word)}</div>`:'';
         return `<div class="bests">${best}${long}</div>`; };
-      $('resBest').innerHTML=card('me','あなた')+card('op','あいて'); } renderVotes(); $('logText').value=logText(); return; }
+      $('resBest').innerHTML=card('me','あなた')+card('op','あいて'); } renderVotes(); renderHintFound(); $('logText').value=logText(); return; }
   const c=checkSel(), ps=selPieces(), p=ps.length?ps[ps.length-1]:null, L=p&&letterOf(p); // 割るは選んだ最後の1枚（D-070）
   { const logEl=$('log'), hitW=(c.msg&&c.msg.startsWith('もうリストに出た言葉'))?c.text:'';
     logEl.querySelectorAll('.row').forEach(e=>{ const on=!!hitW&&e.dataset.w===hitW; if(on&&!e.classList.contains('hit')){ e.classList.add('hit'); try{ e.scrollIntoView({block:'nearest',behavior:reduced?'auto':'smooth'}); }catch(_){} } else if(!on) e.classList.remove('hit'); }); }
@@ -1326,7 +1405,7 @@ function refill(){ if(!S||S.over||S.ending) return;
     if(cur.length===0){ clearTimeout(refT[side]); refT[side]=null; dropOne(side); } // 空になったら待たずに濁音。待っている途中でも、その待ちはやめる
     if(cur.length<FLOOR && !refT[side]){ refT[side]=setTimeout(()=>{ refT[side]=null; if(!S||S.over||S.ending) return;
       dropOne(side); render(); }, REFILL_MS); } } }
-function render(){ refill(); renderOpp(); renderLog(); renderBasket(); renderControls(); queueBasket(); guideCheck(); tutPaint(); }
+function render(){ refill(); renderOpp(); renderLog(); renderBasket(); renderControls(); queueBasket(); guideCheck(); tutPaint(); hintPaint(); }
 
 /* ---- 最初の1戦の案内（HB-010, D-032）----
    はじめての1戦だけ、その場面で触る場所の横に一言ずつ出す。順は 1 始まり → 2 最初に選ぶ → 3 最初に投げる → 4 そのあと初めて1枚だけ選ぶ → 5 終わった画面。
@@ -1738,7 +1817,7 @@ function onOpponentLost(){ if(!S||S.over||S.ending) return; finish('win'); }
 /* 自動テストの窓（HB-035）。テストがページを開く前に window.HB_TEST={} を置いたときだけ、中の表と関数を渡す。ふだんの遊びでは何もしない */
 if(window.HB_TEST&&typeof window.HB_TEST==='object') Object.defineProperty(window.HB_TEST,'CAP',{get:()=>CAP,configurable:true}); // 一戦ごとに変わるので値でなく読む（HB-048）
 if(window.HB_TEST&&typeof window.HB_TEST==='object') Object.assign(window.HB_TEST,{FX,NET,onStartMessage,KANA,PARTS,RECIPE,MERGE,MERGE_TURN,TURN,BAG,logText,makeToday,seedRng,TODAY:()=>TODAY,HAND,DICT,SPEEDS,key,
-  words:()=>WORDS, S:()=>S, mk,letterOf,checkSel,splitMade,mergeMade,comboOf,cpuOk,tapTile,doSplit,doMerge,doTurn,doThrow,render,newGame,TUT,TUT_SEQ,tutDone,startSolo,cpuAct,cpuThrow,setSpeed,showMeaning,SCENE_OF,exchangeCands,VOTE_TEXT,ALIAS,turnShortcuts,mergeTurnBacks,stepsOf,cpuApply,TURN_NOT_CPU,pressAgain,onAgainMessage,onPartnerLeft,onLobbyPresence,againUi,leaveOnline});
+  words:()=>WORDS, S:()=>S, mk,letterOf,checkSel,splitMade,mergeMade,comboOf,cpuOk,tapTile,doSplit,doMerge,doTurn,doThrow,render,newGame,TUT,TUT_SEQ,tutDone,startSolo,cpuAct,cpuThrow,setSpeed,showMeaning,SCENE_OF,exchangeCands,VOTE_TEXT,ALIAS,turnShortcuts,mergeTurnBacks,stepsOf,hintFind,hintPress,HINT:()=>HINT,HINT_TEXT,cpuApply,TURN_NOT_CPU,pressAgain,onAgainMessage,onPartnerLeft,onLobbyPresence,againUi,leaveOnline});
 
 newGame();
 showMenu();
