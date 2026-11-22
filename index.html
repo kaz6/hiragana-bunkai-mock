@@ -1640,8 +1640,8 @@ function onLobbyPresence(){ const count=presentCount();
   else setLobbyText('相手がそろった。始まるのを待っている…'); }
 /* 相手が抜けたとき：対局中なら「いなくなった」で終える。待ち中なら待ちに戻す */
 function onPartnerLeft(){
-  if(isOnline()){ if(S&&!S.over&&!S.ending) finish('gone');
-    else if(S&&(S.over||S.ending)){ NET.partnerGone=true; NET.starting=false; NET.cd=0; againUi(); } // 結果の画面（再戦を待つ間も、数えている間も）に相手が抜けた（HB-061）
+  if(isOnline()){ if(S&&!S.over&&!S.ending){ finish('gone'); NET.partnerGone=true; NET.cd=0; } // 抜けて終わった結果でも、再戦は待たない
+    else if(S&&(S.over||S.ending)){ NET.partnerGone=true; NET.cd=0; againUi(); } // starting は触らない（戻ってきても、押していない再戦は始まらない） // 結果の画面（再戦を待つ間も、数えている間も）に相手が抜けた（HB-061）
     return; }
   NET.starting=false; setLobbyText('相手を待っている…'); }
 
@@ -1658,12 +1658,12 @@ function onStartMessage(payload){ if(!payload||!payload.matchId) return;
 
 /* 3秒数えてから対局を始める（画面の文字で数える） */
 function startCountdown(matchId){ let left=COUNTDOWN_SEC; setLobbyText(`そろった。${left}`); NET.cd=left; againUi();
-  const tick=setInterval(()=>{ left--; if(!NET.starting){ clearInterval(tick); return; }
+  const tick=setInterval(()=>{ left--; if(!NET.starting||NET.partnerGone){ clearInterval(tick); return; }
     if(left>0){ setLobbyText(`そろった。${left}`); NET.cd=left; againUi(); } else clearInterval(tick); }, 1000);
   setTimeout(()=>beginOnlineGame(matchId), COUNTDOWN_SEC*1000); }
 
 /* 対局を始める。数えている間に相手が抜けていたら始めない */
-function beginOnlineGame(matchId){ if(!NET.lobby||!NET.starting) return;
+function beginOnlineGame(matchId){ if(!NET.lobby||!NET.starting||NET.partnerGone) return; // 数えている間に相手が抜けた再戦は始めない（HB-061）
   if(presentCount()<ROOM_CAP){ NET.starting=false; setLobbyText('相手がいなくなった。もう一度入室してください'); if(isOnline()&&S&&S.over){ NET.partnerGone=true; NET.cd=0; againUi(); } return; }
   if(NET.match){ const c=getClient(); if(c) c.removeChannel(NET.match); NET.match=null; } // 再戦のとき：前の一戦の channel を閉じてから（HB-061）
   NET.mode='online'; NET.matchId=matchId; NET.again={me:false,op:false}; NET.partnerGone=false; NET.cd=0;

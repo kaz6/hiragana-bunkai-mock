@@ -11,11 +11,11 @@ async function onlineResult(page, me) {
     const T = window.HB_TEST, N = T.NET, c = window.supabase.createClient();
     window.__hbPresence = { a: [{}], b: [{}] };
     N.client = c; N.playerId = me; N.roomKey = 'rk'; N.lobby = c.channel('hb-lobby-rk'); N.match = c.channel('hb-match-m1');
-    N.mode = 'online'; N.matchId = 'm1'; N.starting = true; N.cap = 12;
+    N.mode = 'online'; N.matchId = 'm1'; N.starting = true; N.cap = 12; N.partnerGone = false; N.cd = 0; N.again = { me: false, op: false };
     document.getElementById('menu').hidden = true; T.newGame(); const S = T.S(); S.over = 'win'; T.render();
   }, me);
 }
-const sent = page => page.evaluate(() => window.__hbCh.map(x => x.msg.event + ':' + JSON.stringify(x.msg.payload)));
+const sent = page => page.evaluate(() => window.__hbCh.filter(x => x.msg.event !== 'basket').map(x => x.msg.event + ':' + JSON.stringify(x.msg.payload))); // basket（自分のカゴの知らせ）は再戦と関係ない
 const note = page => page.locator('#resWait');
 
 test('先頭の側：押すと「相手を待っている…」。相手も押したら新しい matchId で合図を出し、3秒数えて新しい一戦。前の match は閉じる', async ({ page }) => {
@@ -95,4 +95,27 @@ test('English・한국어でも一言と「退室」が出る。ひとりでは�
   await page.evaluate(() => { window.HB_TEST.leaveOnline(); const S = window.HB_TEST.S(); S.over = 'win'; window.HB_TEST.render(); });
   await expect(page.locator('#btnLeaveRes')).toBeHidden();
   await expect(note(page)).toBeHidden();
+});
+
+test('結果の画面で相手が抜けて戻っても、押していない再戦は始まらない。数えている間に抜けて戻っても始まらない', async ({ page }) => {
+  await onlineResult(page, 'a');
+  await page.evaluate(() => { window.__hbPresence = { a: [{}] }; window.HB_TEST.onPartnerLeft(); window.__hbPresence = { a: [{}], b: [{}] }; });
+  await page.waitForTimeout(3500);
+  expect(await sent(page)).toEqual([]);
+  expect(await page.evaluate(() => ({ id: window.HB_TEST.NET.matchId, over: window.HB_TEST.S().over }))).toEqual({ id: 'm1', over: 'win' });
+  await onlineResult(page, 'a');
+  await page.locator('#btnAgain').click();
+  await page.evaluate(() => window.HB_TEST.onAgainMessage({ id: 'b', matchId: 'm1' }));
+  await page.evaluate(() => { window.__hbPresence = { a: [{}] }; window.HB_TEST.onPartnerLeft(); window.__hbPresence = { a: [{}], b: [{}] }; });
+  await page.waitForTimeout(3500);
+  expect(await page.evaluate(() => ({ id: window.HB_TEST.NET.matchId, over: window.HB_TEST.S().over }))).toEqual({ id: 'm1', over: 'win' });
+});
+
+test('対局中に相手が抜けて終わった結果では、「もう一回」は押せない（待ち続けない）', async ({ page }) => {
+  await onlineResult(page, 'a');
+  await page.evaluate(() => { const T = window.HB_TEST; T.newGame(); window.__hbPresence = { a: [{}] }; T.onPartnerLeft(); });
+  await expect(page.locator('#result')).toBeVisible();
+  await expect(page.locator('#btnAgain')).toBeDisabled();
+  await expect(note(page)).toContainText('相手がいなくなった');
+  expect(await sent(page)).toEqual([]);
 });
