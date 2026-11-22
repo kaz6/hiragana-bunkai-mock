@@ -107,3 +107,14 @@ test.describe('上限の設定（12／14）', () => {
     expect(caps).toEqual([14, 12, 12]);
   });
 });
+
+test('負けたあと「もう一回」で新しい一戦が始まる（HB-060。HB-059 でボタンの働きが消えていた）', async ({ page }) => {
+  await setBasket(page, fill(11));
+  await cpuThrows(page, ['い', 'し', 'こ'], 'いし');
+  await expect(page.locator('#result')).toBeVisible();
+  await page.locator('#btnAgain').click();
+  await expect(page.locator('#result')).toBeHidden();
+  const s = await state(page);
+  expect(s.over).toBe(null);
+  expect(s.mine.length).toBe(5);
+});
