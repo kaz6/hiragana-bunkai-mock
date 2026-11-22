@@ -26,8 +26,10 @@ window.__hbSent=[];
     };
     return q;
   }
-  function channel(){ const ch={ on(){ return ch; }, subscribe(cb){ return ch; }, track(){ return done('ok'); }, send(){ return done('ok'); }, presenceState(){ return {}; }, unsubscribe(){ return done('ok'); } }; return ch; }
-  window.supabase={ createClient(){ return { from:table, channel, removeChannel(){ return done('ok'); } }; } };
+  // channel：送ったもの（__hbCh）・消した channel の名前（__hbRemoved）を残す。在室は __hbPresence で差し替える（HB-061。ふだんは空）
+  window.__hbCh=[]; window.__hbRemoved=[]; window.__hbPresence={};
+  function channel(name){ const ch={ name, on(){ return ch; }, subscribe(cb){ return ch; }, track(){ return done('ok'); }, send(m){ window.__hbCh.push({ch:name,msg:m}); return done('ok'); }, presenceState(){ return window.__hbPresence; }, unsubscribe(){ return done('ok'); } }; return ch; }
+  window.supabase={ createClient(){ return { from:table, channel, removeChannel(ch){ window.__hbRemoved.push(ch&&ch.name); return done('ok'); } }; } };
 })();`;
 
 /**

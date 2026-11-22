@@ -35,6 +35,7 @@
   | `tests/e2e/scenes.spec.js` | 場面の組（挨拶返し。scene-groups.js） |
 | `tests/e2e/votes.spec.js` | 結果の画面の「やりとり」の候補と いい／いまいち（exchange_votes。D-081） |
 | `tests/e2e/basket.spec.js` | カゴの上限（12こを超えたら負け） |
+  | `tests/e2e/rematch.spec.js` | ふたりでの「もう一回」＝同じ部屋での再戦（lobby の知らせ・合図・退室。D-094） |
   | `tests/e2e/cpu.spec.js` | CPU（禁止用語 cpu-ng.js、各強さを短く回す） |
   | `tests/e2e/screen.spec.js` | 画面（390px、遊び方、ひとりでの開始、ページの語数） |
   | `tests/e2e/lang.spec.js` | 画面の言葉の切り替え（日本語・English・한국어。D-091） |

@@ -34,7 +34,7 @@ test('同じ種（matchId）なら同じ今日の字。ひとりでは戦ごと�
   expect(r.same).toBe(true); expect(r.varied).toBe(true);
 });
 
-test('ふたりでの「もう一回」は入室し直して matchId が変わる。matchId が違えば今日の字も変わり、同じなら二人で同じ（HB-041）', async ({ page }) => {
+test('ふたりでの「もう一回」は新しい matchId を作る（HB-061 から同じ部屋での再戦。HB-041 のときは入室し直し）。matchId が違えば今日の字も変わり、同じなら二人で同じ（HB-041）', async ({ page }) => {
   const r = await page.evaluate(() => {
     const T = window.HB_TEST;
     const ids = Array.from({ length: 30 }, (_, i) => 'room1-game' + i);

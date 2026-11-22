@@ -195,6 +195,8 @@ button:focus-visible{outline:2px solid var(--me);outline-offset:2px}
 .result .big.win{color:var(--me)}
 .result .act{height:48px;background:var(--me);color:var(--me-ink);font-size:calc(16px*var(--fz))}
 .result .act.sub{background:var(--tile);color:var(--ink)}
+.result .again-note{font:600 calc(13px*var(--fz))/1.5 var(--f-ui);color:var(--sub)} /* ふたりでの再戦の一言（HB-061）。いまの menu-note と同じ控えめな字 */
+.result .act:disabled{opacity:.45;cursor:default} .result #btnLeaveRes{align-self:center}
 .result #resVotes{display:flex;flex-direction:column;gap:6px} /* やりとりの候補（HB-047, D-081）。結果の画面だけ */
 .result #resVotes .vh{font:600 calc(13px*var(--fz))/1.5 var(--f-ui);color:var(--sub)}
 .result #resVotes .ex{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px}
@@ -388,8 +390,10 @@ small.en.b{display:block;margin-left:0}
   <div class="result" id="result" hidden>
     <p class="big" id="resBig"></p>
     <p id="resSub"></p><div id="resBest"></div><div id="resVotes" hidden></div>
+    <p class="again-note" id="resWait" role="status" hidden></p><!-- ふたりでの再戦（HB-061, D-094）：待ち・相手の「もう一回」・数えの一言。結果の画面のふたりでのときだけ -->
     <button class="act" id="btnAgain" type="button">もう一回<small class="en" lang="en">Play again</small></button>
     <button class="act sub" id="btnCopy" type="button">ログをコピー<small class="en" lang="en">Copy log</small></button>
+    <button class="link" id="btnLeaveRes" type="button" hidden>退室<small class="en" lang="en">Leave</small></button>
     <details><summary>ログを見る（コピーできないときはここから）<small class="en" lang="en">View log (if copying fails)</small></summary><textarea id="logText" readonly></textarea></details>
   </div>
 </div>
@@ -898,7 +902,7 @@ const EN_FIX={
   '合言葉を入れてください':'Enter a room code','通信の準備ができない。ネットにつながっているか確かめてください':'Can’t connect. Check your network',
   '入室している…':'Entering…','相手を待っている…':'Waiting for opponent…','つながらなかった。もう一度入室してください':'Couldn’t connect. Please enter again',
   'この合言葉は二人までです。別の合言葉にしてください':'This room is for two. Use another room code','相手がそろった。始まるのを待っている…':'Opponent is here. Starting soon…',
-  '相手がいなくなった。もう一度入室してください':'Opponent left. Please enter again'};
+  '相手がいなくなった。もう一度入室してください':'Opponent left. Please enter again','相手はもう一回を待っている':'Opponent is waiting for a rematch'};
 const EN_PAT=[
   [/^「(.+)」を割った$/,m=>`Split “${m[1]}”`],[/^「(.+)」を回して裏返した$/,m=>`Rotated and flipped “${m[1]}”`],
   [/^「(.+)」を回した$/,m=>`Rotated “${m[1]}”`],[/^「(.+)」を裏返した$/,m=>`Flipped “${m[1]}”`],
@@ -1269,7 +1273,7 @@ function renderLog(){ const el=$('log'); if(logN===S.log.length) return; logN=S.
   if(!S.log.length){ el.innerHTML='<p class="empty">投げた言葉は、ここに二人ぶん残る。'+enTag('Words you both throw stay here.',1)+'相手から届いた言葉は、こっちのカゴの材料になる。'+enTag('Words you receive become tiles in your basket.',1)+'</p>'; return; }
   el.innerHTML=S.log.map(r=>`<div class="row ${r.who}" data-w="${r.word}"><span class="w">${(inkAttr(r.word).cls||inkAttr(r.word).style)?inkSpan(r.word,'ink',escH(wordShow(r.word))):escH(wordShow(r.word))}${r.k?`<span class="st" aria-label="工夫${r.k}">${'★'.repeat(starsOf(r.k))}</span>`:''}</span>${r.note?`<span class="n">${r.note}</span>`:''}${(m=>m?`<span class="m">${escH([m.k,m.e].filter(Boolean).join('　'))}</span>`:'')(meaningOf(r.word))}</div>`).join('');
   el.scrollTop=el.scrollHeight; }
-function renderControls(){ const over=!!S.over; $('controls').hidden=over; $('result').hidden=!over;
+function renderControls(){ const over=!!S.over; $('controls').hidden=over; $('result').hidden=!over; againUi();
   if(over){ const mine=S.log.filter(r=>r.who==='me').length, theirs=S.log.length-mine; const b=$('resBig');
     b.innerHTML=withEn(RESULT_TITLE[S.over],1); b.className='big '+S.over;
     $('resSub').innerHTML=`投げた言葉　あなた ${mine}　あいて ${theirs}`+enTag(`Words thrown: you ${mine}, opponent ${theirs}`,1);
@@ -1446,7 +1450,8 @@ function copyLog(btn){ const t=logText(), o=btn.innerHTML; const done=m=>{ btn.i
 $('btnLog').onclick=()=>copyLog($('btnLog')); $('btnCopy').onclick=()=>copyLog($('btnCopy'));
 $('btnClear').onclick=()=>{ if(locked()||TUT.on) return; S.sel=[]; S.choose=null; render(); };
 $('btnReset').onclick=()=>{ if(isOnline()) return leaveOnline(); logN=-1; newGame(TUT.on); }; // チュートリアルの途中のやりなおしは、チュートリアルをはじめから
-$('btnAgain').onclick=()=>{ if(isOnline()) return leaveOnline(); logN=-1; newGame(); };
+$('btnAgain').onclick=()=>{ if(isOnline()) return pressAgain(); logN=-1; newGame(); }; // ふたりでは部屋に残って再戦を待つ（HB-061, D-094）。ひとりでは新しい一戦（HB-060）
+$('btnLeaveRes').onclick=leaveOnline;
 function setSpeed(i){ speed=i; speedSaved=true; try{localStorage.setItem('hb.speedName',SPEEDS[speed].name)}catch(e){} }
 $('btnSpeed').onclick=()=>{ setSpeed((speed+1)%SPEEDS.length); renderOpp(); schedule(); };
 let sheetOpener=null, sheetEl=null;
@@ -1576,7 +1581,7 @@ const ROOM_CAP=2;      // 通信対戦は二人まで
 const COUNTDOWN_SEC=3; // そろってから始めるまでの秒数
 const RESULT_LABEL={win:'勝ち（相手のカゴがあふれた）',lose:'負け（自分のカゴがあふれた）',gone:'相手がいなくなった（途中で抜けた）'};
 const RESULT_TITLE={win:'相手のカゴがあふれた。勝ち',lose:'カゴがあふれた。負け',gone:'相手がいなくなった。ここで終わり'};
-const NET={cap:0,mode:'cpu',client:null,lobby:null,match:null,matchId:'',roomKey:'',pass:'',playerId:'',starting:false,sentSig:null};
+const NET={cap:0,mode:'cpu',client:null,lobby:null,match:null,matchId:'',roomKey:'',pass:'',playerId:'',starting:false,sentSig:null,again:{me:false,op:false},partnerGone:false,cd:0};
 loadExtraWords(); // NET を作ったあとで呼ぶ（getClient が NET を使う）
 
 function isOnline(){ return NET.mode==='online'; }
@@ -1606,7 +1611,7 @@ function presentCount(){ return NET.lobby?presentIds().length:0; }
 /* 通信の接続をすべて閉じて、ひとりの状態に戻す */
 function closeNet(){ const client=NET.client;
   if(client){ if(NET.lobby) client.removeChannel(NET.lobby); if(NET.match) client.removeChannel(NET.match); }
-  NET.lobby=null; NET.match=null; NET.starting=false; NET.mode='cpu'; $('btnLeave').hidden=true; }
+  NET.lobby=null; NET.match=null; NET.starting=false; NET.mode='cpu'; NET.again={me:false,op:false}; NET.partnerGone=false; NET.cd=0; $('btnLeave').hidden=true; }
 function leaveOnline(){ closeNet(); guideHide(); setLobbyText(''); showMenu(); }
 function startSolo(){ closeNet(); hideMenu(); newGame(!tutDone()); } // はじめての「ひとりで」はチュートリアル（HB-059）
 
@@ -1619,6 +1624,7 @@ function joinRoom(){ const pass=$('roomInput').value.trim();
   NET.lobby=client.channel(`hb-lobby-${NET.roomKey}`,{config:{presence:{key:NET.playerId}}})
     .on('presence',{event:'sync'},onLobbyPresence)
     .on('broadcast',{event:'start'},({payload})=>onStartMessage(payload))
+    .on('broadcast',{event:'again'},({payload})=>onAgainMessage(payload)) // 「もう一回」を押したことの知らせ（HB-061）
     .subscribe(status=>onLobbySubscribed(status));
   $('btnLeave').hidden=false; setLobbyText('入室している…'); }
 function onLobbySubscribed(status){
@@ -1634,7 +1640,9 @@ function onLobbyPresence(){ const count=presentCount();
   else setLobbyText('相手がそろった。始まるのを待っている…'); }
 /* 相手が抜けたとき：対局中なら「いなくなった」で終える。待ち中なら待ちに戻す */
 function onPartnerLeft(){
-  if(isOnline()){ if(S&&!S.over&&!S.ending) finish('gone'); return; }
+  if(isOnline()){ if(S&&!S.over&&!S.ending){ finish('gone'); NET.partnerGone=true; NET.cd=0; } // 抜けて終わった結果でも、再戦は待たない
+    else if(S&&(S.over||S.ending)){ NET.partnerGone=true; NET.cd=0; againUi(); } // starting は触らない（戻ってきても、押していない再戦は始まらない） // 結果の画面（再戦を待つ間も、数えている間も）に相手が抜けた（HB-061）
+    return; }
   NET.starting=false; setLobbyText('相手を待っている…'); }
 
 /* 合図を出す側：matchId を作って相手に伝え、自分も数え始める */
@@ -1644,21 +1652,43 @@ function startAsLeader(){ NET.starting=true;
   NET.lobby.send({type:'broadcast',event:'start',payload:{matchId,cap:capSetting}});
   startCountdown(matchId); }
 /* 合図を受ける側（合図を出した側以外） */
-function onStartMessage(payload){ if(NET.starting||!payload||!payload.matchId) return;
+function onStartMessage(payload){ if(!payload||!payload.matchId) return;
+  if(NET.starting&&!(isOnline()&&S&&S.over&&NET.again.me&&!NET.partnerGone&&payload.matchId!==NET.matchId)) return; // 再戦の合図は、結果の画面で自分が「もう一回」を押しているときだけ受ける（HB-061）
   NET.starting=true; NET.cap=CAP_CHOICES.includes(payload.cap)?payload.cap:12; startCountdown(payload.matchId); }
 
 /* 3秒数えてから対局を始める（画面の文字で数える） */
-function startCountdown(matchId){ let left=COUNTDOWN_SEC; setLobbyText(`そろった。${left}`);
-  const tick=setInterval(()=>{ left--; if(!NET.starting){ clearInterval(tick); return; }
-    if(left>0) setLobbyText(`そろった。${left}`); else clearInterval(tick); }, 1000);
+function startCountdown(matchId){ let left=COUNTDOWN_SEC; setLobbyText(`そろった。${left}`); NET.cd=left; againUi();
+  const tick=setInterval(()=>{ left--; if(!NET.starting||NET.partnerGone){ clearInterval(tick); return; }
+    if(left>0){ setLobbyText(`そろった。${left}`); NET.cd=left; againUi(); } else clearInterval(tick); }, 1000);
   setTimeout(()=>beginOnlineGame(matchId), COUNTDOWN_SEC*1000); }
 
 /* 対局を始める。数えている間に相手が抜けていたら始めない */
-function beginOnlineGame(matchId){ if(!NET.lobby||!NET.starting) return;
-  if(presentCount()<ROOM_CAP){ NET.starting=false; setLobbyText('相手がいなくなった。もう一度入室してください'); return; }
-  NET.mode='online'; NET.matchId=matchId;
-  hideMenu(); newGame(); S.busy=true; S.say='相手の準備を待っている…'; // 二人がつながるまで投げさせない（つながる前の投げは届かないため）
+function beginOnlineGame(matchId){ if(!NET.lobby||!NET.starting||NET.partnerGone) return; // 数えている間に相手が抜けた再戦は始めない（HB-061）
+  if(presentCount()<ROOM_CAP){ NET.starting=false; setLobbyText('相手がいなくなった。もう一度入室してください'); if(isOnline()&&S&&S.over){ NET.partnerGone=true; NET.cd=0; againUi(); } return; }
+  if(NET.match){ const c=getClient(); if(c) c.removeChannel(NET.match); NET.match=null; } // 再戦のとき：前の一戦の channel を閉じてから（HB-061）
+  NET.mode='online'; NET.matchId=matchId; NET.again={me:false,op:false}; NET.partnerGone=false; NET.cd=0;
+  hideMenu(); logN=-1; newGame(); S.busy=true; S.say='相手の準備を待っている…'; // 二人がつながるまで投げさせない（つながる前の投げは届かないため）
   openMatchChannel(matchId); render(); }
+
+/* ふたりでの再戦（HB-061, D-094）。結果の画面の「もう一回」は部屋に残って待つ。押したことは lobby の channel で知らせる（表は使わない）。
+   二人とも押したら、いまの開始の流れ（合図を出す側が新しい matchId を作る → 3秒数える → beginOnlineGame）で新しい一戦 */
+function pressAgain(){ if(!isOnline()||!S||!S.over||NET.again.me||NET.partnerGone||NET.starting&&NET.cd) return;
+  NET.again.me=true; NET.lobby.send({type:'broadcast',event:'again',payload:{id:NET.playerId,matchId:NET.matchId}});
+  againUi(); maybeRematch(); }
+function onAgainMessage(payload){ if(!payload||payload.id===NET.playerId||payload.matchId!==NET.matchId) return; // 前の一戦の知らせは受けない
+  NET.again.op=true; againUi(); maybeRematch(); }
+function maybeRematch(){ if(!NET.again.me||!NET.again.op||NET.partnerGone||NET.cd||!NET.lobby) return;
+  if(presentIds()[0]===NET.playerId){ NET.starting=false; startAsLeader(); } } // 合図を出すのは、いまの決まりどおり先頭の一人
+/* 結果の画面のふたりでの一言と「退室」。ふたりででなければ全部隠す */
+function againUi(){ const on=isOnline()&&S&&S.over, w=$('resWait');
+  $('btnLeaveRes').hidden=!on;
+  let t='';
+  if(on){ if(NET.partnerGone) t='相手がいなくなった。もう一度入室してください';
+    else if(NET.cd) t=`そろった。${NET.cd}`;
+    else if(NET.again.me) t='相手を待っている…';
+    else if(NET.again.op) t='相手はもう一回を待っている'; }
+  w.hidden=!t; w.innerHTML=t?withEn(t,1):'';
+  $('btnAgain').disabled=!!(on&&(NET.again.me||NET.partnerGone||NET.cd)); }
 
 /* 対局の channel：相手の投げ（表 throws への追加）と「負けた」を受け取る。
    二人とも在室（presence）になったら、対局を始められる */
@@ -1708,7 +1738,7 @@ function onOpponentLost(){ if(!S||S.over||S.ending) return; finish('win'); }
 /* 自動テストの窓（HB-035）。テストがページを開く前に window.HB_TEST={} を置いたときだけ、中の表と関数を渡す。ふだんの遊びでは何もしない */
 if(window.HB_TEST&&typeof window.HB_TEST==='object') Object.defineProperty(window.HB_TEST,'CAP',{get:()=>CAP,configurable:true}); // 一戦ごとに変わるので値でなく読む（HB-048）
 if(window.HB_TEST&&typeof window.HB_TEST==='object') Object.assign(window.HB_TEST,{FX,NET,onStartMessage,KANA,PARTS,RECIPE,MERGE,MERGE_TURN,TURN,BAG,logText,makeToday,seedRng,TODAY:()=>TODAY,HAND,DICT,SPEEDS,key,
-  words:()=>WORDS, S:()=>S, mk,letterOf,checkSel,splitMade,mergeMade,comboOf,cpuOk,tapTile,doSplit,doMerge,doTurn,doThrow,render,newGame,TUT,TUT_SEQ,tutDone,startSolo,cpuAct,cpuThrow,setSpeed,showMeaning,SCENE_OF,exchangeCands,VOTE_TEXT,ALIAS,turnShortcuts,mergeTurnBacks,stepsOf,cpuApply,TURN_NOT_CPU});
+  words:()=>WORDS, S:()=>S, mk,letterOf,checkSel,splitMade,mergeMade,comboOf,cpuOk,tapTile,doSplit,doMerge,doTurn,doThrow,render,newGame,TUT,TUT_SEQ,tutDone,startSolo,cpuAct,cpuThrow,setSpeed,showMeaning,SCENE_OF,exchangeCands,VOTE_TEXT,ALIAS,turnShortcuts,mergeTurnBacks,stepsOf,cpuApply,TURN_NOT_CPU,pressAgain,onAgainMessage,onPartnerLeft,onLobbyPresence,againUi,leaveOnline});
 
 newGame();
 showMenu();
