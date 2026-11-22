@@ -97,18 +97,24 @@ test('English・한국어でも一言と「退室」が出る。ひとりでは�
   await expect(note(page)).toBeHidden();
 });
 
-test('結果の画面で相手が抜けて戻っても、押していない再戦は始まらない。数えている間に抜けて戻っても始まらない', async ({ page }) => {
-  await onlineResult(page, 'a');
-  await page.evaluate(() => { window.__hbPresence = { a: [{}] }; window.HB_TEST.onPartnerLeft(); window.__hbPresence = { a: [{}], b: [{}] }; });
-  await page.waitForTimeout(3500);
-  expect(await sent(page)).toEqual([]);
-  expect(await page.evaluate(() => ({ id: window.HB_TEST.NET.matchId, over: window.HB_TEST.S().over }))).toEqual({ id: 'm1', over: 'win' });
+test('結果の画面で相手が抜けて戻っても、押していない再戦は始まらない。数えている間に抜けて戻っても始まらない（先頭・受ける側とも）', async ({ page }) => {
+  const leaveBack = () => page.evaluate(() => { const T = window.HB_TEST, both = { a: [{}], b: [{}] };
+    window.__hbPresence = { a: [{}] }; T.onPartnerLeft(); window.__hbPresence = both; T.onLobbyPresence(); }); // 抜ける → 戻る（在室の同期が呼ばれる）
+  const same = async () => expect(await page.evaluate(() => ({ id: window.HB_TEST.NET.matchId, over: window.HB_TEST.S().over }))).toEqual({ id: 'm1', over: 'win' });
+  for (const me of ['a', 'b']) {
+    await onlineResult(page, me);
+    await leaveBack();
+    await page.evaluate(() => window.HB_TEST.onStartMessage({ matchId: 'm2', cap: 12 })); // 戻った相手の合図も受けない
+    await page.waitForTimeout(3500);
+    expect(await sent(page)).toEqual([]);
+    await same();
+  }
   await onlineResult(page, 'a');
   await page.locator('#btnAgain').click();
   await page.evaluate(() => window.HB_TEST.onAgainMessage({ id: 'b', matchId: 'm1' }));
-  await page.evaluate(() => { window.__hbPresence = { a: [{}] }; window.HB_TEST.onPartnerLeft(); window.__hbPresence = { a: [{}], b: [{}] }; });
+  await leaveBack();
   await page.waitForTimeout(3500);
-  expect(await page.evaluate(() => ({ id: window.HB_TEST.NET.matchId, over: window.HB_TEST.S().over }))).toEqual({ id: 'm1', over: 'win' });
+  await same();
 });
 
 test('対局中に相手が抜けて終わった結果では、「もう一回」は押せない（待ち続けない）', async ({ page }) => {
