@@ -335,7 +335,7 @@ small.en.b{display:block;margin-left:0}
 .tile.tutGlow .face{box-shadow:0 0 0 3px var(--me);animation:tutGlow 1s ease-in-out infinite}
 .act.tutGlow{box-shadow:0 0 0 3px var(--me);animation:tutGlow 1s ease-in-out infinite}
 .tile.hintGlow .face{box-shadow:0 0 0 3px var(--me);animation:tutGlow 1s ease-in-out infinite}
-.act.hintGlow,.how.hintGlow{box-shadow:0 0 0 3px var(--me);animation:tutGlow 1s ease-in-out infinite}
+.act.hintGlow{box-shadow:0 0 0 3px var(--me);animation:tutGlow 1s ease-in-out infinite}
 .hintMsg{margin:4px 0 0;font-size:calc(14px*var(--fz));font-weight:700;color:var(--me)}
 .hintMsg b{font:600 calc(22px*var(--fz))/1.3 var(--f-kana);margin:0 2px}
 #resHints .vh{font-weight:700;margin:10px 0 4px}
@@ -346,7 +346,7 @@ small.en.b{display:block;margin-left:0}
 @keyframes gbob{0%,100%{translate:0 0}50%{translate:0 -5px}}
 .guide.above.bob{animation-name:gbob2} @keyframes gbob2{0%,100%{translate:0 0}50%{translate:0 5px}}
 .guideSet button{font:600 calc(14px*var(--fz))/1 var(--f-ui);padding:8px 12px;border-radius:999px;border:1px solid var(--sub);background:transparent;color:inherit;margin-top:6px}
-@media (prefers-reduced-motion: reduce){ .tile.tutGlow .face,.act.tutGlow,.tile.hintGlow .face,.act.hintGlow,.how.hintGlow{animation:none} .tile,.g{transition:none} .tile.crack .face{animation:none} .guide.bob{animation:none} .tile.snap .face{animation:none} }
+@media (prefers-reduced-motion: reduce){ .tile.tutGlow .face,.act.tutGlow,.tile.hintGlow .face,.act.hintGlow{animation:none} .tile,.g{transition:none} .tile.crack .face{animation:none} .guide.bob{animation:none} .tile.snap .face{animation:none} }
 </style>
 
 <div class="app">
@@ -356,7 +356,7 @@ small.en.b{display:block;margin-left:0}
     <button class="link" id="btnLog" type="button">ログ<small class="en" lang="en">Log</small></button>
     <button class="link" id="btnReset" type="button">やりなおし<small class="en" lang="en">Restart</small></button>
   </header>
-  <div class="hows"><button class="how" id="btnHow" type="button">？ 遊び方<small class="en" lang="en">How to play</small></button><button class="how" id="btnZukan" type="button">辞書<small class="en" lang="en">Dictionary</small></button><button class="how" id="btnHint" type="button" hidden>ヒント<small class="en" lang="en">Hint</small></button><button class="how langBtn" id="btnLang" data-set="langSet" type="button" aria-haspopup="true" aria-expanded="false"></button></div>
+  <div class="hows"><button class="how" id="btnHow" type="button">？ 遊び方<small class="en" lang="en">How to play</small></button><button class="how" id="btnZukan" type="button">辞書<small class="en" lang="en">Dictionary</small></button><button class="how" id="btnHint" type="button" hidden></button><button class="how langBtn" id="btnLang" data-set="langSet" type="button" aria-haspopup="true" aria-expanded="false"></button></div>
   <div class="meanSet langSet" id="langSet" role="group" aria-label="言葉 / Language" hidden></div>
   <p class="hintMsg" id="hintMsg" role="status" aria-live="polite" hidden></p><!-- ヒントの3段目の言葉・見つからない一言（HB-062, D-095） -->
 
@@ -1280,27 +1280,50 @@ document.addEventListener('click',e=>{ const b=e.target.closest&&e.target.closes
 /* ---- ヒント（HB-062, D-095）----
    押すたびに一段ずつ：① 触る札が明滅 ② 押すボタンも明滅 ③ 作れる言葉を出す。まずは「ひとりで」だけ（ふたりで・チュートリアルでは出さない）。
    探し方：自分のカゴ（S.mine）の字から、CPU と同じ stepsOf（手数は向きの2手を2と数える。HB-050）と topAbove（禁止用語 cpu-ng.js の語・もうリストに出た語は辞書の表から外してある）で、
-   手数0（すぐ投げられる）→ 1 → 2 の順に見る。同じ手数なら字数の多い言葉、それも同じなら点数の高い方、それも同じなら先に見つかった方。
+   手数0（すぐ投げられる）→ 1 → 2 の順に見る（字にならない向きの札は、字になる最短の回す・裏返すを手に数える。くっつけて か になる手は自分では向きがずれるので数えない）。同じ手数なら字数の多い言葉、それも同じなら点数の高い方、それも同じなら先に見つかった方。
    札を勝手に動かさない（光らせるだけ）。カゴの札が変わったら（自分の手・相手から届いた・落ちてきた）消えて1回目からに戻る。★・勝ち負け・やりとりの候補には効かない */
 const HINT_TEXT={btn:['ヒント','Hint'], none:['いまは見つからない','No hint right now'], head:['ヒントで見つけた言葉','Found with hints'], thrown:['投げた','Thrown'], notThrown:['投げていない','Not thrown']}; // 仮。ここで直す（韓国語は lang-ko.js）
 const HINT_BTN={split:'aSplit',turn:'aRot',flip:'aFlip',merge:'aMerge',throw:'aThrow'};
 let HINT=null; // {sig, level 0〜3, plan（null＝見つからない）}
-const hintSig=()=>S.mine.map(p=>p.id).join(',');
+const hintSig=()=>S.mine.map(p=>p.id+'.'+p.r+'.'+p.f).join(','); // 札の字・向きが変わったら（回す・裏返すも）消える
 const hintAvail=()=>!!S&&!S.over&&!S.ending&&!isOnline()&&!TUT.on&&$('menu').hidden;
+/* 向きずれ（字にならない）札は、回す・裏返すで字になる最短の手順（2手まで）を手に数える。stepsOf は字の並びしか見ないので、ここで足す（札の r・f から。doTurn と同じ計算） */
+function hintNullSteps(L){ const out=[];
+  L.forEach((l,i)=>{ if(l) return; const p0=S.mine[i], seen=new Map(); let front=[{r:p0.r,f:p0.f,ops:[]}];
+    for(let d=1;d<=2;d++){ const next=[];
+      for(const st of front) for(const kind of ['回す','裏返す']){ const q={...p0,r:st.r,f:st.f}; if(kind==='回す') q.r=(q.r+1)%4; else { q.r=(4-q.r)%4; q.f=q.f?0:1; } norm(q);
+        const ops=[...st.ops,kind], to=letterOf(q); if(to){ if(!seen.has(to)){ seen.set(to,1); const rest=[...L.slice(0,i),...L.slice(i+1)]; out.push({t:'turn',i,to,n:d,ops,res:[...rest,to]}); } } else next.push({r:q.r,f:q.f,ops}); }
+      front=next; } });
+  return out; }
+/* letters で作れる言葉のうち、字数がいちばん多いもの（同じなら点数の高い方、それも同じなら表の先）。topAbove と同じ表・ふるい */
+function longWord(letters){ const T=strongList(), idx=T.idx, pool={}, pm=[0,0,0,0]; let len=0;
+  for(const l of letters){ if(!l) continue; const c=asWord(l); pool[c]=(pool[c]||0)+1; len++; const b=idx[c]; if(b!==undefined&&b<128) pm[b>>5]|=1<<(b&31); }
+  let best=null;
+  for(const y of T){ const x=y.x; if(x.cs.length>len) continue; if(best&&(x.cs.length<best.cs.length||(x.cs.length===best.cs.length&&x.sc<=best.sc))) continue;
+    if(!y.wide&&((y.m[0]&~pm[0])|(y.m[1]&~pm[1])|(y.m[2]&~pm[2])|(y.m[3]&~pm[3]))) continue;
+    const need={}; let ok=true; for(const c of x.cs){ need[c]=(need[c]||0)+1; if(need[c]>(pool[c]||0)){ ok=false; break; } }
+    if(ok&&!(once&&S.used.has(x.w))) best=x; }
+  return best; }
+const HINT_BUDGET=250; // ms。字数で選び直すのに使う時間の上限（遅い端末で止まって見えないように）
 function hintFind(){
-  const L=S.mine.map(letterOf);
+  const L=S.mine.map(letterOf), t0=performance.now();
   const tilesOf=w=>{ const used=[]; for(const ch of w){ const k=S.mine.findIndex((p,i)=>!used.includes(i)&&asWord(letterOf(p))===ch); used.push(k); } return used; };
-  const x0=topAbove(L,0); if(x0) return {hands:0,word:x0.w,tiles:tilesOf(x0.w),btn:'throw'};
-  const rank=c=>c.x.cs.length*1000+c.x.sc; let best=null; const seen=new Map();
-  const top=res=>{ const k=res.map(l=>l?asWord(l):'?').sort().join(''); if(!seen.has(k)) seen.set(k,topAbove(res,0)); return seen.get(k); };
+  if(topAbove(L,0)){ const x=longWord(L); return {hands:0,word:x.w,tiles:tilesOf(x.w),btn:'throw'}; }
   const first=s=>s.t==='split'?{tiles:[s.i],btn:'split'}:s.t==='turn'?{tiles:[s.i],btn:s.ops[0]==='回す'?'turn':'flip'}:{tiles:[s.i,s.j],btn:'merge'};
-  const offer=(hands,x,s1)=>{ const c={hands,x,s1}; if(!best||hands<best.hands||(hands===best.hands&&rank(c)>rank(best))) best=c; };
-  const S1=stepsOf(L).filter(s=>(s.n||1)<=2);
-  for(const s1 of S1){ if((s1.n||1)!==1) continue; const x=top(s1.res); if(x) offer(1,x,s1); }
-  if(!best){
-    for(const s1 of S1){ if((s1.n||1)===2){ const x=top(s1.res); if(x) offer(2,x,s1); } }
-    for(const s1 of S1){ if((s1.n||1)!==1) continue; for(const s2 of stepsOf(s1.res)){ if((s2.n||1)!==1) continue; const x=top(s2.res); if(x) offer(2,x,s1); } } }
-  return best?{hands:best.hands,word:best.x.w,...first(best.s1)}:null; }
+  const okStep=s=>!(s.t==='merge'&&MERGE_TURN[s.r]); // 自分がくっつけた か は向きがずれて出る（D-079）。字に戻すのに裏返す・回すが要り、2手に収まらない
+  const S1=[...stepsOf(L),...hintNullSteps(L)].filter(s=>(s.n||1)<=2&&okStep(s));
+  const feas=new Map(), top=res=>{ const k=res.map(l=>l?asWord(l):'?').sort().join(''); if(!feas.has(k)) feas.set(k,!!topAbove(res,0)); return feas.get(k); };
+  let cands=[];
+  for(const s1 of S1){ if((s1.n||1)===1&&top(s1.res)) cands.push({hands:1,s1,res:s1.res}); }
+  if(!cands.length){
+    for(const s1 of S1){ if((s1.n||1)===2&&top(s1.res)) cands.push({hands:2,s1,res:s1.res}); }
+    for(const s1 of S1){ if((s1.n||1)!==1) continue; for(const s2 of stepsOf(s1.res)){ if((s2.n||1)!==1||!okStep(s2)) continue; if(top(s2.res)) cands.push({hands:2,s1,res:s2.res}); } } }
+  if(!cands.length) return null;
+  const longs=new Map(); let best=null, bx=null;
+  for(const c of cands){ const k=c.res.map(l=>l?asWord(l):'?').sort().join(''); if(!longs.has(k)){ if(best&&performance.now()-t0>HINT_BUDGET) continue; longs.set(k,longWord(c.res)); }
+    const x=longs.get(k); if(!x) continue; if(!best||x.cs.length>bx.cs.length||(x.cs.length===bx.cs.length&&x.sc>bx.sc)){ best=c; bx=x; } }
+  if(!best){ best=cands[0]; bx=longWord(best.res); }
+  return {hands:best.hands,word:bx.w,...first(best.s1)}; }
 function hintPress(){ if(!hintAvail()) return;
   if(HINT&&HINT.sig!==hintSig()) HINT=null;
   if(!HINT){ HINT={sig:hintSig(),level:0,plan:hintFind()}; if(!HINT.plan){ lg('me','ヒント なし'); hintPaint(); return; } }
@@ -1323,7 +1346,7 @@ function hintPaint(){ const b=$('btnHint'), msg=$('hintMsg'); if(!b) return;
 function renderHintFound(){ const el=$('resHints'); if(!S||!S.over||!S.hintFound||!S.hintFound.length){ el.hidden=true; el.innerHTML=''; return; }
   const t=HINT_TEXT, thrown=w=>S.log.some(r=>r.who==='me'&&r.word===w);
   el.hidden=false; el.innerHTML=`<div class="vh">${escH(t.head[0])}${enTag(t.head[1])}</div>`+S.hintFound.map(h=>`<div class="hf"><b>${escH(wordShow(h.word))}</b><span>${thrown(h.word)?escH(t.thrown[0])+enTag(t.thrown[1]):escH(t.notThrown[0])+enTag(t.notThrown[1])}</span></div>`).join(''); }
-$('btnHint').onclick=hintPress;
+$('btnHint').innerHTML=escH(HINT_TEXT.btn[0])+enTag(HINT_TEXT.btn[1]); $('btnHint').onclick=hintPress;
 let logN=-1;
 function renderLog(){ const el=$('log'); if(logN===S.log.length) return; logN=S.log.length;
   if(!S.log.length){ el.innerHTML='<p class="empty">投げた言葉は、ここに二人ぶん残る。'+enTag('Words you both throw stay here.',1)+'相手から届いた言葉は、こっちのカゴの材料になる。'+enTag('Words you receive become tiles in your basket.',1)+'</p>'; return; }
@@ -1794,7 +1817,7 @@ function onOpponentLost(){ if(!S||S.over||S.ending) return; finish('win'); }
 /* 自動テストの窓（HB-035）。テストがページを開く前に window.HB_TEST={} を置いたときだけ、中の表と関数を渡す。ふだんの遊びでは何もしない */
 if(window.HB_TEST&&typeof window.HB_TEST==='object') Object.defineProperty(window.HB_TEST,'CAP',{get:()=>CAP,configurable:true}); // 一戦ごとに変わるので値でなく読む（HB-048）
 if(window.HB_TEST&&typeof window.HB_TEST==='object') Object.assign(window.HB_TEST,{FX,NET,onStartMessage,KANA,PARTS,RECIPE,MERGE,MERGE_TURN,TURN,BAG,logText,makeToday,seedRng,TODAY:()=>TODAY,HAND,DICT,SPEEDS,key,
-  words:()=>WORDS, S:()=>S, mk,letterOf,checkSel,splitMade,mergeMade,comboOf,cpuOk,tapTile,doSplit,doMerge,doTurn,doThrow,render,newGame,TUT,TUT_SEQ,tutDone,startSolo,cpuAct,cpuThrow,setSpeed,showMeaning,SCENE_OF,exchangeCands,VOTE_TEXT,ALIAS,turnShortcuts,mergeTurnBacks,stepsOf,logText,hintFind,hintPress,HINT:()=>HINT,HINT_TEXT,cpuApply,TURN_NOT_CPU,pressAgain,onAgainMessage,onPartnerLeft,onLobbyPresence,againUi,leaveOnline});
+  words:()=>WORDS, S:()=>S, mk,letterOf,checkSel,splitMade,mergeMade,comboOf,cpuOk,tapTile,doSplit,doMerge,doTurn,doThrow,render,newGame,TUT,TUT_SEQ,tutDone,startSolo,cpuAct,cpuThrow,setSpeed,showMeaning,SCENE_OF,exchangeCands,VOTE_TEXT,ALIAS,turnShortcuts,mergeTurnBacks,stepsOf,hintFind,hintPress,HINT:()=>HINT,HINT_TEXT,cpuApply,TURN_NOT_CPU,pressAgain,onAgainMessage,onPartnerLeft,onLobbyPresence,againUi,leaveOnline});
 
 newGame();
 showMenu();

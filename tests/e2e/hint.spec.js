@@ -72,6 +72,47 @@ test('すぐ投げられる言葉があれば、手数の多い言葉より先�
   expect(await page.evaluate(() => { const p = window.HB_TEST.hintFind(); return p && [p.hands, p.btn]; })).toEqual([0, 'throw']);
 });
 
+test('回す・裏返すで札の向きが変わったら消えて1回目に戻る（字になったあとの案内を出し直す）', async ({ page }, info) => {
+  info.ctx = await openGame(page);
+  await startSolo(page);
+  await setBasket(page, ['つ', '十', 'さ']);
+  await page.click('#btnHint'); await page.click('#btnHint');
+  expect(await glowBtns(page)).toEqual(['aFlip']);
+  await page.evaluate(() => { const T = window.HB_TEST, S = T.S(); T.tapTile(S.mine[2].id); }); // さ を選んで 裏返す（ヒントどおり）
+  await page.click('#aFlip');
+  await page.waitForFunction(() => !window.HB_TEST.S().busy);
+  expect(await glowBtns(page)).toEqual([]);
+  expect(await glowLetters(page)).toEqual([]);
+  expect(await page.evaluate(() => window.HB_TEST.HINT())).toBe(null);
+});
+
+test('字にならない向きの札からも手が出る：つ・へ・ん（回す→裏返す の2手で し）。1手目のあとは2手目', async ({ page }, info) => {
+  info.ctx = await openGame(page);
+  await startSolo(page);
+  await setBasket(page, ['つ', 'へ', 'ん']);
+  const p1 = await page.evaluate(() => { const p = window.HB_TEST.hintFind(); return p && { hands: p.hands, btn: p.btn, tiles: p.tiles }; });
+  expect(p1).toEqual({ hands: 2, btn: 'turn', tiles: [0] });
+  await page.evaluate(() => { const T = window.HB_TEST, S = T.S(); T.tapTile(S.mine[0].id); });
+  await page.click('#aRot'); await page.waitForFunction(() => !window.HB_TEST.S().busy);
+  const p2 = await page.evaluate(() => { const p = window.HB_TEST.hintFind(); return p && { hands: p.hands, btn: p.btn, tiles: p.tiles }; });
+  expect(p2).toEqual({ hands: 1, btn: 'flip', tiles: [0] }); // 字にならない札（つ を回した向き）から、裏返して し
+});
+
+test('う＋｜でできる か は自分では向きがずれて出る（2手に収まらない）ので、その手は案内しない', async ({ page }, info) => {
+  info.ctx = await openGame(page);
+  await startSolo(page);
+  await setBasket(page, ['う', '｜', 'は', 'げ']);
+  const p = await page.evaluate(() => window.HB_TEST.hintFind());
+  expect(p === null || p.btn !== 'merge' || p.word !== 'はかげ').toBe(true);
+});
+
+test('同じ手数なら字数の多い言葉を出す（よ・ろ・い・は・つ・め・い → はつめい）', async ({ page }, info) => {
+  info.ctx = await openGame(page);
+  await startSolo(page);
+  await setBasket(page, ['よ', 'ろ', 'い', 'は', 'つ', 'め', 'い']);
+  expect(await page.evaluate(() => { const p = window.HB_TEST.hintFind(); return p && [p.hands, [...p.word].length]; })).toEqual([0, 4]);
+});
+
 test('カゴの札が変わると消えて1回目に戻る', async ({ page }, info) => {
   info.ctx = await openGame(page);
   await startSolo(page);
