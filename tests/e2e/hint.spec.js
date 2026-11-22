@@ -98,12 +98,24 @@ test('字にならない向きの札からも手が出る：つ・へ・ん（�
   expect(p2).toEqual({ hands: 1, btn: 'flip', tiles: [0] }); // 字にならない札（つ を回した向き）から、裏返して し
 });
 
+test('へ・な・ん：へ を回して ＞ になったあとも続く（＞ を裏返して く）', async ({ page }, info) => {
+  info.ctx = await openGame(page);
+  await startSolo(page);
+  await setBasket(page, ['へ', 'な', 'ん']);
+  const f = () => page.evaluate(() => { const p = window.HB_TEST.hintFind(); return p && { hands: p.hands, btn: p.btn, tiles: p.tiles }; });
+  expect(await f()).toEqual({ hands: 2, btn: 'turn', tiles: [0] });
+  await page.evaluate(() => { const T = window.HB_TEST, S = T.S(); T.tapTile(S.mine[0].id); });
+  await page.click('#aRot'); await page.waitForFunction(() => !window.HB_TEST.S().busy);
+  expect(await page.evaluate(() => window.HB_TEST.letterOf(window.HB_TEST.S().mine[0]))).toBe('＞');
+  expect(await f()).toEqual({ hands: 1, btn: 'flip', tiles: [0] });
+});
+
 test('う＋｜でできる か は自分では向きがずれて出る（2手に収まらない）ので、その手は案内しない', async ({ page }, info) => {
   info.ctx = await openGame(page);
   await startSolo(page);
   await setBasket(page, ['う', '｜', 'は', 'げ']);
   const p = await page.evaluate(() => window.HB_TEST.hintFind());
-  expect(p === null || p.btn !== 'merge' || p.word !== 'はかげ').toBe(true);
+  expect(p === null || p.btn !== 'merge').toBe(true); // う＋｜ の くっつけ（か。MERGE_TURN）は案内しない
 });
 
 test('同じ手数なら字数の多い言葉を出す（よ・ろ・い・は・つ・め・い → はつめい）', async ({ page }, info) => {

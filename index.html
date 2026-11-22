@@ -1289,10 +1289,10 @@ const hintSig=()=>S.mine.map(p=>p.id+'.'+p.r+'.'+p.f).join(','); // 札の字・
 const hintAvail=()=>!!S&&!S.over&&!S.ending&&!isOnline()&&!TUT.on&&$('menu').hidden;
 /* 向きずれ（字にならない）札は、回す・裏返すで字になる最短の手順（2手まで）を手に数える。stepsOf は字の並びしか見ないので、ここで足す（札の r・f から。doTurn と同じ計算） */
 function hintNullSteps(L){ const out=[];
-  L.forEach((l,i)=>{ if(l) return; const p0=S.mine[i], seen=new Map(); let front=[{r:p0.r,f:p0.f,ops:[]}];
+  L.forEach((l,i)=>{ if(l&&l!=='＞'&&l!=='⊂') return; /* ＞・⊂ は CPU の表（TURN）に出入りが無い・足りない部品。人は回す・裏返すで字にできる */ const p0=S.mine[i], seen=new Map(); let front=[{r:p0.r,f:p0.f,ops:[]}];
     for(let d=1;d<=2;d++){ const next=[];
       for(const st of front) for(const kind of ['回す','裏返す']){ const q={...p0,r:st.r,f:st.f}; if(kind==='回す') q.r=(q.r+1)%4; else { q.r=(4-q.r)%4; q.f=q.f?0:1; } norm(q);
-        const ops=[...st.ops,kind], to=letterOf(q); if(to){ if(!seen.has(to)){ seen.set(to,1); const rest=[...L.slice(0,i),...L.slice(i+1)]; out.push({t:'turn',i,to,n:d,ops,res:[...rest,to]}); } } else next.push({r:q.r,f:q.f,ops}); }
+        const ops=[...st.ops,kind], to=letterOf(q); if(to&&to!==l){ if(!seen.has(to)){ seen.set(to,1); const rest=[...L.slice(0,i),...L.slice(i+1)]; out.push({t:'turn',i,to,n:d,ops,res:[...rest,to]}); } } else next.push({r:q.r,f:q.f,ops}); }
       front=next; } });
   return out; }
 /* letters で作れる言葉のうち、字数がいちばん多いもの（同じなら点数の高い方、それも同じなら表の先）。topAbove と同じ表・ふるい */
