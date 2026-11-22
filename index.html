@@ -1445,7 +1445,8 @@ function copyLog(btn){ const t=logText(), o=btn.innerHTML; const done=m=>{ btn.i
   if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(()=>done('コピーした'),no); else no(); }
 $('btnLog').onclick=()=>copyLog($('btnLog')); $('btnCopy').onclick=()=>copyLog($('btnCopy'));
 $('btnClear').onclick=()=>{ if(locked()||TUT.on) return; S.sel=[]; S.choose=null; render(); };
-$('btnReset').onclick=()=>{ if(isOnline()) return leaveOnline(); logN=-1; newGame(TUT.on); }; // チュートリアルの途中のやりなおしは、チュートリアルをはじめから $('btnAgain').onclick=()=>{ if(isOnline()) return leaveOnline(); logN=-1; newGame(); };
+$('btnReset').onclick=()=>{ if(isOnline()) return leaveOnline(); logN=-1; newGame(TUT.on); }; // チュートリアルの途中のやりなおしは、チュートリアルをはじめから
+$('btnAgain').onclick=()=>{ if(isOnline()) return leaveOnline(); logN=-1; newGame(); };
 function setSpeed(i){ speed=i; speedSaved=true; try{localStorage.setItem('hb.speedName',SPEEDS[speed].name)}catch(e){} }
 $('btnSpeed').onclick=()=>{ setSpeed((speed+1)%SPEEDS.length); renderOpp(); schedule(); };
 let sheetOpener=null, sheetEl=null;
