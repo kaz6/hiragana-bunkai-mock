@@ -546,6 +546,7 @@ small.en.b{display:block;margin-left:0}
    端末に覚えた設定（hb.cap）は読まない。ふたりでも同じ値（合図の cap は送るが、受けるときはこの値を使う） */
 const CAP_FIXED=(()=>{ const v=window.HB_RULES&&window.HB_RULES.cap; return Number.isInteger(v)&&v>0?v:14; })();
 let CAP=CAP_FIXED;
+{ const r=document.getElementById('rim'); if(r) r.innerHTML=`<span>ここまで ${CAP_FIXED}こ<small class="en" lang="en">Limit ${CAP_FIXED}</small></span>`; } /* カゴの線の文も上限から作る（数字だけ。HB-066）。韓国語は lang-ko.js の ここまで N こ の型が読む */
 const START=5, START_PART='｜'; // 最初の手は START 枚（うち1枚は START_PART。D-034）
 // 字。後ろの16字は濁音・半濁音（HB-013, D-037）。袋（BAG）には入れない＝作るか、相手から届くだけ
 // （tools/build_meanings.py がこの行をそのまま読むので、書き方を変えないこと）
@@ -1223,7 +1224,8 @@ const basket=$('basket');
 let TILE=52; const GAP=4, PAD=8;
 function measure(){ const W=basket.clientWidth; TILE=Math.max(40,Math.min(52,Math.floor((W-12-4*GAP)/5)));
   basket.style.setProperty('--s',TILE+'px'); const H=PAD+4*(TILE+2)+6; basket.style.height=H+'px';
-  $('rim').style.top=(H-PAD-3*(TILE+2)-2)+'px'; return {W,H:H}; }
+  let rows=0,cnt=0; for(let n=5;cnt<CAP&&n>=1;n--){ cnt+=n; rows++; } if(cnt<CAP) rows+=CAP-cnt; /* 上限まで入る段の数（下から 5・4・3…。上限12なら3段、14なら4段）。線はその段の上（HB-066） */
+  $('rim').style.top=(H-PAD-rows*(TILE+2)-2)+'px'; return {W,H:H}; }
 function slotPos(i,W,H){ let k=0,n=5,j=i; while(j>=n&&n>1){ j-=n; n--; k++; } if(j>=n){ k+=j; j=0; }
   const step=TILE+GAP, rowW=n*step-GAP; return {x:(W-rowW)/2+j*step, y:H-PAD-TILE-k*(TILE+2), row:k}; }
 /* 濁音が落ちてきたときの虹色のキラキラ（HB-026, D-058）。札のうしろに虹の縁、まわりに星。着いてから約1秒。動きを減らす設定では縁の色だけ */
@@ -1575,7 +1577,7 @@ const dgEx=(...xs)=>`<span class="dg-e">${xs.join('')}</span>`;
 const mergeTo=(a,b)=>(MERGE[key(a,b)]||[])[0];
 function buildDiagram(){ const F=[];
   const frame=(name,n,body,en)=>F.push(`<div class="dg-f"><div class="dg-h"><span>${name}</span>${n?`<span class="dg-n">${n}</span>`:''}</div>${body}${en?`<p class="dg-en" lang="en">${en}</p>`:''}</div>`);
-  // 1 カゴ：12 をこえたら負け。袋の字を13枚並べ、12枚目のあとに線を引く
+  // 1 カゴ：CAP をこえたら負け。袋の字を CAP+1 枚並べ、CAP 枚目のあとに線を引く
   { const ls=[...new Set(BAG)].slice(0,CAP+1); let h='';
     ls.forEach((L,i)=>{ if(i===CAP) h+=`<span class="dg-line"><span>${CAP}</span></span>`; h+=miniTile(L,i>=CAP?'out':''); });
     frame(`カゴが ${CAP} をこえたら負け`,'',`<div class="dg-bk" aria-label="${CAP}をこえたら負け">${h}</div><p class="dg-t">言葉を投げると相手のカゴにたまる</p>`,`Throw words to fill their basket. Over ${CAP} = lose.`); }

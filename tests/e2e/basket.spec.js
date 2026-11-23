@@ -62,6 +62,12 @@ test('14このときは割れない・13このときは割れる', async ({ page
 
 // カゴの上限は 14 に固定（HB-066, D-082 の追記）。12／14 の選びは無い。値は rules.js
 test.describe('上限は固定（HB-066）', () => {
+  test('カゴの線の文と位置が上限（14）に合う（14こ目まで線の下。HB-066）', async ({ page }) => {
+    await expect(page.locator('#rim')).toContainText('ここまで 14こ');
+    const r = await page.evaluate(() => { const b = document.getElementById('basket').getBoundingClientRect(), l = document.getElementById('rim').getBoundingClientRect(); return { rimBelowTop: l.top - b.top }; });
+    expect(r.rimBelowTop).toBeLessThan(6); // 4段（5+4+3+2=14こ）の上＝カゴの上の縁のすぐ下
+  });
+
   test('メニューに上限の選びが無い', async ({ page }) => {
     await page.goto('http://hb.test/');
     await expect(page.locator('#capSet')).toHaveCount(0);
