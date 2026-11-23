@@ -9,18 +9,12 @@ async function pick(page, letters) {
   return state(page);
 }
 
-test('dict-meirei.js にある語は言葉として通る（たべろ・にげろ）。辞書の語数にも入る', async ({ page }, info) => {
+test('dict-meirei.js にある語は言葉として通る（たべろ・にげろ）。辞書の語数にも入る。ゲームの字に無い並び（たへろ）は通らない', async ({ page }, info) => {
   info.ctx = await openGame(page, { dictMeirei: { status: 200, body: FIXED } }); await startSolo(page);
   expect(await page.evaluate(() => window.HB_TEST.words().includes('たべろ') && window.HB_TEST.words().includes('にげろ'))).toBe(true);
-  expect((await pick(page, ['た', 'へ', 'ろ'])).msg).not.toBe('投げられる'); // へ ≠ べ。字が違えば通らない
-  expect((await pick(page, ['に', 'け', 'ろ'])).msg).not.toBe('投げられる'); // け ≠ げ
-  expectClean(info.ctx);
-});
-
-test('dict-meirei.js の語（にげろ）は、濁点をくっつけた字でも投げられる', async ({ page }, info) => {
-  info.ctx = await openGame(page, { dictMeirei: { status: 200, body: FIXED } }); await startSolo(page);
-  expect((await pick(page, ['に', 'げ', 'ろ'])).msg).toBe('投げられる');
   expect((await pick(page, ['た', 'べ', 'ろ'])).msg).toBe('投げられる');
+  expect((await pick(page, ['に', 'げ', 'ろ'])).msg).toBe('投げられる');
+  expect((await pick(page, ['た', 'へ', 'ろ'])).msg).toBe('ことばの表にない');
   expectClean(info.ctx);
 });
 

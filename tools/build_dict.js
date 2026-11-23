@@ -64,6 +64,6 @@ if(meireiOut){ // HB-070（D-099）：動詞（自立）の命令形。基本形
     m.add(q);
   }
   const list=[...m].sort();
-  fs.writeFileSync(meireiOut,'/* 動詞の命令形（たべろ・にげろ・かえれ・あそべ など）の辞書（HB-070, D-099）。tools/build_dict.js が IPADIC の動詞（自立）の命令ｅ・命令ｒｏ・命令ｉの行から作る。基本形が dict-ipadic.js にあるものだけ。\n   外すとき：このファイルの HB_MEIREI を空にするか、index.html の script 行を消す（無くてもページは動く） */\nwindow.HB_MEIREI='+JSON.stringify(list.join(' '))+';\n');
+  fs.writeFileSync(meireiOut,'/* 動詞の命令形（たべろ・にげろ・あそべ など）の辞書（HB-070, D-099）。tools/build_dict.js が IPADIC の動詞（自立）の命令ｅ・命令ｒｏ・命令ｉの行から作る。基本形が dict-ipadic.js にあるものだけ。\n   外すとき：このファイルの HB_MEIREI を空にするか、index.html の script 行を消す（無くてもページは動く） */\nwindow.HB_MEIREI='+JSON.stringify(list.join(' '))+';\n');
   console.log('meirei',list.length);
 }
