@@ -124,3 +124,11 @@ test('上限いっぱいのときは、向きずれの札も割れない（い�
   await press(page, '#aRot');
   expect((await state(page)).canSplit).toBe(false);
 });
+
+test('割れない字 ん の向きずれは、もとの字 て としては割れない（カード：割れない字に割り方を足さない）', async ({ page }) => {
+  await setBasket(page, ['ん', 'よ']);
+  await tapTiles(page, [0]);
+  await press(page, '#aRot'); // 黄色い札
+  expect(await page.evaluate(() => window.HB_TEST.letterOf(window.HB_TEST.S().mine[0]))).toBe(null);
+  expect((await state(page)).canSplit).toBe(false);
+});

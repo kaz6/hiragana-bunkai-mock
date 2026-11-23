@@ -715,7 +715,7 @@ function norm(p){ const s=SYMM[p.root];
   else if(s==='iri'){ p.r%=2; if(p.r===1) p.f=0; } /* い・り・こ（HB-037, D-072）：180度回すと同じ。い⇄り は裏返し。こ は裏返しても こ（回すと い） */ }
 function letterOf(p){ const al=ALIAS[p.root]||[[p.root,0,0]]; const a=al.find(a=>a[1]===p.r&&a[2]===p.f); return a?a[0]:null; }
 /* 割るときの字（HB-069, D-098）：字になっている向きはその字。向きずれ（letterOf が null）の札は、もとの字（p.root）に割り方があればその字として割る。出る部品はふつうの向き。CPU は向きずれの札を持たないので使わない */
-function splitLetter(p){ const L=letterOf(p); if(L) return L; return RECIPE[p.root]?p.root:null; }
+function splitLetter(p){ const L=letterOf(p); if(L) return L; return RECIPE[p.root]&&RECIPE[p.was]?p.root:null; } /* 最後に字だった向き（p.was）も割れる字のときだけ。ん（root は て）のように、割れない字の向きずれが て として割れないように */
 function view(p){ const al=ALIAS[p.root]||[[p.root,0,0]];
   let a=al.find(a=>a[1]===p.r&&a[2]===p.f); let v;
   if(a) v={g:a[0],rot:0,flip:0};
