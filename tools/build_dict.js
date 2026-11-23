@@ -1,8 +1,8 @@
-// 辞書（3字以上）を IPADIC から作る。小さい字は大きい字に直して通し、見せる形を HB_SMALL に書く（HB-016）。使い方: node tools/build_dict.js <IPADICのdictフォルダ> <出力 dict-ipadic.js> [候補の出力 tools/renyo_candidates.txt]
+// 辞書（3字以上）を IPADIC から作る。小さい字は大きい字に直して通し、見せる形を HB_SMALL に書く（HB-016）。使い方: node tools/build_dict.js <IPADICのdictフォルダ> <出力 dict-ipadic.js> [候補の出力 tools/renyo_candidates.txt] [命令形の出力 dict-meirei.js]
 // 3つ目を付けると、動詞から作る名詞の形の候補（HB-052, D-086）も書く：活用型が「五段・〜」・活用形が「連用形」の動詞の読みで、辞書（dict-ipadic.js の中身）に無い3字以上。JMdict に名詞として載るものだけ tools/build_meanings.py が選ぶ
 // IPADIC は npm の mecab-ipadic-seed（lib/dict に CSV と COPYING）を使う
 const fs=require('fs'),path=require('path');
-const [dir,out,candOut]=process.argv.slice(2);
+const [dir,out,candOut,meireiOut]=process.argv.slice(2);
 const LETTERS='はよほにこいくへさちきめぬろるつしうねわたけすなまのあもー'+'ばぱぼぽごぐべぺざぢぎづじだげず'+'ふぶぷ'+'とどせぜ'+'りかが'+'てでそぞんえ'+'ら'+'む'; // む（HB-055, D-089）。ら（HB-054, D-088）。 てでそぞんえ（HB-042, D-076）。ふぶぷ（HB-027, D-059）。とどせぜ（HB-033, D-069）。り（HB-037, D-072）。かが（HB-040, D-075）
 const S=new Set([...LETTERS]);
 const famous=new Set(fs.readFileSync(path.join(__dirname,'famous_places.txt'),'utf8').split(/\s+/).filter(Boolean));
@@ -11,6 +11,8 @@ const POS=['名詞','動詞','形容詞','副詞','感動詞','連体詞','接�
 const NG2=['数','接尾','非自立','特殊','接続詞的','動詞非自立的','引用文字列'];
 const info=new Map();
 const renyo=new Set(); // 五段動詞の連用形の読み（HB-052）
+const baseRead=new Map(); // 動詞（自立）の基本形：表記|活用型 -> 読み（HB-070）
+const cmds=[]; // 命令形の行（命令ｅ・命令ｒｏ・命令ｉ）：[読み,基本形の表記|活用型]（HB-070, D-099）
 // 小さい字（HB-016, D-043）：ぁぃぅぇぉっゃゅょゎ は大きい字（コードポイント +1）に直して通す。ゕゖ は対象外（その語は入れない）
 const SMALL='ぁぃぅぇぉっゃゅょゎ';
 const big=s=>[...s].map(ch=>SMALL.includes(ch)?String.fromCharCode(ch.charCodeAt(0)+1):ch).join('');
@@ -19,6 +21,8 @@ for(const f of fs.readdirSync(dir).filter(f=>f.endsWith('.csv'))){
   for(const line of fs.readFileSync(path.join(dir,f),'utf8').split('\n')){
     const c=line.split(','); if(c.length<12) continue;
     const pos=c[4],pos2=c[5],form=c[9];
+    if(pos==='動詞'&&pos2==='自立'&&(form==='命令ｅ'||form==='命令ｒｏ'||form==='命令ｉ')){ cmds.push([k2h(c[11]),c[10]+'|'+c[8]]); continue; } // HB-070：命令ｙｏ（書き言葉）は入れない
+    if(pos==='動詞'&&pos2==='自立'&&form==='基本形') baseRead.set(c[10]+'|'+c[8],k2h(c[11]));
     if(pos==='動詞'&&pos2==='自立'&&form==='連用形'&&c[8].startsWith('五段')){ // HB-052：基本形の行ではないので辞書には入らない。候補だけ集める（小さい字を含む読みは除く）
       const q=k2h(c[11]); const n=[...q].length;
       if(/^[ぁ-ゔー]+$/.test(q)&&q[0]!=='ー'&&n>=3&&n<=12&&[...q].every(ch=>S.has(ch))) renyo.add(q);
@@ -51,3 +55,15 @@ const js='/* 辞書データ（3字以上）：mecab-ipadic-2.7.0-20070801 の�
 fs.writeFileSync(out,js);
 if(candOut){ const inDict=new Set(words); const cands=[...renyo].filter(w=>!inDict.has(w)).sort(); fs.writeFileSync(candOut,cands.join('\n')+'\n'); console.log('renyo candidates',cands.length); }
  console.log('words',words.length,'small',Object.keys(smallMap).length,'clash',clash.length,clash.slice(0,15).join(' '));
+if(meireiOut){ // HB-070（D-099）：動詞（自立）の命令形。基本形が辞書にあるものだけ。読みが字で書けて辞書に無い3字以上。小さい字を含む読みは入れない（見せる形の表が要るため。報告に書く）
+  const inDict=new Set(words); const m=new Set();
+  for(const [q,key] of cmds){
+    const b=baseRead.get(key); if(!b||!inDict.has(big(b))) continue;
+    if(!/^[ぁ-ゔー]+$/.test(q)||q[0]==='ー'||[...q].some(ch=>SMALL.includes(ch)||'ゕゖ'.includes(ch))) continue;
+    const n=[...q].length; if(n<3||n>12||![...q].every(ch=>S.has(ch))||inDict.has(q)) continue;
+    m.add(q);
+  }
+  const list=[...m].sort();
+  fs.writeFileSync(meireiOut,'/* 動詞の命令形（たべろ・にげろ・あそべ など）の辞書（HB-070, D-099）。tools/build_dict.js が IPADIC の動詞（自立）の命令ｅ・命令ｒｏ・命令ｉの行から作る。基本形が dict-ipadic.js にあるものだけ。\n   外すとき：このファイルの HB_MEIREI を空にするか、index.html の script 行を消す（無くてもページは動く） */\nwindow.HB_MEIREI='+JSON.stringify(list.join(' '))+';\n');
+  console.log('meirei',list.length);
+}

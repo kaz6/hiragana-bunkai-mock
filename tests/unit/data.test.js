@@ -4,7 +4,7 @@ const assert = require('node:assert');
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
-const { DICT_WORDS_NOW, MEANINGS_NOW, RENYO_WORDS_NOW, MIN_RATIO } = require('../counts');
+const { DICT_WORDS_NOW, MEANINGS_NOW, RENYO_WORDS_NOW, MEIREI_WORDS_NOW, MIN_RATIO } = require('../counts');
 
 const ROOT = path.join(__dirname, '..', '..');
 // ブラウザ用の data ファイルを読み、window に入ったものを返す
@@ -77,6 +77,19 @@ test('動詞から作る名詞の形（HB-052）：候補に さまよい・き�
   assert.strictEqual(new Set(r).size, r.length);
   assert.ok(r.length >= Math.floor(RENYO_WORDS_NOW * MIN_RATIO), `語数 ${r.length}（記録 ${RENYO_WORDS_NOW}）`);
   assert.ok(html.includes('<script src="dict-renyo.js"></script>'));
+});
+
+test('動詞の命令形（HB-070）：dict-meirei.js に たべろ・にげろ・あそべ がある／辞書に無い3字以上で字で書け、語数が減っていない／命令ｙｏ（たべよ）は無い／index.html が読み込む', () => {
+  const dict = new Set(String(load('dict-ipadic.js').HB_IPADIC).split(/\s+/));
+  const m = String(load('dict-meirei.js').HB_MEIREI).split(/\s+/).filter(Boolean);
+  const ms = new Set(m);
+  for (const w of ['たべろ', 'にげろ', 'あそべ']) assert.ok(ms.has(w), w);
+  assert.ok(!ms.has('たべよ'), '命令ｙｏ（書き言葉）は入れない');
+  assert.deepStrictEqual(m.filter(w => dict.has(w)).slice(0, 5), [], '辞書に無い語だけ');
+  assert.ok(m.every(w => { const cs = [...w]; return cs.length >= 3 && cs.length <= 12 && cs[0] !== 'ー' && cs.every(c => c === 'ー' || KANA.has(c)); }));
+  assert.strictEqual(ms.size, m.length);
+  assert.ok(m.length >= Math.floor(MEIREI_WORDS_NOW * MIN_RATIO), `語数 ${m.length}（記録 ${MEIREI_WORDS_NOW}）`);
+  assert.ok(html.includes('<script src="dict-meirei.js"></script>'));
 });
 
 test('韓国語の表（lang-ko.js。HB-058）：読める・index.html が読み込む・英語の表（EN_FIX・案内・はじめの3行）の文は全部ある', () => {

@@ -37,10 +37,11 @@ window.__hbSent=[];
  * opts.guide：false なら最初の1戦の案内を見た扱いにする（初めの手で CPU が止まらないように）
  * opts.tutorial：false なら最初の一戦のチュートリアルを済んだ扱いにする（HB-059。tutorial.spec.js だけ true）
  * opts.rulesJs：文字列を渡すと rules.js の中身をそれにする（HB-068。上限の数を変えて開くテスト）
+ * opts.dictMeirei：{status, body} を渡すと dict-meirei.js の返事をそれにする（HB-070。meirei.spec.js）
  * opts.dictRenyo：{status, body} を渡すと dict-renyo.js の返事をそれにする（HB-052。renyo.spec.js）
  */
 async function openGame(page, opts = {}) {
-  const { guide = false, tutorial = false, extraWords = EXTRA_WORDS, dictRenyo = null, rulesJs = null } = opts;
+  const { guide = false, tutorial = false, extraWords = EXTRA_WORDS, dictRenyo = null, dictMeirei = null, rulesJs = null } = opts;
   const errors = [];
   const blocked = [];
   page.on('pageerror', e => errors.push('pageerror: ' + e.message));
@@ -49,6 +50,7 @@ async function openGame(page, opts = {}) {
     const url = route.request().url();
     if (rulesJs != null && url === ORIGIN + 'rules.js') return route.fulfill({ status: 200, contentType: 'text/javascript', body: rulesJs });
     if (dictRenyo && url === ORIGIN + 'dict-renyo.js') return route.fulfill({ status: dictRenyo.status, contentType: 'text/javascript', body: dictRenyo.body });
+    if (dictMeirei && url === ORIGIN + 'dict-meirei.js') return route.fulfill({ status: dictMeirei.status, contentType: 'text/javascript', body: dictMeirei.body });
     if (url.startsWith(ORIGIN)) {
       let rel = decodeURIComponent(new URL(url).pathname).replace(/^\/+/, '') || 'index.html';
       const file = path.join(ROOT, rel);
