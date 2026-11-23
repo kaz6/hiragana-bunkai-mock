@@ -5,5 +5,6 @@ module.exports = {
   PAGE_WORDS_NOW: 18193,  // ページの WORDS（手選び＋dict-ipadic.js＋テストの固定 extra_words）
   MEANINGS_NOW: 11151,    // meanings.js の意味のある語
   RENYO_WORDS_NOW: 0,     // dict-renyo.js（HB-052）の語数。JMdict を取れる毎日の更新が最初に埋めるまでは 0。埋まったら記録を直す（0 のあいだは減りの見張りをしない）
+  MEIREI_WORDS_NOW: 2789, // dict-meirei.js（HB-070）の語数。tools/build_dict.js の4つ目の引数で作る（IPADIC の命令ｅ・命令ｒｏ・命令ｉ。基本形が辞書にあるもの）
   MIN_RATIO: 0.9,
 };
