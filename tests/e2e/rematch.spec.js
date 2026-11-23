@@ -11,7 +11,7 @@ async function onlineResult(page, me) {
     const T = window.HB_TEST, N = T.NET, c = window.supabase.createClient();
     window.__hbPresence = { a: [{}], b: [{}] };
     N.client = c; N.playerId = me; N.roomKey = 'rk'; N.lobby = c.channel('hb-lobby-rk'); N.match = c.channel('hb-match-m1');
-    N.mode = 'online'; N.matchId = 'm1'; N.starting = true; N.cap = 12; N.partnerGone = false; N.cd = 0; N.again = { me: false, op: false };
+    N.mode = 'online'; N.matchId = 'm1'; N.starting = true; N.cap = 14; N.partnerGone = false; N.cd = 0; N.again = { me: false, op: false };
     document.getElementById('menu').hidden = true; T.newGame(); const S = T.S(); S.over = 'win'; T.render();
   }, me);
 }
@@ -30,7 +30,7 @@ test('先頭の側：押すと「相手を待っている…」。相手も押�
   const out = await sent(page);
   expect(out.length).toBe(2);
   const start = JSON.parse(out[1].replace(/^start:/, ''));
-  expect(start.matchId).not.toBe('m1'); expect(start.cap).toBe(12);
+  expect(start.matchId).not.toBe('m1'); expect(start.cap).toBe(14);
   await expect(note(page)).toContainText('そろった');
   await expect(page.locator('#result')).toBeHidden({ timeout: 6000 }); // 3秒数えて始まる
   const r = await page.evaluate(() => ({ id: window.HB_TEST.NET.matchId, over: window.HB_TEST.S().over, removed: window.__hbRemoved, again: window.HB_TEST.NET.again }));
@@ -39,7 +39,7 @@ test('先頭の側：押すと「相手を待っている…」。相手も押�
 
 test('受ける側：相手の「もう一回」だけだと一言が出る。自分も押して合図が来たら新しい一戦。押す前の合図・前の一戦の知らせは受けない', async ({ page }) => {
   await onlineResult(page, 'b');
-  await page.evaluate(() => window.HB_TEST.onStartMessage({ matchId: 'x9', cap: 12 })); // 押していないので無視
+  await page.evaluate(() => window.HB_TEST.onStartMessage({ matchId: 'x9', cap: 14 })); // 押していないので無視
   expect(await page.evaluate(() => window.HB_TEST.NET.matchId)).toBe('m1');
   await page.evaluate(() => window.HB_TEST.onAgainMessage({ id: 'a', matchId: 'old' })); // 前の一戦の知らせ
   await expect(note(page)).toBeHidden();
@@ -104,7 +104,7 @@ test('結果の画面で相手が抜けて戻っても、押していない再�
   for (const me of ['a', 'b']) {
     await onlineResult(page, me);
     await leaveBack();
-    await page.evaluate(() => window.HB_TEST.onStartMessage({ matchId: 'm2', cap: 12 })); // 戻った相手の合図も受けない
+    await page.evaluate(() => window.HB_TEST.onStartMessage({ matchId: 'm2', cap: 14 })); // 戻った相手の合図も受けない
     await page.waitForTimeout(3500);
     expect(await sent(page)).toEqual([]);
     await same();
