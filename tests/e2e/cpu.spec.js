@@ -104,3 +104,77 @@ test('CPU の2手先の読み：向きの2手は1手目で手数を使い切る�
   expect(r.acts.length).toBeGreaterThan(5);
   expect(r.hands).toBeLessThanOrEqual(2);
 });
+
+// ---- HB-064（D-096）：つよい の CPU が、トドメの一投に「トドメの一言」（cpu-todome.js）の語を選ぶ ----
+// カゴを組んで cpuAct を1回打ち、CPU が投げた語（ログ）と タグを返す
+const todomeTry = (page, { opp, mine, used = [], n = 12 }) => page.evaluate(({ opp, mine, used, n }) => {
+  const T = window.HB_TEST, out = [];
+  for (let i = 0; i < n; i++) {
+    T.newGame(); const S = T.S(); S.started = true; S.used = new Set(used);
+    S.opp = [...opp].map(c => T.mk(c === 'ー' ? '一' : c));
+    S.mine = Array.from({ length: mine }, () => T.mk('よ'));
+    const before = S.log.length; T.cpuAct();
+    const x = T.S().log.slice(before).filter(e => e.who === 'op')[0];
+    out.push(x ? x.word : null);
+  }
+  return { words: out, cap: T.CAP, list: T.TODOME, logs: T.logText() };
+}, { opp, mine, used, n });
+
+test('つよい：その一投で上限を超えるとき、トドメの語（ざこ）を投げる。点数の高い別の語（さくらんぼ）も作れるカゴでも', async ({ page }) => {
+  await startSolo(page, 'つよい');
+  const cap = await page.evaluate(() => window.HB_TEST.CAP);
+  const r = await todomeTry(page, { opp: 'ざこさくらんぼ', mine: cap - 1 });
+  expect(r.words.every(w => w === 'ざこ')).toBe(true);
+  expect(r.logs).toContain('投げる「ざこ」（トドメ）');
+});
+
+test('つよい：一覧は辞書の形に直る（ちょろい→ちよろい）。作者の12語がそろう', async ({ page }) => {
+  await startSolo(page, 'つよい');
+  const list = await page.evaluate(() => window.HB_TEST.TODOME);
+  for (const w of ['ざこ', 'あほ', 'よわい', 'まぬけ', 'へたくそ', 'ざんねん', 'よわむし', 'なさけない', 'ちよろい', 'あまい', 'ばいばい', 'さよなら']) expect(list).toContain(w);
+  expect(list.length).toBe(12);
+});
+
+test('つよい：その一投で上限を超えないときは、いまの決め手のまま（トドメにしない）', async ({ page }) => {
+  await startSolo(page, 'つよい');
+  const cap = await page.evaluate(() => window.HB_TEST.CAP);
+  // 決め手の条件（こちら9こ以上）は満たし、さくら（3字）を投げても ちょうど上限で超えない → トドメにしない
+  const r = await todomeTry(page, { opp: 'ざこさくら', mine: Math.max(cap - 3, 9) });
+  expect(cap - 3).toBeGreaterThanOrEqual(9);
+  expect(r.logs).not.toContain('（トドメ）');
+  expect(r.words.filter(Boolean).length).toBeGreaterThan(0);
+});
+
+test('つよい：トドメの語でも上限を超えないなら差し替えない（勝てる一投を捨てない）', async ({ page }) => {
+  await startSolo(page, 'つよい');
+  const cap = await page.evaluate(() => window.HB_TEST.CAP);
+  // こちら cap-3 こ：さくらんぼ（5字）なら超えるが、ざこ（2字）では cap-1 こで終わらない
+  const r = await todomeTry(page, { opp: 'ざこさくらんぼ', mine: cap - 3 });
+  expect(cap - 3).toBeGreaterThanOrEqual(9);
+  expect(r.logs).not.toContain('（トドメ）');
+  expect(r.words.every(w => w && w !== 'ざこ')).toBe(true);
+});
+
+test('つよい：一覧の語が作れないカゴではトドメにしない（いまの決め手のまま）', async ({ page }) => {
+  await startSolo(page, 'つよい');
+  const cap = await page.evaluate(() => window.HB_TEST.CAP);
+  const r = await todomeTry(page, { opp: 'さくらんぼ', mine: cap - 1 });
+  expect(r.logs).not.toContain('（トドメ）');
+  expect(r.words.filter(Boolean).length).toBeGreaterThan(0);
+});
+
+test('つよい：一度きり（もうリストに出た語）は選ばない。ざこ を使い済みなら あほ', async ({ page }) => {
+  await startSolo(page, 'つよい');
+  const cap = await page.evaluate(() => window.HB_TEST.CAP);
+  const r = await todomeTry(page, { opp: 'ざこあほさくらんぼ', mine: cap - 1, used: ['ざこ'] });
+  expect(r.words.every(w => w === 'あほ')).toBe(true);
+});
+
+for (const lv of ['ふつう', 'ゆっくり']) {
+  test(`${lv}：トドメの語を使わない（つよい 以外は変わらない）`, async ({ page }) => {
+    await startSolo(page, lv);
+    const cap = await page.evaluate(() => window.HB_TEST.CAP);
+    const r = await todomeTry(page, { opp: 'ざこさくらんぼ', mine: cap - 1, n: 6 });
+    expect(r.logs).not.toContain('（トドメ）');
+  });
+}
