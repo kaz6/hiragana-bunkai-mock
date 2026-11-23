@@ -84,8 +84,8 @@ test('韓国語の表（lang-ko.js。HB-058）：読める・index.html が読�
   assert.ok(ko && ko.FIX && Array.isArray(ko.PAT) && Array.isArray(ko.DG));
   assert.ok(Object.values(ko.FIX).every(v => typeof v === 'string' && v));
   assert.ok(html.includes('<script src="lang-ko.js"></script>'));
-  const grab = re => vm.runInNewContext('(' + html.match(re)[0].replace(/^const \w+=/, '').replace(/;$/, '') + ')');
+  const grab = re => vm.runInNewContext('(' + html.match(re)[0].replace(/^const \w+=/, '').replace(/;$/, '') + ')', { CAP_FIXED: 14 }); // 数の入る文は CAP_FIXED（上限の数）から作る（HB-068）
   const missing = [...Object.keys(grab(/const EN_FIX=\{[\s\S]*?\};/)), ...Object.values(grab(/const GUIDE_TEXT=\{[\s\S]*?\};/)), ...grab(/const RULES3=\[[\s\S]*?\]\];/).map(r => r[0])]
-    .filter(jp => !ko.FIX[jp] && !ko.FIX['↑' + jp]);
+    .filter(jp => !ko.FIX[jp] && !ko.FIX['↑' + jp] && !ko.FIX[jp.split('14').join('{cap}')]); // 鍵の {cap} は上限の数に直して引く（index.html が足す形と同じ）
   assert.deepStrictEqual(missing, []);
 });

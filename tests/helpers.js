@@ -36,16 +36,18 @@ window.__hbSent=[];
  * ページを開く。返す errors はページのエラーとコンソールのエラー（テストの最後に空であることを見る）
  * opts.guide：false なら最初の1戦の案内を見た扱いにする（初めの手で CPU が止まらないように）
  * opts.tutorial：false なら最初の一戦のチュートリアルを済んだ扱いにする（HB-059。tutorial.spec.js だけ true）
+ * opts.rulesJs：文字列を渡すと rules.js の中身をそれにする（HB-068。上限の数を変えて開くテスト）
  * opts.dictRenyo：{status, body} を渡すと dict-renyo.js の返事をそれにする（HB-052。renyo.spec.js）
  */
 async function openGame(page, opts = {}) {
-  const { guide = false, tutorial = false, extraWords = EXTRA_WORDS, dictRenyo = null } = opts;
+  const { guide = false, tutorial = false, extraWords = EXTRA_WORDS, dictRenyo = null, rulesJs = null } = opts;
   const errors = [];
   const blocked = [];
   page.on('pageerror', e => errors.push('pageerror: ' + e.message));
   page.on('console', m => { if (m.type() === 'error') errors.push('console: ' + m.text()); });
   await page.route('**/*', async route => {
     const url = route.request().url();
+    if (rulesJs != null && url === ORIGIN + 'rules.js') return route.fulfill({ status: 200, contentType: 'text/javascript', body: rulesJs });
     if (dictRenyo && url === ORIGIN + 'dict-renyo.js') return route.fulfill({ status: dictRenyo.status, contentType: 'text/javascript', body: dictRenyo.body });
     if (url.startsWith(ORIGIN)) {
       let rel = decodeURIComponent(new URL(url).pathname).replace(/^\/+/, '') || 'index.html';
