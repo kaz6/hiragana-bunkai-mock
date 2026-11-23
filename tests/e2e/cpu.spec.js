@@ -145,6 +145,16 @@ test('つよい：その一投で上限を超えないときは、いまの決�
   expect(r.words.filter(Boolean).length).toBeGreaterThan(0);
 });
 
+test('つよい：トドメの語でも上限を超えないなら差し替えない（勝てる一投を捨てない）', async ({ page }) => {
+  await startSolo(page, 'つよい');
+  const cap = await page.evaluate(() => window.HB_TEST.CAP);
+  // こちら cap-3 こ：さくらんぼ（5字）なら超えるが、ざこ（2字）では cap-1 こで終わらない
+  const r = await todomeTry(page, { opp: 'ざこさくらんぼ', mine: cap - 3 });
+  expect(cap - 3).toBeGreaterThanOrEqual(9);
+  expect(r.logs).not.toContain('（トドメ）');
+  expect(r.words.every(w => w && w !== 'ざこ')).toBe(true);
+});
+
 test('つよい：一覧の語が作れないカゴではトドメにしない（いまの決め手のまま）', async ({ page }) => {
   await startSolo(page, 'つよい');
   const cap = await page.evaluate(() => window.HB_TEST.CAP);

@@ -1157,8 +1157,8 @@ function topAbove(letters,th){ const T=strongList(), idx=T.idx, pool={}, pm=[0,0
     if(ok&&!(once&&S.used.has(x.w))) return x; }
   return null; }
 /* トドメの一言：letters で作れて、まだリストに出ていない語（cpu-todome.js）からランダムに1つ（なければ null） */
-function todomeOf(letters){ const pool={}; letters.forEach(l=>{ if(!l) return; const c=asWord(l); pool[c]=(pool[c]||0)+1; });
-  const ok=TODOME.filter(w=>{ if(once&&S.used.has(w)) return false; const need={}; for(const c of w){ need[c]=(need[c]||0)+1; if(need[c]>(pool[c]||0)) return false; } return true; });
+function todomeOf(letters,room){ const pool={}; letters.forEach(l=>{ if(!l) return; const c=asWord(l); pool[c]=(pool[c]||0)+1; });
+  const ok=TODOME.filter(w=>{ if(S.mine.length+[...w].length<=room) return false; /* 語そのものでも上限を超えるものだけ（超えない語に差し替えて勝ちを逃さない） */ if(once&&S.used.has(w)) return false; const need={}; for(const c of w){ need[c]=(need[c]||0)+1; if(need[c]>(pool[c]||0)) return false; } return true; });
   return ok.length?pick(ok):null; }
 /* いちばん長い言葉（同じ長さは点数の高い方、それも同じならランダム） */
 function longBest(letters){ const pool={}; let len=0; letters.forEach(l=>{ if(!l) return; const c=asWord(l); pool[c]=(pool[c]||0)+1; len++; });
@@ -1186,7 +1186,7 @@ function strongMove(t0){ const L=S.opp.map(letterOf), now=smartBest(L); oppMemo(
   if(now&&must){ cpuThrow(now.w); return; }
   const kill=S.mine.length>=STRONG_KILL;
   /* トドメの一言（HB-064, D-096）：この一投でこちらのカゴが CAP を超えるなら、cpu-todome.js の語で作れるものを先に投げる（複数ならランダム） */
-  const todome=w=>{ if(S.mine.length+[...w].length<=CAP) return false; const t=todomeOf(L); if(!t) return false; cpuThrow(t,'トドメ'); return true; };
+  const todome=w=>{ if(S.mine.length+[...w].length<=CAP) return false; const t=todomeOf(L,CAP); if(!t) return false; cpuThrow(t,'トドメ'); return true; };
   if(S.opp.length>=STRONG_GUARD){ const lw=longBest(L); if(lw){ if(todome(lw.w)) return; cpuThrow(lw.w, kill?'守り・決め手':'守り'); return; } }
   if(now&&kill){ if(todome(now.w)) return; cpuThrow(now.w,'決め手'); return; }
   const heavy=S.opp.length>=SMART_SPLIT_AT;
