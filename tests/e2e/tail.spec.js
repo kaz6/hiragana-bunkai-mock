@@ -170,5 +170,5 @@ test('べ・づ・ぢ の向きずれも、見えていた字で割って戻す�
     expect(m.k, g).toBe(k0);
     n++;
   }
-  expect(n).toBeGreaterThan(0); // 少なくとも1字は向きずれから割って戻した
+  expect(n).toBe(3); // 3字とも向きずれから割って戻した
 });
