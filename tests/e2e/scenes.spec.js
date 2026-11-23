@@ -53,7 +53,7 @@ test('新しい一戦では前の投げを覚えていない', async ({ page }) 
   expect(r).not.toContain('あいさつ！');
 });
 
-test('表の7語はどれも組に入っている', async ({ page }) => {
-  const r = await page.evaluate(() => { const T = window.HB_TEST; return ['よろしく', 'よろしこ', 'どうも', 'はろー', 'はーい', 'へい', 'へーい'].filter(w => !(T.SCENE_OF[w] || []).includes('挨拶')); });
+test('表の8語はどれも組に入っている', async ({ page }) => {
+  const r = await page.evaluate(() => { const T = window.HB_TEST; return ['よろしく', 'よろしこ', 'どうも', 'はろー', 'はーい', 'へい', 'へーい', 'ちーす'].filter(w => !(T.SCENE_OF[w] || []).includes('挨拶')); });
   expect(r).toEqual([]);
 });

@@ -56,7 +56,7 @@ test('cpu-ng.js・nice-words.js・scenes.js が読める', () => {
   assert.ok(Object.keys(sc).length > 0);
   const g = load('scene-groups.js'); // 場面の組（HB-039）
   assert.ok(Object.keys(g.HB_SCENE_GROUPS).length > 0 && Object.values(g.HB_SCENE_GROUPS).every(ws => Array.isArray(ws) && ws.length > 0));
-  assert.deepEqual(g.HB_SCENE_GROUPS['挨拶'], ['よろしく', 'よろしこ', 'どうも', 'はろー', 'はーい', 'へい', 'へーい']);
+  assert.deepEqual(g.HB_SCENE_GROUPS['挨拶'], ['よろしく', 'よろしこ', 'どうも', 'はろー', 'はーい', 'へい', 'へーい', 'ちーす']); // ちーす は作者 2026-11-23 18:54（HB-067）
 });
 
 test('config.js には公開キー（publishable）だけ', () => {
