@@ -414,7 +414,6 @@ small.en.b{display:block;margin-left:0}
     <button class="act menu-solo" id="btnSolo" type="button">▶ ひとりで（CPU）<small class="en" lang="en">Solo vs CPU</small></button>
     <!-- ひとりでの相手の強さを、始める前に選ぶ（HB-014 追加, D-041）。中身は JS で SPEEDS から作る -->
     <div class="solo-pick" id="soloPick" role="group" aria-label="相手の強さ" hidden></div>
-    <div class="cap-set" id="capBox"><p class="menu-note" id="capLabel"></p><div class="meanSet" id="capSet" role="group"></div></div>
     <div class="menu-online" id="menuOnline">
       <p class="menu-note">ふたりで：同じ合言葉を入れた二人がそろうと、3秒後に同時に始まる。<small class="en b" lang="en">Two players: when both enter the same room code, the game starts 3 seconds later.</small></p>
       <div class="menu-row">
@@ -539,13 +538,15 @@ small.en.b{display:block;margin-left:0}
 <script src="scene-groups.js"></script>
 <script src="lang-ko.js"></script>
 <script src="tutorial.js"></script>
+<script src="rules.js"></script>
 <script>
 (()=>{
 'use strict';
-/* カゴの上限（HB-048, D-082）。はじめは12。設定で 12／14 を選べる（hb.cap に覚える）。一戦の途中では変わらず、次の一戦（newGame）から。
-   ふたりでは、合図を出した側の値に二人とも合わせる（start の合図に cap を載せる。表の形は変えない） */
-const CAP_CHOICES=[12,14], CAP_LABEL=['カゴの上限','Basket size']; // 設定の見出しは仮（ここ1か所で直す）
-let CAP=12, capSetting=12; try{ const v=+localStorage.getItem('hb.cap'); if(CAP_CHOICES.includes(v)) capSetting=CAP=v; }catch(e){}
+/* カゴの上限（D-082・HB-066）。14 に固定。値は rules.js（window.HB_RULES.cap）から読む。読めないときも 14。
+   端末に覚えた設定（hb.cap）は読まない。ふたりでも同じ値（合図の cap は送るが、受けるときはこの値を使う） */
+const CAP_FIXED=(()=>{ const v=window.HB_RULES&&window.HB_RULES.cap; return Number.isInteger(v)&&v>0?v:14; })();
+let CAP=CAP_FIXED;
+{ const r=document.getElementById('rim'); if(r) r.innerHTML=`<span>ここまで ${CAP_FIXED}こ<small class="en" lang="en">Limit ${CAP_FIXED}</small></span>`; } /* カゴの線の文も上限から作る（数字だけ。HB-066）。韓国語は lang-ko.js の ここまで N こ の型が読む */
 const START=5, START_PART='｜'; // 最初の手は START 枚（うち1枚は START_PART。D-034）
 // 字。後ろの16字は濁音・半濁音（HB-013, D-037）。袋（BAG）には入れない＝作るか、相手から届くだけ
 // （tools/build_meanings.py がこの行をそのまま読むので、書き方を変えないこと）
@@ -749,7 +750,7 @@ const els=new Map();
 function newGame(tut){
   HINT=null; clearTimeout(TUT.t); TUT.on=tut===true; TUT.step=TUT.on?'arrive':''; // tut＝true のときだけチュートリアルの一戦（HB-059）
   clearTimeout(cpuT); clearTimeout(refT.me); clearTimeout(refT.op); refT={me:null,op:null}; els.forEach(el=>el.remove()); els.clear();
-  CAP=isOnline()&&NET.cap?NET.cap:capSetting; // 一戦の始めに決める（HB-048）
+  CAP=CAP_FIXED; // 上限は固定（HB-066）
   lastThrow=null; S={mine:[],opp:[],oppL:null,oppO:null,sel:[],log:[],hintFound:[],used:new Set(),over:null,ending:false,started:false,busy:false,choose:null,
      say:'あなたが動いたら、動き出す'};
   TODAY=makeToday(isOnline()&&NET.matchId?seedRng('today-'+NET.matchId):null); // ふたりでは matchId から。ひとりでは毎戦ランダム
@@ -1223,7 +1224,8 @@ const basket=$('basket');
 let TILE=52; const GAP=4, PAD=8;
 function measure(){ const W=basket.clientWidth; TILE=Math.max(40,Math.min(52,Math.floor((W-12-4*GAP)/5)));
   basket.style.setProperty('--s',TILE+'px'); const H=PAD+4*(TILE+2)+6; basket.style.height=H+'px';
-  $('rim').style.top=(H-PAD-3*(TILE+2)-2)+'px'; return {W,H:H}; }
+  let rows=0,cnt=0; for(let n=5;cnt<CAP&&n>=1;n--){ cnt+=n; rows++; } if(cnt<CAP) rows+=CAP-cnt; /* 上限まで入る段の数（下から 5・4・3…。上限12なら3段、14なら4段）。線はその段の上（HB-066） */
+  $('rim').style.top=(H-PAD-rows*(TILE+2)-2)+'px'; return {W,H:H}; }
 function slotPos(i,W,H){ let k=0,n=5,j=i; while(j>=n&&n>1){ j-=n; n--; k++; } if(j>=n){ k+=j; j=0; }
   const step=TILE+GAP, rowW=n*step-GAP; return {x:(W-rowW)/2+j*step, y:H-PAD-TILE-k*(TILE+2), row:k}; }
 /* 濁音が落ちてきたときの虹色のキラキラ（HB-026, D-058）。札のうしろに虹の縁、まわりに星。着いてから約1秒。動きを減らす設定では縁の色だけ */
@@ -1575,7 +1577,7 @@ const dgEx=(...xs)=>`<span class="dg-e">${xs.join('')}</span>`;
 const mergeTo=(a,b)=>(MERGE[key(a,b)]||[])[0];
 function buildDiagram(){ const F=[];
   const frame=(name,n,body,en)=>F.push(`<div class="dg-f"><div class="dg-h"><span>${name}</span>${n?`<span class="dg-n">${n}</span>`:''}</div>${body}${en?`<p class="dg-en" lang="en">${en}</p>`:''}</div>`);
-  // 1 カゴ：12 をこえたら負け。袋の字を13枚並べ、12枚目のあとに線を引く
+  // 1 カゴ：CAP をこえたら負け。袋の字を CAP+1 枚並べ、CAP 枚目のあとに線を引く
   { const ls=[...new Set(BAG)].slice(0,CAP+1); let h='';
     ls.forEach((L,i)=>{ if(i===CAP) h+=`<span class="dg-line"><span>${CAP}</span></span>`; h+=miniTile(L,i>=CAP?'out':''); });
     frame(`カゴが ${CAP} をこえたら負け`,'',`<div class="dg-bk" aria-label="${CAP}をこえたら負け">${h}</div><p class="dg-t">言葉を投げると相手のカゴにたまる</p>`,`Throw words to fill their basket. Over ${CAP} = lose.`); }
@@ -1736,13 +1738,13 @@ function onPartnerLeft(){
 /* 合図を出す側：matchId を作って相手に伝え、自分も数え始める */
 function startAsLeader(){ NET.starting=true;
   const matchId=`${NET.roomKey}-${makePlayerId()}`; // 合言葉の番号＋始めた側が作る乱数
-  NET.cap=capSetting; // 二人の上限は合図を出した側の値（HB-048）
-  NET.lobby.send({type:'broadcast',event:'start',payload:{matchId,cap:capSetting}});
+  NET.cap=CAP_FIXED; // 二人とも上のデータの値（HB-066）
+  NET.lobby.send({type:'broadcast',event:'start',payload:{matchId,cap:CAP_FIXED}});
   startCountdown(matchId); }
 /* 合図を受ける側（合図を出した側以外） */
 function onStartMessage(payload){ if(!payload||!payload.matchId) return;
   if(NET.starting&&!(isOnline()&&S&&S.over&&NET.again.me&&!NET.partnerGone&&payload.matchId!==NET.matchId)) return; // 再戦の合図は、結果の画面で自分が「もう一回」を押しているときだけ受ける（HB-061）
-  NET.starting=true; NET.cap=CAP_CHOICES.includes(payload.cap)?payload.cap:12; startCountdown(payload.matchId); }
+  NET.starting=true; NET.cap=CAP_FIXED; /* 古い端末から 12 が届いても、こちらの値を使う（HB-066） */ startCountdown(payload.matchId); }
 
 /* 3秒数えてから対局を始める（画面の文字で数える） */
 function startCountdown(matchId){ let left=COUNTDOWN_SEC; setLobbyText(`そろった。${left}`); NET.cd=left; againUi();
@@ -1830,11 +1832,6 @@ if(window.HB_TEST&&typeof window.HB_TEST==='object') Object.assign(window.HB_TES
 
 newGame();
 showMenu();
-/* カゴの上限の設定（HB-048）。メニュー（一戦の前）にだけ出る。選ぶと端末に覚え、次の一戦から効く */
-function renderCapSet(){ $('capLabel').innerHTML=CAP_LABEL[0]+enTag(CAP_LABEL[1]); $('capSet').setAttribute('aria-label',CAP_LABEL[0]);
-  $('capSet').innerHTML=CAP_CHOICES.map(n=>`<button type="button" data-cap="${n}" aria-pressed="${n===capSetting}">${n}</button>`).join(''); }
-$('capSet').addEventListener('click',e=>{ const b=e.target.closest('button[data-cap]'); if(!b) return; capSetting=+b.dataset.cap; try{localStorage.setItem('hb.cap',String(capSetting))}catch(_){} renderCapSet(); });
-renderCapSet();
 $('btnSolo').onclick=soloPickOpen; $('btnJoin').onclick=joinRoom; $('btnLeave').onclick=leaveOnline;
 $('roomInput').addEventListener('keydown',e=>{ if(e.key==='Enter') joinRoom(); });
 })();
