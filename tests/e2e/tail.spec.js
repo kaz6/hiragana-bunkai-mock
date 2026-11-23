@@ -132,3 +132,18 @@ test('割れない字 ん の向きずれは、もとの字 て としては割�
   expect(await page.evaluate(() => window.HB_TEST.letterOf(window.HB_TEST.S().mine[0]))).toBe(null);
   expect((await state(page)).canSplit).toBe(false);
 });
+
+test('さ→裏返して ち→回して向きずれ→割る→くっつけ直しても、さ の札の道すじ・印は ち のまま残らない（root と見えた字が違う札）', async ({ page }) => {
+  await setBasket(page, ['さ', 'よ']);
+  await tapTiles(page, [0]);
+  await press(page, '#aFlip'); // ち
+  await press(page, '#aRot');  // 向きずれ
+  await press(page, '#aSplit'); // さ として 十＋⊂
+  expect((await state(page)).mine).toBe('十⊂よ');
+  await tapTiles(page, [0, 1]);
+  await press(page, '#aMerge');
+  const m = await page.evaluate(() => { const T = window.HB_TEST, p = T.S().mine[0]; return { L: T.letterOf(p), was: p.was, d: p.d }; });
+  expect(m.L).toBe('さ');
+  expect(m.was).toBe('さ');
+  expect(m.d).not.toBe('さ→ち'); // 戻した札に ち のときの道すじが残らない
+});
