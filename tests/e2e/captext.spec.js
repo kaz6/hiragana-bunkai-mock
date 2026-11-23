@@ -31,6 +31,7 @@ for (const [locale, rx] of [['ja-JP', /相手のカゴが(\d+)こをこえたら
       expect(t.guideJa).toContain('14こ'); expect(t.guideEn).toContain('Over 14 in theirs');
       expect(t.note).toContain('14こ のときは割れない');
       expect(t.rim).toContain('14');
+      expect(t.g3).toContain('14');
       for (const s of [t.how, t.g3, t.guideJa, t.guideEn, t.note, t.rim]) expect(s).not.toMatch(/(^|\D)12(\D|$)/);
     });
     test('rules.js の cap を 9 にして開くと、全部の文が 9 になる', async ({ page }, info) => {
