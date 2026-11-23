@@ -496,7 +496,7 @@ small.en.b{display:block;margin-left:0}
     <div>
       <h3>きまり<small class="en" lang="en">Rules</small></h3>
       <p>リストに出た言葉は、二人とも二度と投げられない。</p>
-      <p>字は自分では引けない。カゴが 2こ以下になって 5秒たつと、3こになるまで落ちてくる（二人とも）。12こ のときは割れない。</p>
+      <p>字は自分では引けない。カゴが 2こ以下になって 5秒たつと、3こになるまで落ちてくる（二人とも）。<span id="capNote">14</span>こ のときは割れない。</p>
       <p>作り替えた字（割った・回した・裏返した・くっつけた字）が入った言葉を投げると声が出る。言葉の字それぞれの道すじにある作り替えの回数（「→」の数）を合わせて、1で<span data-combo="1"></span>★、2〜3で<span data-combo="2"></span>★★、4以上で<span data-combo="3"></span>★★★。リストにも★が残り（二人とも）、終わったら二人それぞれの★がいちばん多い言葉が「今日の一語」に出る。元の字からの道すじ（例：し→つ　は→よ　（は→｜）＋し→い）つき。どれも見た目だけで、勝ち負けには関わらない。</p>
     </div>
 
@@ -546,7 +546,8 @@ small.en.b{display:block;margin-left:0}
    端末に覚えた設定（hb.cap）は読まない。ふたりでも同じ値（合図の cap は送るが、受けるときはこの値を使う） */
 const CAP_FIXED=(()=>{ const v=window.HB_RULES&&window.HB_RULES.cap; return Number.isInteger(v)&&v>0?v:14; })();
 let CAP=CAP_FIXED;
-{ const r=document.getElementById('rim'); if(r) r.innerHTML=`<span>ここまで ${CAP_FIXED}こ<small class="en" lang="en">Limit ${CAP_FIXED}</small></span>`; } /* カゴの線の文も上限から作る（数字だけ。HB-066）。韓国語は lang-ko.js の ここまで N こ の型が読む */
+{ const cn=document.getElementById('capNote'); if(cn) cn.textContent=CAP_FIXED; /* 遊び方の「割れない」の文の数も上限から（HB-068） */
+  const r=document.getElementById('rim'); if(r) r.innerHTML=`<span>ここまで ${CAP_FIXED}こ<small class="en" lang="en">Limit ${CAP_FIXED}</small></span>`; } /* カゴの線の文も上限から作る（数字だけ。HB-066）。韓国語は lang-ko.js の ここまで N こ の型が読む */
 const START=5, START_PART='｜'; // 最初の手は START 枚（うち1枚は START_PART。D-034）
 // 字。後ろの16字は濁音・半濁音（HB-013, D-037）。袋（BAG）には入れない＝作るか、相手から届くだけ
 // （tools/build_meanings.py がこの行をそのまま読むので、書き方を変えないこと）
@@ -995,6 +996,8 @@ function renderMeanSet(){ document.querySelectorAll('#meanSet button').forEach(b
    英語は <small class="en"> として日本語の文のあとに付いている。日本語の文（その前の兄弟）を span.jp で包み、English・한국어 のときは .jp を消して英語を主にする。
    動きで作り直される所も多いので、MutationObserver で足された small.en を包む。한국어の表（KO_FIX・KO_PAT。日本語の文を鍵にする。しくみの図の英語の一言は KO_DG。lang-ko.js。HB-058）。表に無い文は English */
 const KO_FIX=(window.HB_KO&&window.HB_KO.FIX)||{}, KO_PAT=(window.HB_KO&&window.HB_KO.PAT)||[], KO_DG=(window.HB_KO&&window.HB_KO.DG)||[]; // 表は lang-ko.js（HB-058）
+/* 数の入る文（HB-068）：lang-ko.js の鍵と訳に {cap} と書いてあるものは、上限の数に直した形も足す（画面の日本語の文は数が入った形で引かれるため） */
+for(const k of Object.keys(KO_FIX)){ if(k.includes('{cap}')) KO_FIX[k.split('{cap}').join(CAP_FIXED)]=KO_FIX[k].split('{cap}').join(CAP_FIXED); }
 function koOf(jp){ if(!jp) return ''; if(KO_FIX[jp]) return KO_FIX[jp]; for(const [re,f] of KO_PAT){ const m=String(jp).match(re); if(m) return f(m); } return ''; }
 function wrapJp(root){ if(!root||root.nodeType!==1) return;
   const list=[...(root.matches('small.en')?[root]:[]),...root.querySelectorAll('small.en')];
@@ -1423,10 +1426,10 @@ function render(){ refill(); renderOpp(); renderLog(); renderBasket(); renderCon
    吹き出しはタップを下に通し（pointer-events:none）、どこかを押すと消える（押した操作もそのまま効く）。
    見たかどうかは localStorage の hb.guide（'done'）。保存が使えなければ毎回出る */
 const GUIDE_KEY='hb.guide';
-const GUIDE_EN={1:'Tap a tile to pick it',2:'Line them up to make a word. “Throw” sends it to their basket',3:'Over 12 in theirs: you win. Over 12 in yours: you lose',4:'Rotate this bar to make ー, or join it to make a new letter',5:'Look here to see it again!'}; // 案内の英語（HB-015, D-042。仮の訳）
-const GUIDE_TEXT={1:'札をタップして選ぶ',2:'順に並べると言葉。『投げる』で相手のカゴへ',3:'相手のカゴが12こをこえたら勝ち。自分のがこえたら負け',4:'この棒は、回すと ー、ほかの字とくっつけると別の字になる',5:'次見たかったらここ見て！'};
+const GUIDE_EN={1:'Tap a tile to pick it',2:'Line them up to make a word. “Throw” sends it to their basket',3:`Over ${CAP_FIXED} in theirs: you win. Over ${CAP_FIXED} in yours: you lose`,4:'Rotate this bar to make ー, or join it to make a new letter',5:'Look here to see it again!'}; // 案内の英語（HB-015, D-042。仮の訳）
+const GUIDE_TEXT={1:'札をタップして選ぶ',2:'順に並べると言葉。『投げる』で相手のカゴへ',3:`相手のカゴが${CAP_FIXED}こをこえたら勝ち。自分のがこえたら負け`,4:'この棒は、回すと ー、ほかの字とくっつけると別の字になる',5:'次見たかったらここ見て！'};
 /* 最初に見せる3行（HB-025, D-057。作者の確定した文言）。案内の最初のカード（'r'）と「？ 遊び方」のいちばん上の両方がここから読む */
-const RULES3=[['相手のカゴが12こをこえたら勝ち。自分のカゴがこえたら負け。','Their basket goes over 12: you win. Yours does: you lose.'],
+const RULES3=[[`相手のカゴが${CAP_FIXED}こをこえたら勝ち。自分のカゴがこえたら負け。`,`Their basket goes over ${CAP_FIXED}: you win. Yours does: you lose.`],
   ['札を並べて言葉を作り、「投げる」で相手のカゴへ送る。','Line up tiles to make a word, then Throw it into their basket.'],
   ['字は「割る・回す・裏返す・くっつける」で別の字に変えられる。','Split, rotate, flip, or join tiles to make new letters.']];
 const rulesHTML=()=>RULES3.map(([jp,en])=>`<li>${escH(jp)}${enTag(en,1)}</li>`).join('');
@@ -1826,6 +1829,7 @@ function onOpponentThrow(row){ if(!S||S.over||S.ending) return;
 function onOpponentLost(){ if(!S||S.over||S.ending) return; finish('win'); }
 
 /* 自動テストの窓（HB-035）。テストがページを開く前に window.HB_TEST={} を置いたときだけ、中の表と関数を渡す。ふだんの遊びでは何もしない */
+if(window.HB_TEST&&typeof window.HB_TEST==='object') Object.assign(window.HB_TEST,{guideShow,GUIDE_TEXT,GUIDE_EN}); // 案内の文（HB-068）
 if(window.HB_TEST&&typeof window.HB_TEST==='object') Object.defineProperty(window.HB_TEST,'CAP',{get:()=>CAP,configurable:true}); // 一戦ごとに変わるので値でなく読む（HB-048）
 if(window.HB_TEST&&typeof window.HB_TEST==='object') Object.assign(window.HB_TEST,{TODOME,FX,NET,onStartMessage,KANA,PARTS,RECIPE,MERGE,MERGE_TURN,TURN,BAG,logText,makeToday,seedRng,TODAY:()=>TODAY,HAND,DICT,SPEEDS,key,
   words:()=>WORDS, S:()=>S, mk,letterOf,checkSel,splitMade,mergeMade,comboOf,cpuOk,tapTile,doSplit,doMerge,doTurn,doThrow,render,newGame,TUT,TUT_SEQ,tutDone,startSolo,cpuAct,cpuThrow,setSpeed,showMeaning,SCENE_OF,exchangeCands,VOTE_TEXT,ALIAS,turnShortcuts,mergeTurnBacks,stepsOf,hintFind,hintPress,HINT:()=>HINT,HINT_TEXT,cpuApply,TURN_NOT_CPU,pressAgain,onAgainMessage,onPartnerLeft,onLobbyPresence,againUi,leaveOnline});

@@ -34,7 +34,7 @@ test('「？ 遊び方」が開いて、ルールの3行がある。とじるで
   await page.click('#btnHow');
   await expect(page.locator('#sheet')).toBeVisible();
   await expect(page.locator('#rulesHow li')).toHaveCount(3);
-  await expect(page.locator('#rulesHow')).toContainText('相手のカゴが12こをこえたら勝ち');
+  await expect(page.locator('#rulesHow')).toContainText('相手のカゴが14こをこえたら勝ち');
   await expect(page.locator('#recipes')).toContainText('と ＝ ｜ ＋ ⊂'); // 作り方の一覧は RECIPE から（D-069）
   await page.click('#btnClose');
   await expect(page.locator('#sheet')).toBeHidden();
