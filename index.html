@@ -714,6 +714,8 @@ function norm(p){ const s=SYMM[p.root];
   if(s==='full'){p.r=0;p.f=0} else if(s==='half'){p.f=0;p.r%=2} else if(s==='axis'&&p.f){p.r=(p.r+2)%4;p.f=0}
   else if(s==='iri'){ p.r%=2; if(p.r===1) p.f=0; } /* い・り・こ（HB-037, D-072）：180度回すと同じ。い⇄り は裏返し。こ は裏返しても こ（回すと い） */ }
 function letterOf(p){ const al=ALIAS[p.root]||[[p.root,0,0]]; const a=al.find(a=>a[1]===p.r&&a[2]===p.f); return a?a[0]:null; }
+/* 割るときの字（HB-069, D-098・答え）：字になっている向きはその字。向きずれ（letterOf が null）の札は、最後に見えていた字（p.was）に割り方があればその字として割る（もとの字 p.root では割らない）。出る部品はふつうの向き。CPU は向きずれの札を持たないので使わない */
+function splitLetter(p){ const L=letterOf(p); if(L) return L; return RECIPE[p.was]?p.was:null; } /* ん は was が ん（割り方なし）なので割れない */
 function view(p){ const al=ALIAS[p.root]||[[p.root,0,0]];
   let a=al.find(a=>a[1]===p.r&&a[2]===p.f); let v;
   if(a) v={g:a[0],rot:0,flip:0};
@@ -823,12 +825,12 @@ function fxMerge(ghosts,n){ if(reduced||!ghosts.length) return; const el=els.get
   ghosts.forEach(g=>{ basket.appendChild(g); void g.offsetWidth; g.style.transition=`transform ${FX.pullMs}ms ease-in,opacity ${FX.pullMs}ms ease-in`; g.style.transform=`translate(${n.x}px,${n.y}px)`; g.style.opacity='.9'; setTimeout(()=>g.remove(),FX.pullMs+30); });
   el.style.setProperty('--fx-pull',FX.pullMs+'ms'); el.style.setProperty('--fx-snap',FX.snapMs+'ms');
   el.classList.remove('snap'); void el.offsetWidth; el.classList.add('snap'); setTimeout(()=>el.classList.remove('snap'),FX.pullMs+FX.snapMs+40); }
-function doSplit(){ const ps0=selPieces(); const p=ps0[ps0.length-1]; if(!p||locked()) return; /* 割るのは選んだ最後の1枚（HB-034, D-070） */ const L=letterOf(p); const parts=RECIPE[L]; if(!parts||S.mine.length>=CAP) return; if(TUT.on&&!tutOk('split')) return;
+function doSplit(){ const ps0=selPieces(); const p=ps0[ps0.length-1]; if(!p||locked()) return; /* 割るのは選んだ最後の1枚（HB-034, D-070） */ const L=splitLetter(p); const parts=RECIPE[L]; if(!parts||S.mine.length>=CAP) return; if(TUT.on&&!tutOk('split')) return; const skew=!letterOf(p);
   begin(); S.busy=true; const el=els.get(p.id); if(el){ el.classList.add('crack'); fxSplit(el,p); }
   setTimeout(()=>{ S.busy=false; if(S.over||S.ending){ render(); return; } // 動きの間に勝ち負けが決まったら、割らない（D-054）
     const i=S.mine.indexOf(p);
     const made=splitMade(p,L,parts,{spawn:{x:p.x,y:p.y}}); // 戻すだけの往復は数えない（D-067）
-    S.mine.splice(i,1,...made); S.sel=S.sel.filter(id=>id!==p.id); /* 割った2つは選ばない。前に選んだ札はそのまま（D-070） */ lg('me',`割る ${L}→${parts.join('＋')}`); tutAdvance('split'); render(); }, reduced?0:FX.splitMs); }
+    S.mine.splice(i,1,...made); S.sel=S.sel.filter(id=>id!==p.id); /* 割った2つは選ばない。前に選んだ札はそのまま（D-070） */ lg('me',skew?`割る ${L}（向きずれ）→${parts.join('＋')}`:`割る ${L}→${parts.join('＋')}`); tutAdvance('split'); render(); }, reduced?0:FX.splitMs); }
 
 function doTurn(kind){ const ps0=selPieces(); const p=ps0[ps0.length-1]; if(!p||locked()) return; if(TUT.on&&!tutOk(kind==='回す'?'turn':'flip')) return; begin(); const before=letterOf(p)||'〓';
   const el=els.get(p.id), g=el&&el.querySelector('.g');
@@ -854,7 +856,7 @@ function joinD(a,b,r){ return `${wrapD(a)}＋${wrapD(b)}→${r}`; }
    割って出た2枚をくっつけて割る前の字に戻ったら、割る前の札（道すじ・元の字・印）に戻す。
    くっつけてできた札を割って、くっつける前の2枚と同じ字が出たら、その2枚（道すじ・元の字・印）に戻す。
    字は操作する時点のもので比べる（途中で回しても、そのとき元の組に戻っていればよい） */
-const snapP=p=>({L:letterOf(p),d:p.d,d0:p.d0,orig:p.orig,was:p.was,base:p.base,note:p.note,sp:p.sp,jn:p.jn});
+const snapP=p=>({L:(letterOf(p)||p.was),d:p.d,d0:p.d0,orig:p.orig,was:p.was,base:p.base,note:p.note,sp:p.sp,jn:p.jn});
 const restoreP=(n,x)=>Object.assign(n,{d:x.d,d0:x.d0,orig:x.orig,was:x.was,base:x.base,note:x.note,sp:x.sp,jn:x.jn});
 function splitMade(p,L,parts,o){ const j=p.jn;
   if(j&&parts.slice().sort().join()===[j[0].L,j[1].L].sort().join()){ const rest=j.slice(); // くっつける前の2枚に戻す
@@ -1384,7 +1386,7 @@ function renderControls(){ const over=!!S.over; $('controls').hidden=over; $('re
         const long=l&&l!==b?`<div class="best long ${who}"><span class="lb">${label}のいちばん長い言葉${enTag(`${W} longest word`)}</span>${word(l.word)}<span class="len">${[...l.word].length}字</span>${l.k?`<span class="st">${'★'.repeat(starsOf(l.k))}</span>`:''}${mean(l.word)}</div>`:'';
         return `<div class="bests">${best}${long}</div>`; };
       $('resBest').innerHTML=card('me','あなた')+card('op','あいて'); } renderVotes(); renderHintFound(); $('logText').value=logText(); return; }
-  const c=checkSel(), ps=selPieces(), p=ps.length?ps[ps.length-1]:null, L=p&&letterOf(p); // 割るは選んだ最後の1枚（D-070）
+  const c=checkSel(), ps=selPieces(), p=ps.length?ps[ps.length-1]:null, L=p&&splitLetter(p); // 割るは選んだ最後の1枚（D-070）
   { const logEl=$('log'), hitW=(c.msg&&c.msg.startsWith('もうリストに出た言葉'))?c.text:'';
     logEl.querySelectorAll('.row').forEach(e=>{ const on=!!hitW&&e.dataset.w===hitW; if(on&&!e.classList.contains('hit')){ e.classList.add('hit'); try{ e.scrollIntoView({block:'nearest',behavior:reduced?'auto':'smooth'}); }catch(_){} } else if(!on) e.classList.remove('hit'); }); }
   if(c.msg==='ことばの表にない'&&!TUT.on) sendReject(c.text); // チュートリアルの途中の並びは rejects に送らない
