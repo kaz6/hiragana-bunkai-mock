@@ -133,17 +133,42 @@ test('割れない字 ん の向きずれは、もとの字 て としては割�
   expect((await state(page)).canSplit).toBe(false);
 });
 
-test('さ→裏返して ち→回して向きずれ→割る→くっつけ直しても、さ の札の道すじ・印は ち のまま残らない（root と見えた字が違う札）', async ({ page }) => {
+test('さ を裏返した ち を回して向きずれ→割る→ち の割り方（つ＋十）。そのままくっつけ直すと ち に戻り、★は割る前と同じ（答え：最後に見えていた字 p.was で割る）', async ({ page }) => {
   await setBasket(page, ['さ', 'よ']);
   await tapTiles(page, [0]);
   await press(page, '#aFlip'); // ち
+  const before = await page.evaluate(() => { const T = window.HB_TEST, p = T.S().mine[0]; return { L: T.letterOf(p), k: T.comboOf([p]), d: p.d }; });
+  expect(before.L).toBe('ち');
   await press(page, '#aRot');  // 向きずれ
-  await press(page, '#aSplit'); // さ として 十＋⊂
-  expect((await state(page)).mine).toBe('十⊂よ');
+  expect(await page.evaluate(() => window.HB_TEST.letterOf(window.HB_TEST.S().mine[0]))).toBe(null);
+  await press(page, '#aSplit'); // ち として つ＋十
+  expect(await page.evaluate(() => [...window.HB_TEST.S().mine.slice(0, 2).map(p => window.HB_TEST.letterOf(p))].sort().join(''))).toBe(['つ', '十'].sort().join(''));
+  expect((await state(page)).mine.endsWith('よ')).toBe(true);
   await tapTiles(page, [0, 1]);
   await press(page, '#aMerge');
-  const m = await page.evaluate(() => { const T = window.HB_TEST, p = T.S().mine[0]; return { L: T.letterOf(p), was: p.was, d: p.d }; });
-  expect(m.L).toBe('さ');
-  expect(m.was).toBe('さ');
-  expect(m.d).not.toBe('さ→ち'); // 戻した札に ち のときの道すじが残らない
+  const m = await page.evaluate(() => { const T = window.HB_TEST, p = T.S().mine[0]; return { L: T.letterOf(p), was: p.was, k: T.comboOf([p]), d: p.d }; });
+  expect(m.L).toBe('ち');
+  expect(m.was).toBe('ち');
+  expect(m.k).toBe(before.k); // ★は割る前と同じ
+  expect(m.d).toBe(before.d); // 道すじも割る前のまま
+});
+
+test('べ・づ・ぢ の向きずれも、見えていた字で割って戻すと ★ が増えない・割れる字だけ', async ({ page }) => {
+  let n = 0;
+  for (const g of ['べ', 'づ', 'ぢ']) {
+    await setBasket(page, [g, 'よ']);
+    await tapTiles(page, [0]);
+    const k0 = await page.evaluate(() => { const T = window.HB_TEST; return T.comboOf([T.S().mine[0]]); });
+    await press(page, '#aRot');
+    const skew = await page.evaluate(() => window.HB_TEST.letterOf(window.HB_TEST.S().mine[0]));
+    if (skew !== null) continue; // 回して字になる字はいまどおり（この検査の対象外）
+    await press(page, '#aSplit');
+    await tapTiles(page, [0, 1]);
+    await press(page, '#aMerge');
+    const m = await page.evaluate(() => { const T = window.HB_TEST, p = T.S().mine[0]; return { L: T.letterOf(p), k: T.comboOf([p]) }; });
+    expect(m.L, g).toBe(g);
+    expect(m.k, g).toBe(k0);
+    n++;
+  }
+  expect(n).toBeGreaterThan(0); // 少なくとも1字は向きずれから割って戻した
 });
