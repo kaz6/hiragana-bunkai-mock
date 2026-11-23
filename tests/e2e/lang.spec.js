@@ -42,13 +42,13 @@ test.describe('en-US：English が主。日本語の画面の文は出ない（�
     expect(await page.locator('.top h1').innerText()).toContain('ひらがな分解');
     expect(await noOverflow(page)).toBe(true);
   });
-  test('声：あいさつ返しが English で出る（日本語の文は出ない）', async ({ page }, info) => {
+  test('声：あいさつ！が English で出る（日本語の文は出ない）', async ({ page }, info) => {
     info.ctx = await openGame(page);
     await startSolo(page, 'ゆるゆる');
     await page.evaluate(() => { const T = window.HB_TEST; T.showMeaning('よろしく', 'op'); T.showMeaning('よろしこ', 'me'); });
     const v = await page.evaluate(() => document.getElementById('combo').innerText); // 英語を包む処理は MutationObserver（次の瞬間）
-    expect(v).toContain('Greeting back!');
-    expect(v).not.toContain('あいさつ返し！');
+    expect(v).toContain('Greeting!');
+    expect(v).not.toContain('あいさつ！');
   });
 });
 
@@ -74,7 +74,7 @@ test.describe('ko-KR：한국어が主。表に無い文は English（HB-058）'
     info.ctx = await openGame(page);
     await startSolo(page, 'ゆるゆる');
     await page.evaluate(() => { const T = window.HB_TEST; T.showMeaning('よろしく', 'op'); T.showMeaning('よろしこ', 'me'); });
-    expect(await page.evaluate(() => document.getElementById('combo').innerText)).toContain('인사로 답례!');
+    expect(await page.evaluate(() => document.getElementById('combo').innerText)).toContain('인사!');
     await page.click('#btnHelp');
     const dg = await page.locator('#diagram .dg-en').allInnerTexts();
     expect(dg).toContain('쪼개기');
