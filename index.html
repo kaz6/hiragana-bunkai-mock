@@ -686,7 +686,7 @@ const bigForm=w=>String(w).normalize('NFC').replace(/[ぁぃぅぇぉっゃゅ�
 const CPU_NG=new Set((window.HB_CPU_NG||[]).map(bigForm));
 const cpuOk=w=>!CPU_NG.has(bigForm(w));
 /* つよい のトドメの一言の語（HB-064, D-096）。一覧は cpu-todome.js。辞書と同じ形に直す。辞書にある語・CPU が投げてよい語だけ使う */
-const TODOME=[...new Set((window.HB_TODOME||[]).map(bigForm))].filter(w=>DICT.has(w)&&cpuOk(w));
+const TODOME_SRC=window.HB_TODOME, TODOME=[...new Set((Array.isArray(TODOME_SRC)?TODOME_SRC:((TODOME_SRC&&TODOME_SRC['つよい'])||[])).map(bigForm))].filter(w=>DICT.has(w)&&cpuOk(w)); // 相手ごとの一覧（HB-067）。いまは つよい の一覧だけ。前の形（配列）も読める
 const SPECIAL=new Set(['ち∘']); // 部品を含む特別な言葉。作品名『チ。』（作者 2026-11-19）。リストでは ∘ を「。」として見せる
 // ふつう（Hard）は ゆっくり と同じ間隔で、そのかわり賢く動く（smart。HB-017, D-045）。ゆるゆる〜ゆっくりは今のまま
 // つよい（Very hard）は作者向けの5段目。ふつうの賢さに2手先・守り・決め手を足し、約4秒ごとに動く（deep。HB-022, D-051）
