@@ -59,3 +59,68 @@ test('途中でも、い＋一 は せ になる（う・い・一 → う・せ
   await expect(page.locator('#trayPick')).toBeHidden();
   expect((await state(page)).sel).toBe('うせ');
 });
+
+// 向きずれの札も、もとの字として割れる（HB-069, D-098）
+test('向きずれの札（に を1回回した）を割ると、ふつうの向きの ｜＋こ。割るも押せる', async ({ page }) => {
+  await setBasket(page, ['に', 'よ']);
+  await tapTiles(page, [0]);
+  await press(page, '#aRot');
+  expect(await page.evaluate(() => window.HB_TEST.letterOf(window.HB_TEST.S().mine[0]))).toBe(null); // 黄色い札
+  expect((await state(page)).canSplit).toBe(true);
+  await press(page, '#aSplit');
+  const s = await state(page);
+  expect(s.mine).toBe('｜こよ'); // 出た札は字（ふつうの向き）
+  const log = await page.evaluate(() => window.HB_TEST.logText());
+  expect(log).toContain('割る に（向きずれ）→｜＋こ');
+});
+
+test('向きずれから割った★：回しただけでは付かず、割ったぶん（1）だけ。割って戻すと0', async ({ page }) => {
+  await setBasket(page, ['に', 'よ']);
+  await tapTiles(page, [0]);
+  await press(page, '#aRot');
+  expect(await page.evaluate(() => window.HB_TEST.comboOf([window.HB_TEST.S().mine[0]]))).toBe(0); // 回しただけ
+  await press(page, '#aSplit');
+  expect(await page.evaluate(() => window.HB_TEST.S().mine.slice(0, 2).map(p => window.HB_TEST.comboOf([p])))).toEqual([1, 1]);
+  await tapTiles(page, [0, 1]);
+  await press(page, '#aMerge'); // ｜＋こ→に（ふつうの向き）
+  const m = await page.evaluate(() => { const T = window.HB_TEST, p = T.S().mine[0]; return { L: T.letterOf(p), k: T.comboOf([p]) }; });
+  expect(m).toEqual({ L: 'に', k: 0 }); // 戻すだけの往復は数えない（D-067）
+});
+
+test('い を回した こ は いまどおり 一＋一（向きずれではない）', async ({ page }) => {
+  await setBasket(page, ['い', 'よ']);
+  await tapTiles(page, [0]);
+  await press(page, '#aRot');
+  expect((await state(page)).mine).toBe('こよ');
+  await press(page, '#aSplit');
+  expect((await state(page)).mine).toBe('一一よ');
+});
+
+test('う＋｜ でできた向きずれの か を割ると う＋｜（くっつける前の札に戻る・★0）', async ({ page }) => {
+  await setBasket(page, ['う', '｜', 'よ']);
+  await tapTiles(page, [0, 1]);
+  await press(page, '#aMerge');
+  const k = await page.evaluate(() => { const T = window.HB_TEST, p = T.S().mine[0]; return { L: T.letterOf(p), r: p.r, f: p.f }; });
+  expect(k).toEqual({ L: null, r: 1, f: 1 }); // 向きずれの か
+  expect((await state(page)).canSplit).toBe(true);
+  await press(page, '#aSplit');
+  expect((await state(page)).mine).toBe('う｜よ');
+  expect(await page.evaluate(() => window.HB_TEST.S().mine.slice(0, 2).map(p => window.HB_TEST.comboOf([p])))).toEqual([0, 0]);
+});
+
+test('割り方のない字（く）の向きずれは割れない', async ({ page }) => {
+  await setBasket(page, ['く', 'よ']);
+  await tapTiles(page, [0]);
+  await press(page, '#aRot'); // へ
+  await press(page, '#aRot'); // ＞（部品）
+  await press(page, '#aRot'); // 黄色い札
+  expect(await page.evaluate(() => window.HB_TEST.letterOf(window.HB_TEST.S().mine[0]))).toBe(null);
+  expect((await state(page)).canSplit).toBe(false);
+});
+
+test('上限いっぱいのときは、向きずれの札も割れない（いまどおり）', async ({ page }) => {
+  await setBasket(page, ['に', ...Array(13).fill('よ')]);
+  await tapTiles(page, [0]);
+  await press(page, '#aRot');
+  expect((await state(page)).canSplit).toBe(false);
+});
