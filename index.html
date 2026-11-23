@@ -534,6 +534,7 @@ small.en.b{display:block;margin-left:0}
 <script src="meanings-author.js"></script>
 <script src="scenes.js"></script>
 <script src="cpu-ng.js"></script>
+<script src="cpu-todome.js"></script>
 <script src="nice-words.js"></script>
 <script src="scene-groups.js"></script>
 <script src="lang-ko.js"></script>
@@ -684,6 +685,8 @@ const DICT=new Set(WORDS);
 const bigForm=w=>String(w).normalize('NFC').replace(/[ぁぃぅぇぉっゃゅょゎ]/g,c=>String.fromCharCode(c.charCodeAt(0)+1));
 const CPU_NG=new Set((window.HB_CPU_NG||[]).map(bigForm));
 const cpuOk=w=>!CPU_NG.has(bigForm(w));
+/* つよい のトドメの一言の語（HB-064, D-096）。一覧は cpu-todome.js。辞書と同じ形に直す。辞書にある語・CPU が投げてよい語だけ使う */
+const TODOME=[...new Set((window.HB_TODOME||[]).map(bigForm))].filter(w=>DICT.has(w)&&cpuOk(w));
 const SPECIAL=new Set(['ち∘']); // 部品を含む特別な言葉。作品名『チ。』（作者 2026-11-19）。リストでは ∘ を「。」として見せる
 // ふつう（Hard）は ゆっくり と同じ間隔で、そのかわり賢く動く（smart。HB-017, D-045）。ゆるゆる〜ゆっくりは今のまま
 // つよい（Very hard）は作者向けの5段目。ふつうの賢さに2手先・守り・決め手を足し、約4秒ごとに動く（deep。HB-022, D-051）
@@ -1153,6 +1156,10 @@ function topAbove(letters,th){ const T=strongList(), idx=T.idx, pool={}, pm=[0,0
     const need={}; let ok=true; for(const c of x.cs){ need[c]=(need[c]||0)+1; if(need[c]>(pool[c]||0)){ ok=false; break; } }
     if(ok&&!(once&&S.used.has(x.w))) return x; }
   return null; }
+/* トドメの一言：letters で作れて、まだリストに出ていない語（cpu-todome.js）からランダムに1つ（なければ null） */
+function todomeOf(letters){ const pool={}; letters.forEach(l=>{ if(!l) return; const c=asWord(l); pool[c]=(pool[c]||0)+1; });
+  const ok=TODOME.filter(w=>{ if(once&&S.used.has(w)) return false; const need={}; for(const c of w){ need[c]=(need[c]||0)+1; if(need[c]>(pool[c]||0)) return false; } return true; });
+  return ok.length?pick(ok):null; }
 /* いちばん長い言葉（同じ長さは点数の高い方、それも同じならランダム） */
 function longBest(letters){ const pool={}; let len=0; letters.forEach(l=>{ if(!l) return; const c=asWord(l); pool[c]=(pool[c]||0)+1; len++; });
   let top=[], tl=0, ts=0;
@@ -1178,8 +1185,10 @@ function strongMove(t0){ const L=S.opp.map(letterOf), now=smartBest(L); oppMemo(
   const must=S.oppThrowNext; S.oppThrowNext=false;
   if(now&&must){ cpuThrow(now.w); return; }
   const kill=S.mine.length>=STRONG_KILL;
-  if(S.opp.length>=STRONG_GUARD){ const lw=longBest(L); if(lw){ cpuThrow(lw.w, kill?'守り・決め手':'守り'); return; } }
-  if(now&&kill){ cpuThrow(now.w,'決め手'); return; }
+  /* トドメの一言（HB-064, D-096）：この一投でこちらのカゴが CAP を超えるなら、cpu-todome.js の語で作れるものを先に投げる（複数ならランダム） */
+  const todome=w=>{ if(S.mine.length+[...w].length<=CAP) return false; const t=todomeOf(L); if(!t) return false; cpuThrow(t,'トドメ'); return true; };
+  if(S.opp.length>=STRONG_GUARD){ const lw=longBest(L); if(lw){ if(todome(lw.w)) return; cpuThrow(lw.w, kill?'守り・決め手':'守り'); return; } }
+  if(now&&kill){ if(todome(now.w)) return; cpuThrow(now.w,'決め手'); return; }
   const heavy=S.opp.length>=SMART_SPLIT_AT;
   const go=(st,tag)=>{ if(heavy&&st.t==='split') S.oppThrowNext=true; cpuApply(st,tag); };
   const all=cpuSteps(); all.forEach(st=>{ st.top=topAbove(st.res,0); }); // 1手先の点数（ふつう の smartBest と同じ最高点。ビットでふるって速くした）
@@ -1816,7 +1825,7 @@ function onOpponentLost(){ if(!S||S.over||S.ending) return; finish('win'); }
 
 /* 自動テストの窓（HB-035）。テストがページを開く前に window.HB_TEST={} を置いたときだけ、中の表と関数を渡す。ふだんの遊びでは何もしない */
 if(window.HB_TEST&&typeof window.HB_TEST==='object') Object.defineProperty(window.HB_TEST,'CAP',{get:()=>CAP,configurable:true}); // 一戦ごとに変わるので値でなく読む（HB-048）
-if(window.HB_TEST&&typeof window.HB_TEST==='object') Object.assign(window.HB_TEST,{FX,NET,onStartMessage,KANA,PARTS,RECIPE,MERGE,MERGE_TURN,TURN,BAG,logText,makeToday,seedRng,TODAY:()=>TODAY,HAND,DICT,SPEEDS,key,
+if(window.HB_TEST&&typeof window.HB_TEST==='object') Object.assign(window.HB_TEST,{TODOME,FX,NET,onStartMessage,KANA,PARTS,RECIPE,MERGE,MERGE_TURN,TURN,BAG,logText,makeToday,seedRng,TODAY:()=>TODAY,HAND,DICT,SPEEDS,key,
   words:()=>WORDS, S:()=>S, mk,letterOf,checkSel,splitMade,mergeMade,comboOf,cpuOk,tapTile,doSplit,doMerge,doTurn,doThrow,render,newGame,TUT,TUT_SEQ,tutDone,startSolo,cpuAct,cpuThrow,setSpeed,showMeaning,SCENE_OF,exchangeCands,VOTE_TEXT,ALIAS,turnShortcuts,mergeTurnBacks,stepsOf,hintFind,hintPress,HINT:()=>HINT,HINT_TEXT,cpuApply,TURN_NOT_CPU,pressAgain,onAgainMessage,onPartnerLeft,onLobbyPresence,againUi,leaveOnline});
 
 newGame();
