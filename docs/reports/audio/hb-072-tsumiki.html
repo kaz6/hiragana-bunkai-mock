@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>積み木の音 試聴（HB-072・仮）</title>
+<style>
+:root{--bg:#E4ECEA;--field:#D2DEDB;--ink:#1B2A36;--sub:#52646C;--on:#1B2A36}
+@media (prefers-color-scheme:dark){:root{--bg:#141C23;--field:#1D2832;--ink:#E6EDEE;--sub:#96A7AD;--on:#E6EDEE}}
+*{box-sizing:border-box}
+body{margin:0;padding:16px 14px 40px;background:var(--bg);color:var(--ink);font:500 15px/1.55 -apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif;-webkit-tap-highlight-color:transparent}
+h1{font-size:18px;margin:0 0 4px}
+p.note{margin:0 0 14px;color:var(--sub);font-size:13px}
+section{background:var(--field);border-radius:12px;padding:10px 12px 12px;margin:0 0 10px}
+h2{font-size:16px;margin:0 0 2px}
+.how{color:var(--sub);font-size:12px;margin:0 0 8px}
+.row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+button{font:inherit;font-weight:700;border:2px solid var(--ink);background:transparent;color:var(--ink);border-radius:10px;padding:12px 4px;min-height:54px;touch-action:manipulation}
+button small{display:block;font-weight:500;font-size:11px;color:var(--sub)}
+button:active{background:var(--ink);color:var(--bg)}
+button:active small{color:var(--bg)}
+.opts{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;font-size:14px}
+.opts label{display:flex;gap:6px;align-items:center}
+.hap{position:absolute;left:-9999px;opacity:0}
+</style>
+</head>
+<body>
+<h1>積み木の音 試聴（仮）</h1>
+<p class="note">ひらがな分解（仮）の手触りの候補。音はすべてこのページの中で作っている（録音・素材なし）。A・B・C は木の大きさの違い。ゲームにはまだ入れていない。iPhone は消音スイッチがオンだと鳴らないことがある。</p>
+
+<section>
+  <h2>ふるえ（バイブ）</h2>
+  <p class="how">音のボタンを押したときに、いっしょに震わせる。Android は長さが選べる。iPhone は長さを選べず、軽い1回だけ（iOS 18 以降）。</p>
+  <div class="opts" id="vibOpts">
+    <label><input type="radio" name="vib" value="0"> なし</label>
+    <label><input type="radio" name="vib" value="8" checked> ごく短い</label>
+    <label><input type="radio" name="vib" value="15"> 短い</label>
+    <label><input type="radio" name="vib" value="28"> ふつう</label>
+  </div>
+</section>
+
+<div id="events"></div>
+
+<section>
+  <h2>ひと続き</h2>
+  <p class="how">割る→回す→くっつける→投げる を、遊んでいるくらいの間で続けて鳴らす。</p>
+  <div class="row" id="seq"></div>
+</section>
+
+<label class="hap" aria-hidden="true"><input type="checkbox" switch id="hapSwitch" tabindex="-1"></label>
+
+<script>
+(function(){
+// ── 音の中身（データ）。ゲームに入れるときはこの表をそのまま持っていく ──
+// 木の音色：f＝いちばん下の音の高さ(Hz)、decay＝鳴りの長さ(秒)、parts＝[倍率, 大きさ, 長さの倍率]、
+// click＝打った瞬間の「コッ」（雑音を帯域で絞る）、tone＝こもらせる上限(Hz)
+var WOOD = {
+  A:{name:'A 小さい木',  sub:'高く軽い',  f:1350, decay:0.055, parts:[[1,1,1],[2.76,0.32,0.5],[5.40,0.10,0.3]], click:{f:4200,q:1.2,amp:0.22,dur:0.010}, tone:9000},
+  B:{name:'B 積み木',    sub:'まんなか',  f:880,  decay:0.085, parts:[[1,1,1],[2.76,0.28,0.5],[5.40,0.08,0.3]], click:{f:2600,q:1.4,amp:0.28,dur:0.012}, tone:6500},
+  C:{name:'C 木の箱',    sub:'低くこもる',f:500,  decay:0.130, parts:[[1,1,1],[2.30,0.22,0.6],[4.10,0.06,0.3]], click:{f:1300,q:1.6,amp:0.32,dur:0.016}, tone:3200}
+};
+// 動きごとの鳴らし方：t＝鳴らす時刻(秒)、p＝高さの倍率、g＝大きさ
+var MOVES = [
+  {key:'split', name:'割る',       how:'2つに分かれる「コン・カッ」', hits:[{t:0,p:1,g:1},{t:0.06,p:1.26,g:0.75}]},
+  {key:'turn',  name:'回す',       how:'軽く1回「コッ」',             hits:[{t:0,p:1.12,g:1}]},
+  {key:'flip',  name:'裏返す',     how:'すばやく2回「カタッ」',       hits:[{t:0,p:0.92,g:0.8},{t:0.028,p:1.10,g:0.85}]},
+  {key:'merge', name:'くっつける', how:'はまる「カチッ」',             hits:[{t:0,p:1.32,g:0.45},{t:0.034,p:0.84,g:1}]},
+  {key:'throw', name:'投げる',     how:'上がる3つ「コロコロ」',       hits:[{t:0,p:1,g:0.8},{t:0.065,p:1.19,g:0.8},{t:0.13,p:1.5,g:0.9}]}
+];
+var VOLUME = 0.6;
+
+// ── 鳴らす仕組み ──
+var ctx = null, master = null, noiseBuf = null;
+function ready(){
+  if(!ctx){
+    var AC = window.AudioContext || window.webkitAudioContext;
+    ctx = new AC();
+    var comp = ctx.createDynamicsCompressor();
+    comp.threshold.value = -10; comp.ratio.value = 6;
+    master = ctx.createGain(); master.gain.value = VOLUME;
+    master.connect(comp); comp.connect(ctx.destination);
+    noiseBuf = ctx.createBuffer(1, Math.ceil(ctx.sampleRate*0.05), ctx.sampleRate);
+    var d = noiseBuf.getChannelData(0);
+    for(var i=0;i<d.length;i++) d[i] = Math.random()*2-1;
+  }
+  if(ctx.state === 'suspended') ctx.resume();
+  return ctx;
+}
+function knock(w, at, p, g){
+  var f = w.f*p;
+  var lp = ctx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value = w.tone; lp.connect(master);
+  w.parts.forEach(function(pt){
+    var o = ctx.createOscillator(), e = ctx.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(f*pt[0]*1.06, at);
+    o.frequency.exponentialRampToValueAtTime(f*pt[0], at+0.012);
+    var len = Math.max(0.012, w.decay*pt[2]);
+    e.gain.setValueAtTime(0.0001, at);
+    e.gain.exponentialRampToValueAtTime(pt[1]*g*1.2, at+0.0015);
+    e.gain.exponentialRampToValueAtTime(0.0001, at+len);
+    o.connect(e); e.connect(lp);
+    o.start(at); o.stop(at+len+0.02);
+  });
+  var c = w.click, n = ctx.createBufferSource(), bp = ctx.createBiquadFilter(), ne = ctx.createGain();
+  n.buffer = noiseBuf; bp.type='bandpass'; bp.frequency.value = c.f*Math.sqrt(p); bp.Q.value = c.q;
+  ne.gain.setValueAtTime(c.amp*g, at);
+  ne.gain.exponentialRampToValueAtTime(0.0001, at+c.dur);
+  n.connect(bp); bp.connect(ne); ne.connect(lp);
+  n.start(at); n.stop(at+c.dur+0.01);
+}
+function play(woodKey, move, delay){
+  ready();
+  var w = WOOD[woodKey], t0 = ctx.currentTime + 0.01 + (delay||0);
+  move.hits.forEach(function(h){ knock(w, t0+h.t, h.p, h.g); });
+}
+
+// ── ふるえ ──
+var hapSwitch = document.getElementById('hapSwitch');
+function buzz(){
+  var ms = +(document.querySelector('input[name=vib]:checked')||{value:0}).value;
+  if(!ms) return;
+  if(navigator.vibrate){ navigator.vibrate(ms); return; }
+  // iPhone：switch の付いた checkbox を切り替えると軽く震える（Safari 18 以降。公式の仕組みではない）
+  try{ hapSwitch.parentNode.click(); }catch(e){}
+}
+
+// ── 画面 ──
+var box = document.getElementById('events');
+MOVES.forEach(function(m){
+  var s = document.createElement('section');
+  s.innerHTML = '<h2>'+m.name+'</h2><p class="how">'+m.how+'</p><div class="row"></div>';
+  var row = s.querySelector('.row');
+  Object.keys(WOOD).forEach(function(k){
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.dataset.wood = k; b.dataset.move = m.key;
+    b.innerHTML = WOOD[k].name.split(' ')[0]+'<small>'+WOOD[k].name.split(' ')[1]+'</small><small>'+WOOD[k].sub+'</small>';
+    b.addEventListener('click', function(){ play(k, m); buzz(); });
+    row.appendChild(b);
+  });
+  box.appendChild(s);
+});
+var seqRow = document.getElementById('seq');
+Object.keys(WOOD).forEach(function(k){
+  var b = document.createElement('button');
+  b.type = 'button'; b.dataset.seq = k;
+  b.innerHTML = WOOD[k].name.split(' ')[0]+'<small>'+WOOD[k].sub+'</small>';
+  b.addEventListener('click', function(){
+    var order = ['split','turn','merge','throw'], gap = 0.42;
+    order.forEach(function(key,i){
+      var m = MOVES.filter(function(x){return x.key===key;})[0];
+      play(k, m, i*gap);
+      setTimeout(buzz, i*gap*1000);
+    });
+  });
+  seqRow.appendChild(b);
+});
+
+// 確かめ用（自動テストから読むだけ。遊びには関係ない）
+window.HB_SOUND_TRIAL = {WOOD:WOOD, MOVES:MOVES, knockInto:function(c, dest, w, at, p, g){
+  var saveCtx = ctx, saveMaster = master, saveBuf = noiseBuf;
+  ctx = c; master = dest;
+  noiseBuf = c.createBuffer(1, Math.ceil(c.sampleRate*0.05), c.sampleRate);
+  var d = noiseBuf.getChannelData(0); for(var i=0;i<d.length;i++) d[i] = Math.random()*2-1;
+  knock(w, at, p, g);
+  ctx = saveCtx; master = saveMaster; noiseBuf = saveBuf;
+}};
+})();
+</script>
+</body>
+</html>
