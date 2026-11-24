@@ -971,4 +971,5 @@
   - 中身：sound.js（新。window.HB_SOUND＝木の音色と動きごとの鳴らし方の表、window.HB_SE.play）。index.html は自分の割る・回す・裏返す・くっつける・投げる（投げられたときだけ）で HB_SE.play を呼ぶだけ。CPU・相手・投げられない並びでは鳴らさない。sound.js が読めないときは鳴らないだけ
   - 編集の仮置き：音の大きさ 0.6・音を切る設定は無し・バイブは入れていない（長さを作者が選んでいない）
   - テスト：tests/e2e/sound.spec.js（4本。選んだ組・5つの動きで鳴らす・失敗と CPU では鳴らさない・sound.js が無くても遊べる）。tests/helpers.js に soundJs の差し替えを足した。既存テストの期待は変えていない。npm test 198件
+- 追記（作者 2026-11-24 22:51「ごく短いで」。HB-074）：バイブは「ごく短い」。sound.js の vibMs＝8。音を鳴らす5つの動きのたびに震わせる（Android は navigator.vibrate(8)。iPhone は見えない所に置いた switch の checkbox を切り替えて軽い1回。Safari 18 以降・公式の仕組みではない。その click はページのほかの動きに届かないようにした）。テスト：sound.spec.js に1本（8ms・失敗では震わせない）。iPhone の道は chromium で navigator.vibrate を消して、切り替わること・ページの click に届かないことを手元で見た（テストには入れていない）。実機では未確認
 

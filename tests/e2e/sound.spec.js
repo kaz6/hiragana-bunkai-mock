@@ -32,6 +32,17 @@ test.describe('音あり', () => {
     expect(await played(page)).toEqual(['split', 'turn', 'flip', 'merge', 'throw']);
   });
 
+  test('音といっしょに「ごく短い」8ms だけ震わせる（作者 2026-11-24 22:51）。失敗では震わせない', async ({ page }) => {
+    expect(await page.evaluate(() => window.HB_SOUND.vibMs)).toBe(8);
+    await page.evaluate(() => { window.__vib = []; Object.defineProperty(navigator, 'vibrate', { configurable: true, value: ms => { window.__vib.push(ms); return true; } }); });
+    await setBasket(page, ['は', 'ぬ', 'ぬ']);
+    await tapTiles(page, [0]); await press(page, '#aSplit');
+    expect(await page.evaluate(() => window.__vib)).toEqual([8]);
+    await setBasket(page, ['ぬ', 'ぬ']);
+    await tapTiles(page, [0, 1]); await press(page, '#aThrow');
+    expect(await page.evaluate(() => window.__vib)).toEqual([8]);
+  });
+
   test('投げられない並びでは鳴らさない。CPU の投げでも鳴らさない', async ({ page }) => {
     await setBasket(page, ['ぬ', 'ぬ']);
     await tapTiles(page, [0, 1]); await press(page, '#aThrow');
