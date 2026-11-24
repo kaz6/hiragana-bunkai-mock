@@ -55,12 +55,15 @@ const js='/* 辞書データ（3字以上）：mecab-ipadic-2.7.0-20070801 の�
 fs.writeFileSync(out,js);
 if(candOut){ const inDict=new Set(words); const cands=[...renyo].filter(w=>!inDict.has(w)).sort(); fs.writeFileSync(candOut,cands.join('\n')+'\n'); console.log('renyo candidates',cands.length); }
  console.log('words',words.length,'small',Object.keys(smallMap).length,'clash',clash.length,clash.slice(0,15).join(' '));
+// 命令形のうち、作者が辞書から外した語（HB-071。作者 2026-11-24 19:06「しなせ、しねろ、はほぼ使わないため、全体から消したい」「のろえくみは全てから消します」）。足し引きはここ
+const MEIREI_OUT=new Set(['しなせ','しねろ','のろえ','まじなえ']);
 if(meireiOut){ // HB-070（D-099）：動詞（自立）の命令形。基本形が辞書にあるものだけ。読みが字で書けて辞書に無い3字以上。小さい字を含む読みは入れない（見せる形の表が要るため。報告に書く）
   const inDict=new Set(words); const m=new Set();
   for(const [q,key] of cmds){
     const b=baseRead.get(key); if(!b||!inDict.has(big(b))) continue;
     if(!/^[ぁ-ゔー]+$/.test(q)||q[0]==='ー'||[...q].some(ch=>SMALL.includes(ch)||'ゕゖ'.includes(ch))) continue;
     const n=[...q].length; if(n<3||n>12||![...q].every(ch=>S.has(ch))||inDict.has(q)) continue;
+    if(MEIREI_OUT.has(q)) continue; // 作者が辞書から外した語（HB-071）
     m.add(q);
   }
   const list=[...m].sort();

@@ -33,3 +33,18 @@ test('本物の dict-meirei.js で たべろ・にげろ が通る（辞書の�
   expect((await pick(page, ['に', 'げ', 'ろ'])).msg).toBe('投げられる');
   expectClean(info.ctx);
 });
+
+test('作者が外した命令形（しなせ・しねろ・のろえ・まじなえ）は辞書に無い。止めた命令形（ころせ など）は辞書にあるが CPU の禁止の一覧に入る（HB-071）', async ({ page }, info) => {
+  info.ctx = await openGame(page); await startSolo(page);
+  const r = await page.evaluate(() => {
+    const W = new Set(window.HB_TEST.words());
+    return {
+      gone: ['しなせ', 'しねろ', 'のろえ', 'まじなえ'].filter(w => W.has(w)),
+      kept: ['ころせ', 'さしころせ', 'ほしころせ', 'つぶせ', 'きえろ'].filter(w => !W.has(w)),
+      ng: ['ころせ', 'うちころせ', 'しめころせ', 'とりころせ', 'もりころせ', 'ほしころせ', 'ししろ', 'しにかけろ', 'しにはてろ', 'しにたえろ', 'しにそこなえ'].filter(w => !(window.HB_CPU_NG || []).includes(w)),
+      allowed: ['さしころせ', 'つぶせ', 'きえろ', 'ぶちのめせ', 'くるえ'].filter(w => (window.HB_CPU_NG || []).includes(w)),
+    };
+  });
+  expect(r).toEqual({ gone: [], kept: [], ng: [], allowed: [] });
+  expectClean(info.ctx);
+});
