@@ -121,6 +121,18 @@ test('技で変わった札で作った言葉の★は増えない（自分で�
   expect(byHand).toBe(1);
 });
 
+test('CPU の札は ＞・⊂ にならない（CPU の TURN と同じ変わり方だけ）。い→こ・く→へ は効く', async ({ page }) => {
+  const r = await page.evaluate(() => { const T = window.HB_TEST, S = T.S(), seen = new Set();
+    for (let i = 0; i < 60; i++) { for (const w of ['まわる', 'うら']) { S.used.clear(); S.mine = [...w].map(l => T.mk(l)); S.opp = ['く', 'し', 'つ', 'へ', 'い'].map(l => T.mk(l)); S.sel = S.mine.map(p => p.id); T.doThrow(); S.opp.slice(0, 5).forEach(p => seen.add(T.letterOf(p))); } }
+    return [...seen]; });
+  expect(r).not.toContain('＞'); expect(r).not.toContain('⊂'); expect(r).not.toContain(null);
+});
+
+test('「どっち」を開いたまま技を食らったら、候補を閉じる', async ({ page }) => {
+  const r = await page.evaluate(() => { const T = window.HB_TEST, S = T.S(); S.mine = ['は', 'こ'].map(l => T.mk(l)); S.opp = ['き', 'る'].map(l => T.mk(l)); S.sel = S.mine.map(p => p.id); S.choose = ['x']; T.cpuThrow('きる'); return S.choose; });
+  expect(r).toBe(null);
+});
+
 test('技で割れた2枚をくっつけ直すと元の札に戻る（往復は数えない）', async ({ page }) => {
   const r = await page.evaluate(() => { const T = window.HB_TEST, S = T.S(); S.mine = ['は', 'し'].map(l => T.mk(l)); S.opp = ['き', 'る'].map(l => T.mk(l)); T.cpuThrow('きる');
     const parts = S.mine.filter(p => ['｜', 'よ'].includes(T.letterOf(p))); const ids = S.mine.map(p => p.d);
@@ -159,7 +171,7 @@ test('ふたりで：相手の技が届いたら、受けた側の端末で札�
 test.describe('食らいエフェクト（動きを許した設定）', () => {
   test.use({ reducedMotion: 'no-preference' });
   test('割る：カゴの真ん中に斜めの線が一閃し、選ばれた札が割れる。動いている間は自分の手を止める', async ({ page }) => {
-    await page.evaluate(() => { const T = window.HB_TEST, S = T.S(); S.mine = ['は', 'し', 'よ'].map(l => T.mk(l)); S.opp = ['き', 'る'].map(l => T.mk(l)); S.sel = []; T.cpuThrow('きる'); T.render(); });
+    await page.evaluate(() => { const T = window.HB_TEST, S = T.S(); T.ATK_FX.lineMs = 1200; T.FX.splitMs = 1500; /* 線・割れる動きが見える間を長くして、負荷で見落とさない */ S.mine = ['は', 'し', 'よ'].map(l => T.mk(l)); S.opp = ['き', 'る'].map(l => T.mk(l)); S.sel = []; T.cpuThrow('きる'); T.render(); });
     await expect(page.locator('#basket .atkline')).toHaveCount(1);
     expect(await page.evaluate(() => window.HB_TEST.S().busy)).toBe(true);
     await expect(page.locator('.tile.cut .half')).toHaveCount(2);
@@ -175,7 +187,7 @@ test.describe('食らいエフェクト（動きを許した設定）', () => {
     expect(await page.evaluate(() => window.HB_TEST.S().mine.slice(0, 3).map(window.HB_TEST.letterOf).join(''))).toBe('こ十十');
   });
   test('投げた側：あいての行にも同じ動き（斬撃は線、回す・裏返すは札が回る・裏返る）', async ({ page }) => {
-    await page.evaluate(() => { const T = window.HB_TEST, S = T.S(); S.used.clear(); S.mine = ['き', 'る'].map(l => T.mk(l)); S.opp = ['は', 'し', 'し'].map(l => T.mk(l)); S.sel = S.mine.map(p => p.id); T.doThrow(); });
+    await page.evaluate(() => { const T = window.HB_TEST, S = T.S(); T.ATK_FX.lineMs = 1500; S.used.clear(); S.mine = ['き', 'る'].map(l => T.mk(l)); S.opp = ['は', 'し', 'し'].map(l => T.mk(l)); S.sel = S.mine.map(p => p.id); T.doThrow(); });
     await expect(page.locator('#oppSlots .atkline')).toHaveCount(1);
     await expect.poll(() => page.evaluate(() => window.HB_TEST.S().opp.length)).toBe(6);
     await page.waitForFunction(() => !window.HB_TEST.OPPFX());

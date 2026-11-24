@@ -831,7 +831,7 @@ function fxMerge(ghosts,n){ if(reduced||!ghosts.length) return; const el=els.get
   ghosts.forEach(g=>{ basket.appendChild(g); void g.offsetWidth; g.style.transition=`transform ${FX.pullMs}ms ease-in,opacity ${FX.pullMs}ms ease-in`; g.style.transform=`translate(${n.x}px,${n.y}px)`; g.style.opacity='.9'; setTimeout(()=>g.remove(),FX.pullMs+30); });
   el.style.setProperty('--fx-pull',FX.pullMs+'ms'); el.style.setProperty('--fx-snap',FX.snapMs+'ms');
   el.classList.remove('snap'); void el.offsetWidth; el.classList.add('snap'); setTimeout(()=>el.classList.remove('snap'),FX.pullMs+FX.snapMs+40); }
-/* 手触りの音（D-100・HB-073）。中身は sound.js。読めないときは鳴らないだけ。自分の操作だけ鳴らす（CPU・相手は鳴らさない） */
+/* 手触りの音（D-100・HB-073）。中身は sound.js。読めないときは鳴らないだけ。自分の操作と、特別攻撃ワードの食らい（HB-075）だけ鳴らす（CPU の手・相手の手は鳴らさない） */
 const se=k=>{ try{ if(window.HB_SE) window.HB_SE.play(k); }catch(e){} };
 function doSplit(){ const ps0=selPieces(); const p=ps0[ps0.length-1]; if(!p||locked()) return; /* 割るのは選んだ最後の1枚（HB-034, D-070） */ const L=splitLetter(p); const parts=RECIPE[L]; if(!parts||S.mine.length>=CAP) return; if(TUT.on&&!tutOk('split')) return; const skew=!letterOf(p);
   begin(); se('split'); S.busy=true; const el=els.get(p.id); if(el){ el.classList.add('crack'); fxSplit(el,p); }
@@ -900,7 +900,8 @@ const ATK_FX={ lineMs:240, lineSpan:.9, // 斬撃：線が走る時間／カゴ�
 const atkShuf=a=>{ a=a.slice(); for(let i=a.length-1;i>0;i--){ const j=rnd(i+1); [a[i],a[j]]=[a[j],a[i]]; } return a; };
 const atkCanSplit=p=>{ const L=splitLetter(p); return !!(L&&RECIPE[L]); };
 function atkOp(p,kind){ const q={root:p.root,r:p.r,f:p.f}; if(kind==='turn') q.r=(q.r+1)%4; else { q.r=(4-q.r)%4; q.f=q.f?0:1; } norm(q); return q; } // その操作を1回したあとの向き（doTurn と同じ計算）
-const atkVisible=(p,kind,cpu)=>{ const q=atkOp(p,kind); if(q.r===p.r&&q.f===p.f) return false; return !(cpu&&!letterOf(q)); }; // 見た目が変わる。CPU は向きずれの札を持たないので、字にならない向きは変わる札に数えない
+const atkCpuOk=(from,to)=>!!to&&to!=='＞'&&from!=='＞'&&!TURN_NOT_CPU.has(from+'→'+to); // CPU の札にしてよい変わり方（字になる向き。＞ と、作者が決めていない し⇄⊂ などは除く＝CPU の TURN と同じ）
+const atkVisible=(p,kind,cpu)=>{ const q=atkOp(p,kind); if(q.r===p.r&&q.f===p.f) return false; return !cpu||atkCpuOk(letterOf(p),letterOf(q)); }; // 見た目が変わる。CPU の札は atkCpuOk の変わり方だけ
 function atkPick(pool,kind,n,cpu){ const pref=ATK.prefer[kind]!=='いいえ';
   const good=p=>kind==='split'?atkCanSplit(p):atkVisible(p,kind,cpu); let list;
   if(kind==='split') list=pref?atkShuf(pool.filter(good)):atkShuf(pool);
@@ -915,7 +916,7 @@ function atkApplyTo(arr,p,kind,cpu){ const i=arr.indexOf(p); if(i<0) return null
     if(!back) made.forEach((n,k)=>{ const x=parts[k]; Object.assign(n,{d:x,d0:x,note:'',base:'',orig:x,was:x}); }); // 割る前の札の写し（sp）だけ残す。道すじに「→」を足さない
     arr.splice(i,1,...made); return {from:L,parts,n:made.length}; }
   const q=atkOp(p,kind), to=letterOf(q);
-  if((q.r===p.r&&q.f===p.f)||(cpu&&!to)) return {same:true,from:L0,to:L0};
+  if((q.r===p.r&&q.f===p.f)||(cpu&&!atkCpuOk(letterOf(p),to))) return {same:true,from:L0,to:L0};
   if(cpu){ arr.splice(i,1,mk(to)); return {from:L0,to}; }
   p.r=q.r; p.f=q.f; const L=letterOf(p)||p.was; Object.assign(p,{orig:L,was:L,d:L,d0:L,note:'',base:'',ops:[],sp:null,jn:null}); return {from:L0,to:to||'〓'}; }
 function atkLog(who,w,kind,rs,cpuSide){ const wh=who==='me'?'自分':'相手', head=`${wh}の「${wordShow(w)}」`;
@@ -938,7 +939,7 @@ function atkRunMine(S0,kind,w,elig,tries){ if(S!==S0||S.over||S.ending) return;
   if(S.busy&&tries<40){ setTimeout(()=>atkRunMine(S0,kind,w,elig,tries+1),80); return; }
   const picks=atkPick(S.mine.filter(p=>elig.has(p.id)),kind,atkN(kind,w),false); se(kind);
   const apply=()=>{ if(S!==S0) return; if(S.over||S.ending){ S.busy=false; render(); return; }
-    const rs=picks.map(p=>atkApplyTo(S.mine,p,kind,false)).filter(Boolean); S.sel=S.sel.filter(id=>S.mine.some(p=>p.id===id));
+    const rs=picks.map(p=>atkApplyTo(S.mine,p,kind,false)).filter(Boolean); S.sel=S.sel.filter(id=>S.mine.some(p=>p.id===id)); S.choose=null; // 「どっち」の候補は選びが変わったので閉じる
     atkLog('op',w,kind,rs,false);
     if(S.mine.length>CAP){ if(isOnline()) sendLoseToOpponent(); finish('lose'); }
     return rs; };
