@@ -95,6 +95,9 @@ button:focus-visible{outline:2px solid var(--me);outline-offset:2px}
 .fz-l .top{flex-wrap:wrap;row-gap:0} .fz-l .top h1{flex:1 0 100%} .fz-l .top h1+.link{margin-left:auto} /* 大きく：題名を1行目、しくみ・ログ・やりなおしを2行目の右に */
 .today{margin:4px 0 0;font-size:calc(11px*var(--fz));color:var(--ink);opacity:.75;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.today small{opacity:.8}
 .opp .say{margin:4px 0 0;font-size:calc(13px*var(--fz));color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.slots{position:relative}
+.atkline{position:absolute;left:50%;top:50%;height:4px;margin-top:-2px;border-radius:2px;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.3),0 0 10px 3px rgba(255,255,255,.9);pointer-events:none;z-index:6;transform-origin:50% 50%}
+.atkline.opp{height:3px;margin-top:-1.5px}
 .slots{display:flex;gap:2px;margin-top:4px}
 .slots span{flex:1 1 0;max-width:26px;height:28px;display:grid;place-items:center;font:600 18px/1 var(--f-kana);
   background:var(--field);border-radius:4px;color:var(--ink)}
@@ -541,6 +544,7 @@ small.en.b{display:block;margin-left:0}
 <script src="tutorial.js"></script>
 <script src="rules.js"></script>
 <script src="sound.js"></script>
+<script src="attack-words.js"></script>
 <script>
 (()=>{
 'use strict';
@@ -873,6 +877,109 @@ function mergeMade(a,b,res,o,turned){ const la=letterOf(a), lb=letterOf(b);
 function trailOf(ps){ return shown(ps.filter(p=>p.d&&p.d.includes('→')).map(p=>p.d.replace(/→一$/,'→ー')).join('　')); } // 作り替えの道すじ（元の字から）
 function notesOf(ps){ const out=[]; ps.forEach(p=>{ if(p.note){ const s=`${asWord(letterOf(p))}←${p.note}`; if(!out.includes(s)) out.push(s); } }); return shown(out.slice(0,3).join('　')); }
 
+/* ---- 特別攻撃ワード（HB-075, D-101）----
+   操作の言葉（割る・回す・裏返す。語と枚数は attack-words.js）を投げると、受けた側のカゴの札にランダムでその操作が効く。
+   自分→CPU（doThrow）・CPU→自分（cpuThrow）・ふたり（onOpponentThrow）で同じ決まり。ふたりでは受けた側の端末で札を選んで効かせ、
+   変わった札は D-033 のカゴの送り合いで投げた側にも見える（新しい表・送る形は変えない）。CPU に狙う手は足さない。チュートリアルでは効かない。
+   札の選び方（仮）：届いた字を足す前からカゴにあった札から、重ならずに枚数ぶん。割る＝割れる札から（無ければ空振り）。回す・裏返す＝見た目が変わる札から（足りないときだけ変わらない札も）。
+   優先は attack-words.js の prefer で戻せる（'いいえ' なら全部の札から）。
+   技で変わった札は★に数えない（仮）：技で変わった後の字を、その札のもとの字として道すじ・印を作り直す。割った2枚には「割る前の札の写し」だけ残し、くっつけ直すと元に戻る（往復は数えない。D-067） */
+const ATK=(()=>{ const A=window.HB_ATTACK||{}, W=A.words||{}, map=new Map();
+  ['split','turn','flip'].forEach(k=>String(W[k]||'').split(/\s+/).filter(Boolean).forEach(w=>{ if(!map.has(w)) map.set(w,k); }));
+  return {map,count:A.count||{},prefer:A.prefer||{}}; })();
+const atkKind=w=>ATK.map.get(String(w))||null;
+const atkN=(kind,w)=>{ const c=ATK.count[kind]||[1,1]; return Math.max(0,+(([...String(w)].length>=4?c[1]:c[0]))||0); };
+/* 食らいエフェクト（作者が決めた三つ：斬撃の一閃・回転 ♺・裏返し ■→□。数字はここだけ。動きを減らす設定では出さない）。音は自分の操作と同じ（split・turn・flip） */
+const ATK_FX={ lineMs:240, lineSpan:.9, // 斬撃：線が走る時間／カゴの高さに対して線が届く長さ（割合）。角度は FX.angle（57°）
+  oppLinePx:70,                          // あいての行（細い帯）での線の長さ
+  spinMs:640, spinDeg:360,               // 回す：札が回る時間・角度（♺）。回しきる半ばで新しい向きになる
+  flipMs:520,                            // 裏返す：札が横に薄くなって反対側から開く時間（■→□）。半ばで裏返す
+  landMs:380,                            // 届いた字が着いてから、技が出るまでの待ち（字ごとの待ち 110ms は別に足す）
+  throwerSound:true,                     // 投げた側でも同じ音を鳴らす（編集の仮置き。外すときは false）
+  throwerLagMs:260 };                    // 投げた側の画面で技が出るまでの待ち
+const atkShuf=a=>{ a=a.slice(); for(let i=a.length-1;i>0;i--){ const j=rnd(i+1); [a[i],a[j]]=[a[j],a[i]]; } return a; };
+const atkCanSplit=p=>{ const L=splitLetter(p); return !!(L&&RECIPE[L]); };
+function atkOp(p,kind){ const q={root:p.root,r:p.r,f:p.f}; if(kind==='turn') q.r=(q.r+1)%4; else { q.r=(4-q.r)%4; q.f=q.f?0:1; } norm(q); return q; } // その操作を1回したあとの向き（doTurn と同じ計算）
+const atkVisible=(p,kind,cpu)=>{ const q=atkOp(p,kind); if(q.r===p.r&&q.f===p.f) return false; return !(cpu&&!letterOf(q)); }; // 見た目が変わる。CPU は向きずれの札を持たないので、字にならない向きは変わる札に数えない
+function atkPick(pool,kind,n,cpu){ const pref=ATK.prefer[kind]!=='いいえ';
+  const good=p=>kind==='split'?atkCanSplit(p):atkVisible(p,kind,cpu); let list;
+  if(kind==='split') list=pref?atkShuf(pool.filter(good)):atkShuf(pool);
+  else if(pref) list=atkShuf(pool.filter(good)).concat(atkShuf(pool.filter(p=>!good(p))));
+  else list=atkShuf(pool);
+  return list.slice(0,n); }
+/* 札に技を効かせる（arr＝そのカゴ）。返り値：{miss:true,from} 空振り／{same:true,from,to} 変わらず／{from,parts|to} */
+function atkApplyTo(arr,p,kind,cpu){ const i=arr.indexOf(p); if(i<0) return null; const L0=letterOf(p)||'〓';
+  if(kind==='split'){ const L=splitLetter(p), parts=L&&RECIPE[L]; if(!parts) return {miss:true,from:L0};
+    const j=p.jn, back=!!(j&&parts.slice().sort().join()===[j[0].L,j[1].L].sort().join());
+    const made=splitMade(p,L,parts,cpu?{}:{spawn:{x:p.x,y:p.y}});
+    if(!back) made.forEach((n,k)=>{ const x=parts[k]; Object.assign(n,{d:x,d0:x,note:'',base:'',orig:x,was:x}); }); // 割る前の札の写し（sp）だけ残す。道すじに「→」を足さない
+    arr.splice(i,1,...made); return {from:L,parts,n:made.length}; }
+  const q=atkOp(p,kind), to=letterOf(q);
+  if((q.r===p.r&&q.f===p.f)||(cpu&&!to)) return {same:true,from:L0,to:L0};
+  if(cpu){ arr.splice(i,1,mk(to)); return {from:L0,to}; }
+  p.r=q.r; p.f=q.f; const L=letterOf(p)||p.was; Object.assign(p,{orig:L,was:L,d:L,d0:L,note:'',base:'',ops:[],sp:null,jn:null}); return {from:L0,to:to||'〓'}; }
+function atkLog(who,w,kind,rs,cpuSide){ const wh=who==='me'?'自分':'相手', head=`${wh}の「${wordShow(w)}」`;
+  if(kind==='split'){ const h=rs.filter(r=>!r.miss);
+    if(h.length) lg(who,`${head}で ${cpuSide?'CPU の ':''}${h.map(r=>r.from).join('・')} が割れた（${h.map(r=>r.parts.join('＋')).join('、')}）`);
+    else lg(who,`${head}は空振り`+(rs.length?`（${rs.map(r=>r.from).join('・')}）`:'')); return; }
+  if(!rs.length){ lg(who,`${head}は空振り`); return; }
+  lg(who,`${head}で ${cpuSide?'CPU の ':''}${rs.map(r=>r.from).join('・')} が${kind==='turn'?'回った':'裏返った'}（${rs.map(r=>r.from+'→'+r.to).join('・')}）`); }
+function atkLine(host,len,cls,cx){ const i=document.createElement('i'); i.className='atkline'+(cls?' '+cls:''); i.setAttribute('aria-hidden','true');
+  i.style.width=len+'px'; i.style.marginLeft=(-len/2)+'px'; if(cx!=null) i.style.left=cx+'px'; host.appendChild(i); const a=-FX.angle;
+  const an=i.animate([{transform:`rotate(${a}deg) scaleX(0)`,opacity:1},{transform:`rotate(${a}deg) scaleX(1)`,opacity:1,offset:.7},{transform:`rotate(${a}deg) scaleX(1)`,opacity:0}],{duration:ATK_FX.lineMs,easing:'ease-out',fill:'forwards'});
+  setTimeout(()=>i.remove(),ATK_FX.lineMs+80); return an; }
+function atkSpin(el,kind){ const f=el&&el.querySelector('.face'); if(!f) return;
+  if(kind==='turn') f.animate([{transform:'rotate(0deg)'},{transform:`rotate(${ATK_FX.spinDeg}deg)`}],{duration:ATK_FX.spinMs,easing:'ease-in-out'});
+  else f.animate([{transform:'scaleX(1)'},{transform:'scaleX(.04)',offset:.5},{transform:'scaleX(1)'}],{duration:ATK_FX.flipMs,easing:'ease-in-out'}); }
+/* 受けた側（自分のカゴ）で効かせる。S.busy の間は待つ（割る・回すの動きの途中の札を変えない）。動きの間は自分の手を止める */
+function atkReceive(w,had){ const kind=atkKind(w); if(!kind||TUT.on||!S) return; const S0=S, elig=new Set(had);
+  const ms=reduced?0:[...String(w)].length*110+ATK_FX.landMs; if(ms) setTimeout(()=>atkRunMine(S0,kind,w,elig,0),ms); else atkRunMine(S0,kind,w,elig,0); }
+function atkRunMine(S0,kind,w,elig,tries){ if(S!==S0||S.over||S.ending) return;
+  if(S.busy&&tries<40){ setTimeout(()=>atkRunMine(S0,kind,w,elig,tries+1),80); return; }
+  const picks=atkPick(S.mine.filter(p=>elig.has(p.id)),kind,atkN(kind,w),false); se(kind);
+  const apply=()=>{ if(S!==S0) return; if(S.over||S.ending){ S.busy=false; render(); return; }
+    const rs=picks.map(p=>atkApplyTo(S.mine,p,kind,false)).filter(Boolean); S.sel=S.sel.filter(id=>S.mine.some(p=>p.id===id));
+    atkLog('op',w,kind,rs,false);
+    if(S.mine.length>CAP){ if(isOnline()) sendLoseToOpponent(); finish('lose'); }
+    return rs; };
+  if(reduced){ apply(); render(); return; }
+  S.busy=true; const done=()=>{ if(S!==S0) return; S.busy=false; render(); };
+  if(kind==='split'){ atkLine(basket,Math.min(basket.clientHeight*ATK_FX.lineSpan/Math.sin(FX.angle*Math.PI/180),basket.clientWidth*.95));
+    setTimeout(()=>{ if(S!==S0) return; picks.forEach(p=>{ const el=els.get(p.id); if(el&&atkCanSplit(p)){ el.classList.add('crack'); fxSplit(el,p); } }); },ATK_FX.lineMs);
+    setTimeout(()=>{ apply(); done(); },ATK_FX.lineMs+(picks.some(atkCanSplit)?FX.splitMs:0)); return; }
+  const ms=kind==='turn'?ATK_FX.spinMs:ATK_FX.flipMs; picks.forEach(p=>atkSpin(els.get(p.id),kind));
+  setTimeout(()=>{ if(S!==S0) return; picks.forEach(p=>{ const g=els.get(p.id)&&els.get(p.id).querySelector('.g'); if(g) g.style.transition='none'; });
+    apply(); render(); picks.forEach(p=>{ const g=els.get(p.id)&&els.get(p.id).querySelector('.g'); if(g){ void g.offsetWidth; g.style.transition=''; } }); },ms/2);
+  setTimeout(done,ms); }
+/* 投げた側の画面（あいての行）。ひとり：CPU の札にその場で効かせて見せる。ふたり：一閃は投げたときに出し、札の動きは相手のカゴが届いて変わった所に出す */
+let OPPFX=null; // {kind, idx[], t0}
+const atkOppMs=kind=>kind==='split'?ATK_FX.lineMs+FX.splitMs:kind==='turn'?ATK_FX.spinMs:ATK_FX.flipMs;
+function oppFxStart(kind,idx){ if(reduced) return; OPPFX={kind,idx:idx||[],t0:performance.now()}; renderOpp(); setTimeout(()=>{ if(OPPFX&&performance.now()-OPPFX.t0>=atkOppMs(OPPFX.kind)) OPPFX=null; },atkOppMs(kind)+60); }
+function oppFxPaint(){ const fx=OPPFX; if(!fx||reduced) return; const el=performance.now()-fx.t0, total=atkOppMs(fx.kind); if(el>=total){ OPPFX=null; return; }
+  const box=$('oppSlots'), kids=box.querySelectorAll('span'), at=a=>{ a.currentTime=el; return a; };
+  if(fx.kind==='split'){ const lf=ATK_FX.lineMs/total;
+    if(el<ATK_FX.lineMs){ const f=[...kids].filter(s=>s.textContent), a=f[0], b=f[f.length-1]; // 線は、いま入っている札の真ん中に走らせる
+      const an=atkLine(box,ATK_FX.oppLinePx,'opp',a&&b?(a.offsetLeft+b.offsetLeft+b.offsetWidth)/2:null); an.currentTime=el; }
+    fx.idx.forEach((k,j)=>{ const s=kids[k]; if(!s) return; at(s.animate([{opacity:0,transform:`translateX(${j?-6:6}px) scale(.5)`},{opacity:0,transform:`translateX(${j?-6:6}px) scale(.5)`,offset:lf},{opacity:1,transform:'none'}],{duration:total,easing:'ease-out',fill:'both'})); }); return; }
+  fx.idx.forEach(k=>{ const s=kids[k]; if(!s) return; at(s.animate(fx.kind==='turn'?[{transform:'rotate(0deg)'},{transform:`rotate(${ATK_FX.spinDeg}deg)`}]:[{transform:'scaleX(1)'},{transform:'scaleX(.04)',offset:.5},{transform:'scaleX(1)'}],{duration:total,easing:'ease-in-out'})); }); }
+function atkThrowSolo(w,had){ const kind=atkKind(w); if(!kind||TUT.on||!S) return; const S0=S, elig=new Set(had), lag=reduced?0:ATK_FX.throwerLagMs;
+  const go=()=>{ if(S!==S0||S.over||S.ending) return; if(ATK_FX.throwerSound) se(kind);
+    const picks=atkPick(S.opp.filter(p=>elig.has(p.id)),kind,atkN(kind,w),true), idx=[], rs=[];
+    picks.forEach(p=>{ const i=S.opp.indexOf(p); const r=atkApplyTo(S.opp,p,kind,true); if(!r) return; rs.push(r); if(kind==='split'){ if(!r.miss) for(let k=0;k<r.n;k++) idx.push(i+k); } else idx.push(i); });
+    atkLog('me',w,kind,rs,true);
+    if(S.opp.length>CAP) finish('win'); // 割って上限を超えたらあいての負け
+    if(kind==='split'||idx.length) oppFxStart(kind,idx);
+    render(); };
+  if(lag) setTimeout(go,lag); else go(); }
+function atkThrowOnline(w){ const kind=atkKind(w); if(!kind||TUT.on||!S) return; const S0=S, lag=reduced?0:ATK_FX.throwerLagMs;
+  if(kind!=='split') S.atkWait={kind,before:(S.oppL||[]).slice(),beforeO:(S.oppO||[]).slice(),until:Date.now()+8000};
+  const go=()=>{ if(S!==S0||S.over||S.ending) return; if(ATK_FX.throwerSound) se(kind); if(kind==='split') oppFxStart('split',[]); };
+  if(lag) setTimeout(go,lag); else go(); }
+function atkWaitCheck(){ const w=S&&S.atkWait; if(!w) return; if(Date.now()>w.until){ S.atkWait=null; return; }
+  const L=S.oppL||[], O=S.oppO||[]; if(L.length<w.before.length) return; // 相手が言葉を投げて縮んだときは見ない
+  const idx=[]; w.before.forEach((l,i)=>{ if(L[i]!==l||(O[i]||0)!==(w.beforeO[i]||0)) idx.push(i); });
+  if(idx.length&&idx.length<=Math.max(2,atkN(w.kind,'ああああ'))){ S.atkWait=null; oppFxStart(w.kind,idx); } }
+
 // 工夫の合計で出す声（見た目だけ）。日本語の声＋下に小さく英語（D-050。言葉は編集の仮置き。変えるときはこの2つの表だけ）
 const COMBO=['','いいね','すごい','すばらしい'], COMBO_EN=['','Nice','Great','Excellent']; let comboT=null;
 /* ★の数え方（HB-009, D-031）：投げた言葉の各字の道すじ（D-023 の d）にある「→」の合計＝工夫の数。
@@ -1069,11 +1176,11 @@ let lastTry='';
 function logFailedThrow(c){ if(!c.text||c.cls==='ok') return; const k=c.text+'|'+c.msg; if(k===lastTry) return; lastTry=k; lg('me',`投げようとした「${c.text}」（${c.msg}）`); }
 function doThrow(){ if(locked()) return; if(TUT.on&&!tutOk('throw')) return; const c=checkSel(); if(!c.word){ logFailedThrow(c); return; } lastTry=''; begin(); se('throw');
   if(isOnline()){ throwOnline(c); return; }
-  const ps=selPieces(); recordMyThrow(c,ps); removeMyPieces(ps); oppBump(c.word);
+  const ps=selPieces(); recordMyThrow(c,ps); removeMyPieces(ps); oppBump(c.word); const had=S.opp.map(p=>p.id);
   [...c.word].forEach(ch=>S.opp.push(mk(ch==='ー'?'一':ch)));
   let bx=''; if(bonus&&!TUT.on){ const b=mk(pick(TODAY.bag)); S.opp.push(b); bx=letterOf(b); }
   logMyThrow(c,ps,bx);
-  if(S.opp.length>CAP) finish('win');
+  if(S.opp.length>CAP) finish('win'); else atkThrowSolo(c.core,had); // 操作の言葉なら、CPU の札に効く（HB-075）
   tutAdvance('throw'); render(); }
 
 /* ---- 相手 ---- */
@@ -1118,11 +1225,11 @@ function smartBest(letters){ const pool={}; letters.forEach(l=>{ if(!l) return; 
   return ties.length?pick(ties):null; }
 /* 言葉の表は、ページが空いているときに先に作る（初めの1手で止まらないように） */
 (window.requestIdleCallback||(f=>setTimeout(f,1500)))(()=>{ try{ smartList(); strongList(); }catch(_){} });
-function cpuThrow(w,tag){ const used=[]; for(const ch of w){ const p=S.opp.find(x=>!used.includes(x)&&asWord(letterOf(x))===ch); used.push(p); }
+function cpuThrow(w,tag){ const had=S.mine.map(p=>p.id), used=[]; for(const ch of w){ const p=S.opp.find(x=>!used.includes(x)&&asWord(letterOf(x))===ch); used.push(p); }
     S.used.add(w); S.log.push({who:'op',word:w,note:notesOf(used),k:comboOf(used),trail:trailOf(used)}); zkRecord(w,'op',comboOf(used),trailOf(used)); S.opp=S.opp.filter(x=>!used.includes(x));
     [...w].forEach((ch,k)=>S.mine.push(mk(ch==='ー'?'一':ch,{delay:k*110,drop:tierOf(w)}))); S.say=`「${wordShow(w)}」を投げてきた`; landFx(w);
     lg('op',`投げる「${w}」`+(tag?`（${tag}）`:'')); showMeaning(w,'op');
-    if(S.mine.length>CAP) finish('lose'); }
+    if(S.mine.length>CAP) finish('lose'); else atkReceive(w,had); } // 操作の言葉なら、自分の札に効く（HB-075）
 /* 戻るだけの作り替えをしない（ふつう・つよい。HB-028, D-061）。賢い相手の手のたびに、そのときのカゴの中身（字の集まり。並びは見ない）を
    OPP_MEMO 手分おぼえる。言葉にならないときの適当な1手・くっつけるだけの1手は、そのあとの中身がおぼえた中身と同じになる手を除く。
    除くと何も残らないときは除かない（止まらない）。1手先・2手先で言葉ができる手は今までどおり選んでよい */
@@ -1215,12 +1322,12 @@ function cpuAct(){ if(S.over||S.ending||sheetOpen||guideHolds()||TUT.on) return;
   if(SPEEDS[speed].deep){ cpuStrong(); render(); schedule(); return; }
   if(SPEEDS[speed].smart){ cpuSmart(); render(); schedule(); return; }
   const L=S.opp.map(letterOf); const w=bestWord(L);
-  if(w){ const used=[]; for(const ch of w){ const p=S.opp.find(x=>!used.includes(x)&&asWord(letterOf(x))===ch); used.push(p); }
+  if(w){ const had=S.mine.map(p=>p.id), used=[]; for(const ch of w){ const p=S.opp.find(x=>!used.includes(x)&&asWord(letterOf(x))===ch); used.push(p); }
     S.used.add(w); S.log.push({who:'op',word:w,note:notesOf(used),k:comboOf(used),trail:trailOf(used)}); zkRecord(w,'op',comboOf(used),trailOf(used)); S.opp=S.opp.filter(x=>!used.includes(x));
     [...w].forEach((ch,k)=>S.mine.push(mk(ch==='ー'?'一':ch,{delay:k*110,drop:tierOf(w)}))); S.say=`「${wordShow(w)}」を投げてきた`; landFx(w);
     let bx=''; if(bonus){ const b=mk(pick(TODAY.bag),{delay:[...w].length*110,note:'おまけ'}); S.mine.push(b); bx=letterOf(b); S.say+='（＋おまけ1字）'; }
     lg('op',`投げる「${w}」`+(bx?` 自分におまけ「${bx}」`:'')); showMeaning(w,'op');
-    if(S.mine.length>CAP) finish('lose'); }
+    if(S.mine.length>CAP) finish('lose'); else atkReceive(w,had); }
   else { const steps=cpuSteps(); const good=steps.filter(s=>bestWord(s.res));
     if(good.length) cpuApply(pick(good));
     else if(steps.length&&S.opp.length<=8){ cpuApply(pick(steps)); }
@@ -1272,7 +1379,7 @@ function renderOpp(){ const online=isOnline();
   $('btnSpeed').innerHTML=escH('速さ：'+SPEEDS[speed].name)+enTag('Speed: '+(SPEED_EN[SPEEDS[speed].name]||''));
   let h=''; for(let i=0;i<Math.max(CAP,n);i++){ const l=L[i]; if(l===undefined){ h+='<span></span>'; continue; }
     h+=`<span class="${i>=CAP?'out':(O[i]||(PARTS.has(l)&&l!=='一'))?'part':'fill'}">${escH(shown(l))}</span>`; }
-  $('oppSlots').innerHTML=h; }
+  $('oppSlots').innerHTML=h; oppFxPaint(); }
 /* ---- 結果の画面の「やりとり」の候補（HB-047, D-081）----
    ある言葉が、直前に相手が投げた言葉の3字以上を並びのまま含むとき、その組を候補にする。
    「ー」も1字、小さい字は見せる形（wordShow）で比べる。見た目だけ：★・勝ち負け・ほめる声に効かせない。送れなくても遊びは止めない */
@@ -1535,7 +1642,7 @@ function queueBasket(){ if(!isOnline()||!NET.match||!S) return; const sig=JSON.s
   basketT=setTimeout(()=>{ if(!NET.match||!S) return; NET.match.send({type:'broadcast',event:'basket',payload:basketPayload()}); }, BASKET_SEND_MS); }
 function onOppBasket(pl){ if(!S||!isOnline()||!pl||!Array.isArray(pl.l)||pl.l.length>40) return;
   const l=pl.l.map(x=>String(x).slice(0,2)), o=Array.isArray(pl.o)?pl.o.map(x=>x?1:0):[];
-  S.oppL=l; S.oppO=o; renderOpp(); }
+  S.oppL=l; S.oppO=o; atkWaitCheck(); renderOpp(); }
 
 /* ---- つなぎ ---- */
 $('aSplit').onclick=doSplit; $('aRot').onclick=()=>doTurn('回す'); $('aFlip').onclick=()=>doTurn('裏返す');
@@ -1816,7 +1923,7 @@ async function throwOnline(c){ const ps=selPieces(); S.busy=true; render();
   const result=await insertThrow(c,ps);
   S.busy=false;
   if(S.over||S.ending){ render(); return; } // 投げている間に対局が終わった
-  if(result==='ok'){ recordMyThrow(c,ps); removeMyPieces(ps); logMyThrow(c,ps,''); oppBump(c.word); }
+  if(result==='ok'){ recordMyThrow(c,ps); removeMyPieces(ps); logMyThrow(c,ps,''); oppBump(c.word); atkThrowOnline(c.core); }
   else if(result==='dup'){ S.used.add(c.core); S.say='もうリストに出た言葉。札は手元に残した'; }
   else { S.say='送れなかった。つながりを確かめて、もう一度投げてください'; }
   render(); }
@@ -1824,12 +1931,13 @@ async function throwOnline(c){ const ps=selPieces(); S.busy=true; render();
 /* 相手が投げた言葉を、自分のカゴの材料として受け取る（ー は棒として届く） */
 function onOpponentThrow(row){ if(!S||S.over||S.ending) return;
   if(row.player===NET.playerId) return; // 自分の投げは投げたときに済んでいる
-  S.used.add(row.word);
+  S.used.add(row.word); const had=S.mine.map(p=>p.id);
   S.log.push({who:'op',word:row.word,note:'',k:row.stars||0,trail:row.trail||''}); zkRecord(row.word,'op',row.stars||0,row.trail||'');
   [...row.word].forEach((ch,k)=>S.mine.push(mk(ch==='ー'?'一':ch,{delay:k*110,drop:tierOf(row.word)}))); landFx(row.word);
   S.say=`「${wordShow(row.word)}」が届いた`;
   lg('op',`投げる「${row.word}」`); showMeaning(row.word,'op');
   if(S.mine.length>CAP){ sendLoseToOpponent(); finish('lose'); return; }
+  atkReceive(row.word,had); // 操作の言葉なら、自分の札に効く（HB-075）
   render(); }
 /* 相手が「負けた」を送ってきた */
 function onOpponentLost(){ if(!S||S.over||S.ending) return; finish('win'); }
@@ -1838,7 +1946,7 @@ function onOpponentLost(){ if(!S||S.over||S.ending) return; finish('win'); }
 if(window.HB_TEST&&typeof window.HB_TEST==='object') Object.assign(window.HB_TEST,{guideShow,GUIDE_TEXT,GUIDE_EN}); // 案内の文（HB-068）
 if(window.HB_TEST&&typeof window.HB_TEST==='object') Object.defineProperty(window.HB_TEST,'CAP',{get:()=>CAP,configurable:true}); // 一戦ごとに変わるので値でなく読む（HB-048）
 if(window.HB_TEST&&typeof window.HB_TEST==='object') Object.assign(window.HB_TEST,{TODOME,FX,NET,onStartMessage,KANA,PARTS,RECIPE,MERGE,MERGE_TURN,TURN,BAG,logText,makeToday,seedRng,TODAY:()=>TODAY,HAND,DICT,SPEEDS,key,
-  words:()=>WORDS, S:()=>S, mk,letterOf,checkSel,splitMade,mergeMade,comboOf,cpuOk,tapTile,doSplit,doMerge,doTurn,doThrow,render,newGame,TUT,TUT_SEQ,tutDone,startSolo,cpuAct,cpuThrow,setSpeed,showMeaning,SCENE_OF,exchangeCands,VOTE_TEXT,ALIAS,turnShortcuts,mergeTurnBacks,stepsOf,hintFind,hintPress,HINT:()=>HINT,HINT_TEXT,cpuApply,TURN_NOT_CPU,pressAgain,onAgainMessage,onPartnerLeft,onLobbyPresence,againUi,leaveOnline});
+  words:()=>WORDS, S:()=>S, mk,letterOf,checkSel,splitMade,mergeMade,comboOf,cpuOk,tapTile,doSplit,doMerge,doTurn,doThrow,render,newGame,TUT,TUT_SEQ,tutDone,startSolo,cpuAct,cpuThrow,setSpeed,showMeaning,SCENE_OF,exchangeCands,VOTE_TEXT,ALIAS,turnShortcuts,mergeTurnBacks,stepsOf,hintFind,hintPress,HINT:()=>HINT,HINT_TEXT,cpuApply,TURN_NOT_CPU,ATK,ATK_FX,atkKind,atkN,atkVisible,atkCanSplit,OPPFX:()=>OPPFX,onOpponentThrow,onOppBasket,atkThrowOnline,pressAgain,onAgainMessage,onPartnerLeft,onLobbyPresence,againUi,leaveOnline});
 
 newGame();
 showMenu();
