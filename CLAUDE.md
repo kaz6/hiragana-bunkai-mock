@@ -7,7 +7,7 @@
 - ひらがなを「割る・回す・裏返す・くっつける」で作り替えて、言葉を相手のカゴに投げ合う対戦ゲームのモック（仮）
 - 公開ページ：https://kaz6.github.io/hiragana-bunkai-mock/
 - **main にマージすると、GitHub Pages がすぐ（数十秒で）公開ページを変える。** 作者と友人が遊んでいるページなので、壊したまま main に入れない
-- ページは `index.html` ひとつ（スクリプトは中の IIFE）。データは `dict-ipadic.js`（辞書 3字以上）・`meanings.js`（意味）・`scenes.js`・`cpu-ng.js`・`nice-words.js`・`scene-groups.js`・`config.js`（Supabase の公開キー）
+- ページは `index.html` ひとつ（スクリプトは中の IIFE）。データは `dict-ipadic.js`（辞書 3字以上）・`meanings.js`（意味）・`scenes.js`・`cpu-ng.js`・`nice-words.js`・`scene-groups.js`・`attack-words.js`（特別攻撃ワードの表。D-101）・`config.js`（Supabase の公開キー）
 - 辞書と意味を作る道具：`tools/build_dict.js`（IPADIC から。R-004）・`tools/build_meanings.py`（JMdict から。D-035）。材料は `.work/`（リポジトリに入れない）
 - `.github/workflows/meanings.yml` が毎日 main に「自動：足した言葉の意味を更新」をコミットすることがある
 
@@ -35,6 +35,7 @@
   | `tests/e2e/scenes.spec.js` | 場面の組（挨拶返し。scene-groups.js） |
 | `tests/e2e/votes.spec.js` | 結果の画面の「やりとり」の候補と いい／いまいち（exchange_votes。D-081） |
 | `tests/e2e/sound.spec.js` | 手触りの音（sound.js。どの動きで鳴らすか・作者が選んだ組。D-100） |
+| `tests/e2e/attack.spec.js` | 特別攻撃ワード（attack-words.js。語・枚数・札の選び方・★・音・食らいエフェクト。D-101） |
 | `tests/e2e/basket.spec.js` | カゴの上限（14こを超えたら負け。値は rules.js） |
 | `tests/e2e/captext.spec.js` | 画面の文に入る上限の数（日本語・English・한국어。rules.js の cap を変えて開く。HB-068） |
   | `tests/e2e/rematch.spec.js` | ふたりでの「もう一回」＝同じ部屋での再戦（lobby の知らせ・合図・退室。D-094） |
