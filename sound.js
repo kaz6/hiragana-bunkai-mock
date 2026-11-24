@@ -4,9 +4,12 @@
    変えるとき：下の HB_SOUND の表だけを直す（index.html は触らない）。このファイルが読めないときは音が鳴らないだけ
    wood：木の音色。f＝いちばん下の音の高さ(Hz)、decay＝鳴りの長さ(秒)、parts＝[倍率, 大きさ, 長さの倍率]、
          click＝打った瞬間の「コッ」（雑音を帯域で絞る）、tone＝こもらせる上限(Hz)
-   moves：動きごとに、どの木で・どう鳴らすか。hits の t＝鳴らす時刻(秒)、p＝高さの倍率、g＝大きさ */
+   moves：動きごとに、どの木で・どう鳴らすか。hits の t＝鳴らす時刻(秒)、p＝高さの倍率、g＝大きさ
+   vibMs：音といっしょに震わせる長さ(ミリ秒)。0 で震わせない。作者が「ごく短い」（8ms）を選んだ（2026-11-24 22:51・HB-074）。
+          Android は navigator.vibrate。iPhone は長さを選べず、switch の付いた checkbox を切り替えて軽い1回（Safari 18 以降。公式の仕組みではない） */
 window.HB_SOUND = {
   volume: 0.6,
+  vibMs: 8,
   wood: {
     A: { f: 1350, decay: 0.055, parts: [[1, 1, 1], [2.76, 0.32, 0.5], [5.40, 0.10, 0.3]], click: { f: 4200, q: 1.2, amp: 0.22, dur: 0.010 }, tone: 9000 },
     B: { f: 880,  decay: 0.085, parts: [[1, 1, 1], [2.76, 0.28, 0.5], [5.40, 0.08, 0.3]], click: { f: 2600, q: 1.4, amp: 0.28, dur: 0.012 }, tone: 6500 }
@@ -22,7 +25,20 @@ window.HB_SOUND = {
 
 /* 鳴らす仕組み。index.html は HB_SE.play('split') のように呼ぶだけ */
 window.HB_SE = (function () {
-  var ctx = null, master = null, noiseBuf = null, played = [];
+  var ctx = null, master = null, noiseBuf = null, played = [], hap = null;
+  function buzz() {
+    var ms = +(window.HB_SOUND.vibMs || 0);
+    if (!ms) return;
+    if (navigator.vibrate) { navigator.vibrate(ms); return; }
+    if (!hap) { // iPhone 向け。見えない所に置く
+      hap = document.createElement('label'); hap.setAttribute('aria-hidden', 'true');
+      hap.style.cssText = 'position:fixed;left:-9999px;top:0;opacity:0;pointer-events:none';
+      var inp = document.createElement('input'); inp.type = 'checkbox'; inp.setAttribute('switch', ''); inp.tabIndex = -1;
+      hap.appendChild(inp); document.body.appendChild(hap);
+      hap.addEventListener('click', function (e) { e.stopPropagation(); }); // ページのほかの「どこかを押したら」の動きに届かせない
+    }
+    hap.click();
+  }
   function ready() {
     var AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return null;
@@ -64,6 +80,7 @@ window.HB_SE = (function () {
     var cfg = window.HB_SOUND, m = cfg && cfg.moves && cfg.moves[key];
     if (!m) return;
     if (window.HB_TEST) played.push(key); // 自動テストの窓が開いているときだけ、鳴らした動きを覚える
+    try { buzz(); } catch (e) { /* 震えなくても遊びは止めない */ }
     try {
       if (!ready()) return;
       var w = cfg.wood[m.wood]; if (!w) return;
