@@ -540,6 +540,7 @@ small.en.b{display:block;margin-left:0}
 <script src="lang-ko.js"></script>
 <script src="tutorial.js"></script>
 <script src="rules.js"></script>
+<script src="sound.js"></script>
 <script>
 (()=>{
 'use strict';
@@ -826,14 +827,16 @@ function fxMerge(ghosts,n){ if(reduced||!ghosts.length) return; const el=els.get
   ghosts.forEach(g=>{ basket.appendChild(g); void g.offsetWidth; g.style.transition=`transform ${FX.pullMs}ms ease-in,opacity ${FX.pullMs}ms ease-in`; g.style.transform=`translate(${n.x}px,${n.y}px)`; g.style.opacity='.9'; setTimeout(()=>g.remove(),FX.pullMs+30); });
   el.style.setProperty('--fx-pull',FX.pullMs+'ms'); el.style.setProperty('--fx-snap',FX.snapMs+'ms');
   el.classList.remove('snap'); void el.offsetWidth; el.classList.add('snap'); setTimeout(()=>el.classList.remove('snap'),FX.pullMs+FX.snapMs+40); }
+/* 手触りの音（D-100・HB-073）。中身は sound.js。読めないときは鳴らないだけ。自分の操作だけ鳴らす（CPU・相手は鳴らさない） */
+const se=k=>{ try{ if(window.HB_SE) window.HB_SE.play(k); }catch(e){} };
 function doSplit(){ const ps0=selPieces(); const p=ps0[ps0.length-1]; if(!p||locked()) return; /* 割るのは選んだ最後の1枚（HB-034, D-070） */ const L=splitLetter(p); const parts=RECIPE[L]; if(!parts||S.mine.length>=CAP) return; if(TUT.on&&!tutOk('split')) return; const skew=!letterOf(p);
-  begin(); S.busy=true; const el=els.get(p.id); if(el){ el.classList.add('crack'); fxSplit(el,p); }
+  begin(); se('split'); S.busy=true; const el=els.get(p.id); if(el){ el.classList.add('crack'); fxSplit(el,p); }
   setTimeout(()=>{ S.busy=false; if(S.over||S.ending){ render(); return; } // 動きの間に勝ち負けが決まったら、割らない（D-054）
     const i=S.mine.indexOf(p);
     const made=splitMade(p,L,parts,{spawn:{x:p.x,y:p.y}}); // 戻すだけの往復は数えない（D-067）
     S.mine.splice(i,1,...made); S.sel=S.sel.filter(id=>id!==p.id); /* 割った2つは選ばない。前に選んだ札はそのまま（D-070） */ lg('me',skew?`割る ${L}（向きずれ）→${parts.join('＋')}`:`割る ${L}→${parts.join('＋')}`); tutAdvance('split'); render(); }, reduced?0:FX.splitMs); }
 
-function doTurn(kind){ const ps0=selPieces(); const p=ps0[ps0.length-1]; if(!p||locked()) return; if(TUT.on&&!tutOk(kind==='回す'?'turn':'flip')) return; begin(); const before=letterOf(p)||'〓';
+function doTurn(kind){ const ps0=selPieces(); const p=ps0[ps0.length-1]; if(!p||locked()) return; if(TUT.on&&!tutOk(kind==='回す'?'turn':'flip')) return; begin(); se(kind==='回す'?'turn':'flip'); const before=letterOf(p)||'〓';
   const el=els.get(p.id), g=el&&el.querySelector('.g');
   const apply=()=>{ if(S.over||S.ending){ S.busy=false; render(); return; } // 動きの間に勝ち負けが決まったら、向きを変えない（D-054）
     if(kind==='回す'){ p.r=(p.r+1)%4; } else { p.r=(4-p.r)%4; p.f=p.f?0:1; } norm(p);
@@ -843,7 +846,7 @@ function doTurn(kind){ const ps0=selPieces(); const p=ps0[ps0.length-1]; if(!p||
   if(reduced||!g){ apply(); return; }
   S.busy=true; g.style.transform=(kind==='回す'?'rotate(90deg) ':'scaleX(-1) ')+g.style.transform; setTimeout(apply,180); }
 
-function doMerge(res){ const ps=selPieces(); if(ps.length<2||locked()) return; if(TUT.on&&!tutOk('merge')) return; begin();
+function doMerge(res){ const ps=selPieces(); if(ps.length<2||locked()) return; if(TUT.on&&!tutOk('merge')) return; begin(); se('merge');
   const [a,b]=ps.slice(-2), la=letterOf(a), lb=letterOf(b); const i=Math.min(S.mine.indexOf(a),S.mine.indexOf(b));
   const gh=fxGhosts([a,b]); const n=mergeMade(a,b,res,{spawn:{x:a.x,y:a.y}},true); // 戻すだけの往復は数えない（D-067）。true＝できた字を MERGE_TURN の向きで出す（自分だけ）
   S.mine=S.mine.filter(p=>p!==a&&p!==b); S.mine.splice(i,0,n); S.sel=S.sel.filter(id=>id!==a.id&&id!==b.id).concat(n.id); /* できた字はその位置で選ばれたまま（D-070） */ S.choose=null; lg('me',`くっつける ${la}＋${lb}→${res}`+(letterOf(n)!==res?`（${res}の裏返して回した向き）`:'')); tutAdvance('merge'); render(); fxMerge(gh,n); }
@@ -1064,7 +1067,7 @@ function logMyThrow(c,ps,bonusLetter){ const nt=notesOf(ps), k=comboOf(ps);
 let lastTry='';
 /* 投げられない並びで「投げる」を押したら、何がだめだったかをログに残す（出来そうでできなかった言葉を後で見られるように） */
 function logFailedThrow(c){ if(!c.text||c.cls==='ok') return; const k=c.text+'|'+c.msg; if(k===lastTry) return; lastTry=k; lg('me',`投げようとした「${c.text}」（${c.msg}）`); }
-function doThrow(){ if(locked()) return; if(TUT.on&&!tutOk('throw')) return; const c=checkSel(); if(!c.word){ logFailedThrow(c); return; } lastTry=''; begin();
+function doThrow(){ if(locked()) return; if(TUT.on&&!tutOk('throw')) return; const c=checkSel(); if(!c.word){ logFailedThrow(c); return; } lastTry=''; begin(); se('throw');
   if(isOnline()){ throwOnline(c); return; }
   const ps=selPieces(); recordMyThrow(c,ps); removeMyPieces(ps); oppBump(c.word);
   [...c.word].forEach(ch=>S.opp.push(mk(ch==='ー'?'一':ch)));

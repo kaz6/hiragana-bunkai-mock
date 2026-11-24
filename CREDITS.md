@@ -6,7 +6,7 @@
 
 | Asset | 作者・置き場 | ライセンス | 何に使ったか |
 |---|---|---|---|
-| 積み木の音（A・B・C × 割る・回す・裏返す・くっつける・投げる）（仮） | 自前（Web Audio でページの中で作る。docs/reports/audio/hb-072-tsumiki.html の WOOD・MOVES） | 自前のため制限なし | 試聴のみ。ゲームにはまだ入れていない（HB-072、D-100） |
+| 積み木の音（A・B・C × 割る・回す・裏返す・くっつける・投げる）（仮） | 自前（Web Audio でページの中で作る。sound.js の HB_SOUND。試聴は docs/reports/audio/hb-072-tsumiki.html） | 自前のため制限なし | 割る・回す・裏返す・くっつける・投げる の音（sound.js。HB-073、D-100）と試聴ページ（HB-072）。値は仮 |
 
 ## データ
 
