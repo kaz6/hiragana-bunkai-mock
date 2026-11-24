@@ -34,6 +34,7 @@
   | `tests/e2e/tail.spec.js` | 選んでいる途中の割る・くっつける（D-070） |
   | `tests/e2e/scenes.spec.js` | 場面の組（挨拶返し。scene-groups.js） |
 | `tests/e2e/votes.spec.js` | 結果の画面の「やりとり」の候補と いい／いまいち（exchange_votes。D-081） |
+| `tests/e2e/sound.spec.js` | 手触りの音（sound.js。どの動きで鳴らすか・作者が選んだ組。D-100） |
 | `tests/e2e/basket.spec.js` | カゴの上限（14こを超えたら負け。値は rules.js） |
 | `tests/e2e/captext.spec.js` | 画面の文に入る上限の数（日本語・English・한국어。rules.js の cap を変えて開く。HB-068） |
   | `tests/e2e/rematch.spec.js` | ふたりでの「もう一回」＝同じ部屋での再戦（lobby の知らせ・合図・退室。D-094） |
