@@ -135,6 +135,65 @@ test('お・み は袋に入らない（作るしかない字）。向きで別�
   expect(r).toEqual({ bag: [], turn: [0, 0], kana: [true, true] });
 });
 
+test('う＋｜→か、か を割ると う＋｜、か＋゛→が、が を割ると か＋゛。う＋い→ふ はいまのまま（D-075）', async ({ page }) => {
+  await setBasket(page, ['う', '｜']);
+  await tapTiles(page, [0, 1]);
+  await mergeTo(page, 'か');
+  expect((await state(page)).mine).toBe(''); // くっつけた直後は裏返して90°回した向き（HB-045, D-079）。向きは下のテスト
+  await press(page, '#aFlip'); await press(page, '#aRot'); // 裏返す→回す で か に戻る
+  expect((await state(page)).mine).toBe('か');
+  await press(page, '#aSplit');
+  expect((await state(page)).mine).toBe('う｜');
+  await setBasket(page, ['か', '゛']);
+  await tapTiles(page, [0, 1]);
+  await mergeTo(page, 'が');
+  expect((await state(page)).mine).toBe('が');
+  await press(page, '#aSplit');
+  expect((await state(page)).mine).toBe('か゛');
+  await setBasket(page, ['う', 'い']);
+  await tapTiles(page, [0, 1]);
+  await mergeTo(page, 'ふ');
+  expect((await state(page)).mine).toBe('ふ');
+  const t = await page.evaluate(() => ({ k: window.HB_TEST.BAG.includes('か') || window.HB_TEST.BAG.includes('が') }));
+  expect(t.k).toBe(false); // 袋に入れない（作るしかない字）
+});
+
+test('ろ＋一→ら、ら を割ると ろ＋一。ろ＋∘→る・｜＋ろ→わ はいまのまま。袋に入らない（D-088）', async ({ page }) => {
+  await setBasket(page, ['ろ', '一']);
+  await tapTiles(page, [0, 1]);
+  await mergeTo(page, 'ら');
+  expect((await state(page)).mine).toBe('ら');
+  await press(page, '#aSplit');
+  expect((await state(page)).mine).toBe('ろ一');
+  await setBasket(page, ['ろ', '∘']);
+  await tapTiles(page, [0, 1]);
+  await mergeTo(page, 'る');
+  expect((await state(page)).mine).toBe('る');
+  await setBasket(page, ['｜', 'ろ']);
+  await tapTiles(page, [0, 1]);
+  await mergeTo(page, 'わ');
+  expect((await state(page)).mine).toBe('わ');
+  expect(await page.evaluate(() => window.HB_TEST.BAG.includes('ら'))).toBe(false);
+});
+
+test('せ＋∘→む、む を割ると せ＋∘。せ＋゛→ぜ・ろ＋∘→る はいまのまま。袋に入らない（D-089）', async ({ page }) => {
+  await setBasket(page, ['せ', '∘']);
+  await tapTiles(page, [0, 1]);
+  await mergeTo(page, 'む');
+  expect((await state(page)).mine).toBe('む');
+  await press(page, '#aSplit');
+  expect((await state(page)).mine).toBe('せ∘');
+  await setBasket(page, ['せ', '゛']);
+  await tapTiles(page, [0, 1]);
+  await mergeTo(page, 'ぜ');
+  expect((await state(page)).mine).toBe('ぜ');
+  await setBasket(page, ['ろ', '∘']);
+  await tapTiles(page, [0, 1]);
+  await mergeTo(page, 'る');
+  expect((await state(page)).mine).toBe('る');
+  expect(await page.evaluate(() => window.HB_TEST.BAG.includes('む'))).toBe(false);
+});
+
 async function turnOnce(page, letter, btn) {
   await setBasket(page, [letter]);
   await tapTiles(page, [0]);
