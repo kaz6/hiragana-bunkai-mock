@@ -7,6 +7,12 @@
    札・言葉はひらがなのまま。意味（漢字・英語）の英語は変えない（JMdict に韓国語が無いため） */
 (function(){
 const FIX={
+  // 出どころ（HB-081。仮の訳。英語の一文 This game uses the JMdict… は訳さない）
+  'つかったもの':'사용한 것','辞書：JMdict（EDRDG）・IPADIC':'사전: JMdict (EDRDG) · IPADIC','著作権表示と条件（原文）':'저작권 표시와 조건(원문)',
+  '意味（漢字・英語）は JMdict（EDRDG の辞書）を、その決まりに従って使っています。意味のデータ（meanings.js）も同じ条件（CC BY-SA 4.0）で出しています。':'뜻(한자·영어)은 EDRDG의 사전인 JMdict를 그 이용 조건에 따라 사용하고 있습니다. 뜻 데이터(meanings.js)도 같은 조건(CC BY-SA 4.0)으로 제공합니다.',
+  '言葉の表（dict-ipadic.js・dict-renyo.js・dict-meirei.js）は IPADIC（mecab-ipadic-2.7.0-20070801）から作りました。':'단어 목록(dict-ipadic.js, dict-renyo.js, dict-meirei.js)은 IPADIC(mecab-ipadic-2.7.0-20070801)에서 만들었습니다.',
+  '字体：Klee One・Zen Kaku Gothic New（Google Fonts。SIL Open Font License 1.1）':'글꼴: Klee One·Zen Kaku Gothic New(Google Fonts, SIL Open Font License 1.1)',
+  '音：このページの中で作った自前の音（Web Audio）':'소리: 이 페이지 안에서 직접 만든 소리(Web Audio)',
   // 上の並び・はじめの画面
   'しくみ':'작동 방식','ログ':'로그','やりなおし':'다시 시작','？ 遊び方':'? 게임 방법','辞書':'사전','あいて':'상대',
   '▶ ひとりで（CPU）':'혼자서 (CPU)','▶ ふたりで（対人）':'둘이서 (대인전)','入室':'입장','退室':'퇴장','とじる':'닫기','もどる':'뒤로',

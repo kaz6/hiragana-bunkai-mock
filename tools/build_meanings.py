@@ -127,7 +127,7 @@ notice = f'''/* 投げた言葉の意味（漢字の書き方・英語）。HB-0
    このファイルは JMdict から抜き出して並べ替えたもの（改変物）で、同じく CC BY-SA 4.0 で提供する。
    形：{{ ひらがなの言葉: [漢字の書き方（・区切り、3つまで）, 英語（; 区切り、3つまで）] }} */
 '''
-src_js = notice + 'window.HB_MEANINGS_NOTICE=' + json.dumps('意味（漢字・英語）は JMdict（EDRDG, https://www.edrdg.org/wiki/index.php/JMdict-EDICT_Dictionary_Project）から。CC BY-SA 4.0（https://creativecommons.org/licenses/by-sa/4.0/）。意味のデータ（meanings.js）も同じ条件で使える。JMdict_e ' + (created.group(1) if created else '') + ' 作成版。', ensure_ascii=False) + ';\n'
+src_js = notice + 'window.HB_MEANINGS_NOTICE=' + json.dumps("This game uses the JMdict dictionary files. These files are the property of the Electronic Dictionary Research and Development Group, and are used in conformance with the Group's licence.", ensure_ascii=False) + ';\n'
 src_js += 'window.HB_MEANINGS=' + json.dumps(dict(sorted(out_map.items())), ensure_ascii=False, separators=(',', ':')) + ';\n'
 open(out, 'w', encoding='utf-8').write(src_js)
 if cands:
