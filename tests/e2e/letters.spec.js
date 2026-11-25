@@ -61,8 +61,8 @@ test('結果が2つあるくっつけ方は「どっち」が出て、選んだ�
     for (const [k, rs] of Object.entries(T.MERGE)) if (rs.length > 1) out.push({ parts: [...k], rs });
     return out;
   });
-  // い＋一 を せ だけにしたので、いまは結果が2つのくっつけ方はない（D-072。前は せ・け の「どっち」）。出るようになったら、下で字ごとに確かめる
-  expect(multi).toEqual([]);
+  // 結果が2つあるのは い＋一（せ／け。D-072 で せ だけにしたのを D-103 で戻した）と の＋｜（め／み。D-103）の2組だけ
+  expect(multi.map(m => m.parts.join('') + '=' + m.rs.join('/')).sort()).toEqual(['い一=せ/け', 'の｜=め/み'].sort());
   for (const { parts, rs } of multi) {
     for (const r of rs) {
       await setBasket(page, parts);
@@ -77,71 +77,62 @@ test('結果が2つあるくっつけ方は「どっち」が出て、選んだ�
   }
 });
 
-test('い＋一 は せ だけ。「どっち」は出ない（D-072）', async ({ page }) => {
-  await setBasket(page, ['い', '一']);
-  await tapTiles(page, [0, 1]);
-  await page.click('#aMerge');
-  await expect(page.locator('#trayPick')).toBeHidden();
-  expect((await state(page)).mine).toBe('せ');
+test('い＋一 は「どっち（せ／け）」。どちらも選べる。｜＋十→け・り＋一→け はいまのまま（D-103）', async ({ page }) => {
+  for (const r of ['せ', 'け']) {
+    await setBasket(page, ['い', '一']);
+    await tapTiles(page, [0, 1]);
+    await page.click('#aMerge');
+    await expect(page.locator('#trayPick')).toBeVisible();
+    await expect(page.locator('#trayPick button')).toHaveText(['せ', 'け']);
+    await page.click(`#trayPick button[data-r="${r}"]`);
+    expect((await state(page)).mine).toBe(r);
+  }
+  for (const order of [['｜', '十'], ['り', '一']]) { // どっち は出ない。け だけ
+    await setBasket(page, order);
+    await tapTiles(page, [0, 1]);
+    await page.click('#aMerge');
+    await expect(page.locator('#trayPick')).toBeHidden();
+    expect((await state(page)).mine).toBe('け');
+  }
 });
 
-test('う＋｜→か、か を割ると う＋｜、か＋゛→が、が を割ると か＋゛。う＋い→ふ はいまのまま（D-075）', async ({ page }) => {
-  await setBasket(page, ['う', '｜']);
-  await tapTiles(page, [0, 1]);
-  await mergeTo(page, 'か');
-  expect((await state(page)).mine).toBe(''); // くっつけた直後は裏返して90°回した向き（HB-045, D-079）。向きは下のテスト
-  await press(page, '#aFlip'); await press(page, '#aRot'); // 裏返す→回す で か に戻る
-  expect((await state(page)).mine).toBe('か');
+test('あ＋゜→お、お を割ると あ＋゜（どちらの順でも。D-103）', async ({ page }) => {
+  for (const order of [['あ', '∘'], ['∘', 'あ']]) {
+    await setBasket(page, order);
+    await tapTiles(page, [0, 1]);
+    await page.click('#aMerge');
+    await expect(page.locator('#trayPick')).toBeHidden();
+    expect((await state(page)).mine).toBe('お');
+  }
+  await setBasket(page, ['お']);
+  await tapTiles(page, [0]);
   await press(page, '#aSplit');
-  expect((await state(page)).mine).toBe('う｜');
-  await setBasket(page, ['か', '゛']);
-  await tapTiles(page, [0, 1]);
-  await mergeTo(page, 'が');
-  expect((await state(page)).mine).toBe('が');
-  await press(page, '#aSplit');
-  expect((await state(page)).mine).toBe('か゛');
-  await setBasket(page, ['う', 'い']);
-  await tapTiles(page, [0, 1]);
-  await mergeTo(page, 'ふ');
-  expect((await state(page)).mine).toBe('ふ');
-  const t = await page.evaluate(() => ({ k: window.HB_TEST.BAG.includes('か') || window.HB_TEST.BAG.includes('が') }));
-  expect(t.k).toBe(false); // 袋に入れない（作るしかない字）
+  expect((await state(page)).mine).toBe('あ∘');
 });
 
-test('ろ＋一→ら、ら を割ると ろ＋一。ろ＋∘→る・｜＋ろ→わ はいまのまま。袋に入らない（D-088）', async ({ page }) => {
-  await setBasket(page, ['ろ', '一']);
-  await tapTiles(page, [0, 1]);
-  await mergeTo(page, 'ら');
-  expect((await state(page)).mine).toBe('ら');
-  await press(page, '#aSplit');
-  expect((await state(page)).mine).toBe('ろ一');
-  await setBasket(page, ['ろ', '∘']);
-  await tapTiles(page, [0, 1]);
-  await mergeTo(page, 'る');
-  expect((await state(page)).mine).toBe('る');
-  await setBasket(page, ['｜', 'ろ']);
-  await tapTiles(page, [0, 1]);
-  await mergeTo(page, 'わ');
-  expect((await state(page)).mine).toBe('わ');
-  expect(await page.evaluate(() => window.HB_TEST.BAG.includes('ら'))).toBe(false);
+test('の＋｜ は「どっち（め／み）」。どちらも選べる。み を割ると の＋｜、め を割ると ｜＋の、め＋゜→ぬ はいまのまま（D-103）', async ({ page }) => {
+  for (const order of [['の', '｜'], ['｜', 'の']]) {
+    for (const r of ['め', 'み']) {
+      await setBasket(page, order);
+      await tapTiles(page, [0, 1]);
+      await page.click('#aMerge');
+      await expect(page.locator('#trayPick')).toBeVisible();
+      await expect(page.locator('#trayPick button')).toHaveText(['め', 'み']);
+      await page.click(`#trayPick button[data-r="${r}"]`);
+      expect((await state(page)).mine).toBe(r);
+    }
+  }
+  await setBasket(page, ['み']); await tapTiles(page, [0]); await press(page, '#aSplit');
+  expect((await state(page)).mine).toBe('の｜');
+  await setBasket(page, ['め']); await tapTiles(page, [0]); await press(page, '#aSplit');
+  expect((await state(page)).mine).toBe('｜の');
+  await setBasket(page, ['め', '∘']); await tapTiles(page, [0, 1]); await mergeTo(page, 'ぬ');
+  expect((await state(page)).mine).toBe('ぬ');
 });
 
-test('せ＋∘→む、む を割ると せ＋∘。せ＋゛→ぜ・ろ＋∘→る はいまのまま。袋に入らない（D-089）', async ({ page }) => {
-  await setBasket(page, ['せ', '∘']);
-  await tapTiles(page, [0, 1]);
-  await mergeTo(page, 'む');
-  expect((await state(page)).mine).toBe('む');
-  await press(page, '#aSplit');
-  expect((await state(page)).mine).toBe('せ∘');
-  await setBasket(page, ['せ', '゛']);
-  await tapTiles(page, [0, 1]);
-  await mergeTo(page, 'ぜ');
-  expect((await state(page)).mine).toBe('ぜ');
-  await setBasket(page, ['ろ', '∘']);
-  await tapTiles(page, [0, 1]);
-  await mergeTo(page, 'る');
-  expect((await state(page)).mine).toBe('る');
-  expect(await page.evaluate(() => window.HB_TEST.BAG.includes('む'))).toBe(false);
+test('お・み は袋に入らない（作るしかない字）。向きで別の字にならない（D-103）', async ({ page }) => {
+  const r = await page.evaluate(() => { const T = window.HB_TEST; return { bag: T.BAG.filter(l => 'おみ'.includes(l)), turn: ['お', 'み'].map(l => (T.TURN[l] || []).length), kana: ['お', 'み'].map(l => T.KANA.has(l)) }; });
+  expect(r).toEqual({ bag: [], turn: [0, 0], kana: [true, true] });
 });
 
 async function turnOnce(page, letter, btn) {

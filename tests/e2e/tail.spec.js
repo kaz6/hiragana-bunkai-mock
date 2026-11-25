@@ -52,11 +52,12 @@ test('2枚だけのときは今までどおり「くっつけられる」。く�
   expect(b.sel).toBe('い');
 });
 
-test('途中でも、い＋一 は せ になる（う・い・一 → う・せ。「どっち」は出ない。D-072）', async ({ page }) => {
+test('途中でも、い＋一 は「どっち（せ／け）」が出る（う・い・一 → う・せ／う・け。D-103）', async ({ page }) => {
   await setBasket(page, ['う', 'い', '一']);
   await tapTiles(page, [0, 1, 2]);
   await press(page, '#aMerge');
-  await expect(page.locator('#trayPick')).toBeHidden();
+  await expect(page.locator('#trayPick button')).toHaveText(['せ', 'け']);
+  await press(page, '#trayPick button[data-r="せ"]');
   expect((await state(page)).sel).toBe('うせ');
 });
 
