@@ -89,6 +89,17 @@ test.describe('ふつうの一戦', () => {
   });
 });
 
+test('メニューが出ている間（ページを開いたとき・退室したあと）は、裏の一戦に落ちない', async ({ page }, info) => {
+  info.ctx = await openGame(page);
+  await page.evaluate(() => window.HB_TEST.suddenSkip(400)); // 開いたままのメニューの裏
+  await page.waitForTimeout(300);
+  expect(await page.evaluate(() => window.HB_TEST.suddenCount())).toBe(0);
+  await startSolo(page);
+  await page.evaluate(() => { window.HB_TEST.leaveOnline(); window.HB_TEST.suddenSkip(400); }); // 退室でメニューに戻る
+  await page.waitForTimeout(300);
+  expect(await page.evaluate(() => window.HB_TEST.suddenCount())).toBe(0);
+});
+
 test('チュートリアルの一戦では落ちない', async ({ page }, info) => {
   info.ctx = await openGame(page, { tutorial: true });
   await startSolo(page);

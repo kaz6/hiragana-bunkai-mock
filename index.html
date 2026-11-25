@@ -1244,7 +1244,7 @@ function cpuThrow(w,tag){ const had=S.mine.map(p=>p.id), used=[]; for(const ch o
     if(S.mine.length>CAP) finish('lose'); else atkReceive(w,had); } // 操作の言葉なら、自分の札に効く（HB-075）
 /* 戻るだけの作り替えをしない（ふつう・つよい。HB-028, D-061）。賢い相手の手のたびに、そのときのカゴの中身（字の集まり。並びは見ない）を
    OPP_MEMO 手分おぼえる。言葉にならないときの適当な1手・くっつけるだけの1手は、そのあとの中身がおぼえた中身と同じになる手を除く。
-   除くと何も残らないときは除かない（止まらない）。1手先・2手先で言葉ができる手は今までどおり選んでよい */
+   何も残らないときは動かずに待つ（HB-082。前は「除かない」）。1手先・2手先で言葉ができる手は今までどおり選んでよい */
 const OPP_MEMO=4;
 const bagKey=L=>L.slice().sort().join('');
 function oppMemo(L){ const h=S.oppHist||(S.oppHist=[]), k=bagKey(L); if(h[h.length-1]===k) return; /* 動かずに待っている間は、おぼえた中身を増やさない（古い中身が押し出されて、戻る手がまた出てくるのを防ぐ。HB-082） */ S.oppWait=false; h.push(k); if(h.length>OPP_MEMO+1) h.shift(); }
@@ -1550,11 +1550,11 @@ const suddenWhen=n=>{ let t=SUDDEN.at; for(let k=0;k<n;k++) t+=suddenGap(k); ret
 let sudT=null, sudN=0, sudStart=0, sudRng=null;
 function suddenPick(rng){ return RARE[Math.floor(rng()*RARE.length)]; }
 function suddenChars(seed,n){ const r=seedRng('sudden-'+seed); return Array.from({length:n},()=>suddenPick(r)); } // 確かめ用：同じ種なら同じ並び
-function suddenArm(){ clearTimeout(sudT); sudT=null; if(!S||S.over||S.ending||TUT.on||!RARE.length) return;
+function suddenArm(){ clearTimeout(sudT); sudT=null; if(!S||S.over||S.ending||TUT.on||!RARE.length||!$('menu').hidden) return;
   sudT=setTimeout(suddenDrop, Math.max(0,sudStart+suddenWhen(sudN)*1000-Date.now())); } // 始めの時刻からの決まった時刻で数える（ずれが貯まらない）
 function suddenStart(){ clearTimeout(sudT); sudT=null; sudN=0; sudStart=Date.now();
   sudRng=seedRng('sudden-'+(isOnline()&&NET.matchId?NET.matchId:'solo-'+Math.random())); suddenArm(); }
-function suddenDrop(){ sudT=null; if(!S||S.over||S.ending||TUT.on) return;
+function suddenDrop(){ sudT=null; if(!S||S.over||S.ending||TUT.on||!$('menu').hidden) return;
   const ch=suddenPick(sudRng); if(sudN===0) lg('me','サドンデス'); sudN++;
   for(const side of isOnline()?['me']:['me','op']){ const a=side==='me'?S.mine:S.opp, n=mk(ch); a.push(n); lg(side,'落ちてきた '+letterOf(n)+'（サドンデス）'); } // ふたりででは相手のカゴは相手の端末が同じ字を落とす
   if(S.mine.length>CAP){ if(isOnline()) sendLoseToOpponent(); finish('lose'); }
@@ -1836,7 +1836,7 @@ function roomKeyOf(pass){ let h=0x811c9dc5; for(const byte of new TextEncoder().
 function getClient(){ if(NET.client) return NET.client; if(!window.supabase||!window.HB_SUPABASE) return null;
   NET.client=window.supabase.createClient(HB_SUPABASE.url,HB_SUPABASE.key); return NET.client; }
 function setLobbyText(text){ $('lobbyText').innerHTML=withEn(text,1); }
-function showMenu(){ $('menu').hidden=false; soloPickClose(); }
+function showMenu(){ $('menu').hidden=false; clearTimeout(sudT); sudT=null; /* メニューの裏に残った一戦では、サドンデスを数えない（HB-082） */ soloPickClose(); }
 /* ひとりでの相手の強さを、始める前に選ぶ（HB-014 追加, D-041）。「とまる」は出さない（右上の「速さ」からは選べる）。
    英語の出す・出さないは画面の言葉の設定（D-091）に従う。前に選んだ強さに印。選ぶとすぐ始まる */
 const SOLO_LEVELS=[['ゆるゆる','Very easy'],['のんびり','Easy'],['ゆっくり','Normal'],['ふつう','Hard'],['つよい','Very hard']]; // 一言は英語だけ（D-041 の直し、作者 23:29）
