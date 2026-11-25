@@ -305,8 +305,8 @@ small.en.b{display:block;margin-left:0}
 .menu-in{max-width:448px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
 .menu h2{margin:0;font:700 calc(18px*var(--fz))/1.3 var(--f-ui)}
 .menu-solo{height:52px;font-size:calc(16px*var(--fz))}
-#btnSolo,#btnJoin{background:var(--me);color:var(--me-ink)} /* ボタンらしい塗り（HB-056, D-090）。結果の画面の主なボタンと同じ */
-#btnSolo small.en,#btnJoin small.en{color:inherit;opacity:.85}
+#btnSolo,#btnDuo,#btnJoin{background:var(--me);color:var(--me-ink)} /* ボタンらしい塗り（HB-056, D-090）。結果の画面の主なボタンと同じ */
+#btnSolo small.en,#btnDuo small.en,#btnJoin small.en{color:inherit;opacity:.85}
 .menu-online{display:flex;flex-direction:column;gap:8px}
 .solo-pick{display:flex;flex-direction:column;gap:8px}
 .solo-pick h3{margin:0;font:700 calc(15px*var(--fz))/1.4 var(--f-ui)}
@@ -417,7 +417,9 @@ small.en.b{display:block;margin-left:0}
     <button class="act menu-solo" id="btnSolo" type="button">▶ ひとりで（CPU）<small class="en" lang="en">Solo vs CPU</small></button>
     <!-- ひとりでの相手の強さを、始める前に選ぶ（HB-014 追加, D-041）。中身は JS で SPEEDS から作る -->
     <div class="solo-pick" id="soloPick" role="group" aria-label="相手の強さ" hidden></div>
-    <div class="menu-online" id="menuOnline">
+    <!-- ふたりで：押すと合言葉と入室が出る（HB-076, D-102。作者 2026-11-25 10:36）。もう一度押すとしまう -->
+    <button class="act menu-solo" id="btnDuo" type="button" aria-expanded="false" aria-controls="menuOnline">▶ ふたりで（対人）<small class="en" lang="en">Two players</small></button>
+    <div class="menu-online" id="menuOnline" hidden>
       <p class="menu-note">ふたりで：同じ合言葉を入れた二人がそろうと、3秒後に同時に始まる。<small class="en b" lang="en">Two players: when both enter the same room code, the game starts 3 seconds later.</small></p>
       <div class="menu-row">
         <input id="roomInput" type="text" maxlength="20" placeholder="合言葉" autocomplete="off">
@@ -1807,8 +1809,11 @@ const SOLO_LEVELS=[['ゆるゆる','Very easy'],['のんびり','Easy'],['ゆっ
 function soloPickOpen(){ const cur=speedSaved?SPEEDS[speed].name:'';
   $('soloPick').innerHTML='<h3>相手の強さ '+enTag('CPU level')+'</h3>'+SOLO_LEVELS.map(([n,en])=>`<button type="button" class="lv" data-n="${n}"${n===cur?' aria-current="true"':''}><b>${n}${enTag(en)}</b>${n===cur?'<span class="mark">前回</span>':''}</button>`).join('')
     +'<button type="button" class="link" id="btnSoloBack" style="align-self:flex-start">もどる'+enTag('Back')+'</button>';
-  $('btnSolo').hidden=true; $('menuOnline').hidden=true; $('soloPick').hidden=false; const f=$('soloPick').querySelector('[aria-current="true"]')||$('soloPick').querySelector('.lv'); if(f) f.focus(); }
-function soloPickClose(){ $('soloPick').hidden=true; $('btnSolo').hidden=false; $('menuOnline').hidden=false; }
+  $('btnSolo').hidden=true; $('btnDuo').hidden=true; $('menuOnline').hidden=true; $('soloPick').hidden=false; const f=$('soloPick').querySelector('[aria-current="true"]')||$('soloPick').querySelector('.lv'); if(f) f.focus(); }
+function soloPickClose(){ $('soloPick').hidden=true; $('btnSolo').hidden=false; $('btnDuo').hidden=false; $('menuOnline').hidden=!duoIsOpen(); }
+/* ふたりで（HB-076, D-102）：押すと合言葉・入室を出す。もう一度押すとしまう。開いたかはボタンの aria-expanded に持ち、メニューに戻ったときもそのまま */
+function duoIsOpen(){ return $('btnDuo').getAttribute('aria-expanded')==='true'; }
+function duoToggle(open){ const o=(open===undefined)?!duoIsOpen():!!open; $('menuOnline').hidden=!o; $('btnDuo').setAttribute('aria-expanded',String(o)); if(o){ const ri=$('roomInput'); if(ri&&!ri.disabled) ri.focus(); } }
 $('soloPick').addEventListener('click',e=>{ if(e.target.closest('#btnSoloBack')){ soloPickClose(); $('btnSolo').focus(); return; }
   const b=e.target.closest('.lv'); if(!b) return; const i=SPEEDS.findIndex(x=>x.name===b.dataset.n); if(i<0) return; setSpeed(i); startSolo(); });
 function hideMenu(){ $('menu').hidden=true; }
@@ -1951,7 +1956,7 @@ if(window.HB_TEST&&typeof window.HB_TEST==='object') Object.assign(window.HB_TES
 
 newGame();
 showMenu();
-$('btnSolo').onclick=soloPickOpen; $('btnJoin').onclick=joinRoom; $('btnLeave').onclick=leaveOnline;
+$('btnSolo').onclick=soloPickOpen; $('btnDuo').onclick=()=>duoToggle(); $('btnJoin').onclick=joinRoom; $('btnLeave').onclick=leaveOnline;
 $('roomInput').addEventListener('keydown',e=>{ if(e.key==='Enter') joinRoom(); });
 })();
 </script>
