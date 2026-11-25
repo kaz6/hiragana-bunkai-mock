@@ -42,6 +42,12 @@ button:active small{color:var(--bg)}
 <div id="events"></div>
 
 <section>
+  <h2>ドスン（空になって落ちてくる）</h2>
+  <p class="how">カゴが空になって字が落ちてきたときの音の候補（HB-079・仮）。重い木が落ちる「ドスン」。</p>
+  <div class="row" id="dosun"></div>
+</section>
+
+<section>
   <h2>ひと続き</h2>
   <p class="how">割る→回す→くっつける→投げる を、遊んでいるくらいの間で続けて鳴らす。</p>
   <div class="row" id="seq"></div>
@@ -68,6 +74,12 @@ var MOVES = [
   {key:'throw', name:'投げる',     how:'上がる3つ「コロコロ」',       hits:[{t:0,p:1,g:0.8},{t:0.065,p:1.19,g:0.8},{t:0.13,p:1.5,g:0.9}]}
 ];
 var VOLUME = 0.6;
+// ドスンの候補（HB-079・仮）。sweep＝打った瞬間の高さの倍率（大きいほど「ド」が沈む）、sweepT＝沈む長さ(秒)
+var DOSUN = {
+  D1:{name:'D1 木の箱を置く', sub:'ド・スン', f:150, decay:0.26, sweep:1.5, sweepT:0.05, parts:[[1,1,1],[2.3,0.22,0.5],[4.1,0.05,0.3]], click:{f:500,q:1.0,amp:0.5,dur:0.03}, tone:1600, hits:[{t:0,p:1.5,g:0.35},{t:0.06,p:1,g:1}]},
+  D2:{name:'D2 積み木を落とす', sub:'ドン・コッ', f:240, decay:0.18, sweep:1.35, sweepT:0.04, parts:[[1,1,1],[2.76,0.25,0.5],[5.4,0.06,0.3]], click:{f:900,q:1.2,amp:0.45,dur:0.025}, tone:2600, hits:[{t:0,p:1,g:1.8},{t:0.13,p:1.08,g:0.5}]},
+  D3:{name:'D3 ずしん', sub:'低く長い', f:95, decay:0.40, sweep:1.8, sweepT:0.08, parts:[[1,1,1],[2.1,0.2,0.6],[3.6,0.06,0.3]], click:{f:350,q:0.9,amp:0.6,dur:0.04}, tone:1100, hits:[{t:0,p:1,g:2.2}]}
+};
 
 // ── 鳴らす仕組み ──
 var ctx = null, master = null, noiseBuf = null;
@@ -92,8 +104,8 @@ function knock(w, at, p, g){
   w.parts.forEach(function(pt){
     var o = ctx.createOscillator(), e = ctx.createGain();
     o.type = 'sine';
-    o.frequency.setValueAtTime(f*pt[0]*1.06, at);
-    o.frequency.exponentialRampToValueAtTime(f*pt[0], at+0.012);
+    o.frequency.setValueAtTime(f*pt[0]*(w.sweep||1.06), at);
+    o.frequency.exponentialRampToValueAtTime(f*pt[0], at+(w.sweepT||0.012));
     var len = Math.max(0.012, w.decay*pt[2]);
     e.gain.setValueAtTime(0.0001, at);
     e.gain.exponentialRampToValueAtTime(pt[1]*g*1.2, at+0.0015);
@@ -140,6 +152,14 @@ MOVES.forEach(function(m){
   });
   box.appendChild(s);
 });
+var dosunRow = document.getElementById('dosun');
+Object.keys(DOSUN).forEach(function(k){
+  var d = DOSUN[k], b = document.createElement('button');
+  b.type = 'button'; b.dataset.dosun = k;
+  b.innerHTML = k+'<small>'+d.name.split(' ')[1]+'</small><small>'+d.sub+'</small>';
+  b.addEventListener('click', function(){ ready(); var t0 = ctx.currentTime + 0.01; d.hits.forEach(function(h){ knock(d, t0+h.t, h.p, h.g); }); if(navigator.vibrate) navigator.vibrate(20); else buzz(); });
+  dosunRow.appendChild(b);
+});
 var seqRow = document.getElementById('seq');
 Object.keys(WOOD).forEach(function(k){
   var b = document.createElement('button');
@@ -157,7 +177,7 @@ Object.keys(WOOD).forEach(function(k){
 });
 
 // 確かめ用（自動テストから読むだけ。遊びには関係ない）
-window.HB_SOUND_TRIAL = {WOOD:WOOD, MOVES:MOVES, knockInto:function(c, dest, w, at, p, g){
+window.HB_SOUND_TRIAL = {WOOD:WOOD, MOVES:MOVES, DOSUN:DOSUN, knockInto:function(c, dest, w, at, p, g){
   var saveCtx = ctx, saveMaster = master, saveBuf = noiseBuf;
   ctx = c; master = dest;
   noiseBuf = c.createBuffer(1, Math.ceil(c.sampleRate*0.05), c.sampleRate);
