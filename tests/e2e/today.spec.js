@@ -50,7 +50,8 @@ test('はじめの手・CPU・落ちてくる字は、その戦の袋から引�
   const r = await page.evaluate(() => {
     const T = window.HB_TEST; T.newGame(); const t = T.TODAY(), S = T.S(); const inBag = new Set(t.bag);
     const hands = [...S.mine, ...S.opp].map(p => p.orig).filter(l => l !== '｜');
-    return { ok: hands.every(l => inBag.has(l)), n: hands.length };
+    const R = T.RARE_TODAY(); hands.splice(hands.indexOf(R.letter), 1); // レアの字は袋の外から1枚入る（HB-083, D-108）。それ以外は袋から
+    return { ok: hands.every(l => inBag.has(l)), n: hands.length + 1 };
   });
   expect(r.ok).toBe(true); expect(r.n).toBe(8);
 });

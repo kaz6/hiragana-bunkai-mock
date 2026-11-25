@@ -632,6 +632,13 @@ function makeToday(rng){ const r=rng||Math.random, ri=(lo,hi)=>lo+Math.floor(r()
   const bag=[]; BAG.forEach(l=>{ if(!less.includes(l)) bag.push(l); }); less.forEach(l=>bag.push(l)); more.forEach(l=>{ for(let i=0;i<TODAY_PLUS;i++) bag.push(l); });
   return {bag,more,less}; }
 let TODAY={bag:BAG,more:[],less:[]};
+/* レアの字（HB-083, D-108。数・見せ方は編集の仮置き）：一戦の始めに、HB-082 の「ふだん落ちてこない字」（RARE）から1字と、どちらの最初の手に入れるか（二人のどちらか1人）を選ぶ。
+   当たった人の最初の手は、袋から引く4枚のうち1枚をレアの字に替える（5枚のまま・｜はそのまま）。外れた人の手はいまのまま。袋（TODAY.bag）には足さない。
+   ふたりででは matchId から決め、「どちらか」は在室の並び（presentIds の並び順）の何番目かで言うので、二人の画面で同じ字・同じ人になる。チュートリアルでは出さない */
+let RARE_TODAY=null; // {letter, toMe}。なし＝null
+function makeRare(rng,myIdx){ const r=rng||Math.random; if(!RARE.length) return null;
+  const letter=RARE[Math.floor(r()*RARE.length)], side=r()<0.5?0:1; // side：在室の並びの何番目の人の手に入るか（ひとりでは 0＝自分）
+  return {letter, toMe:myIdx==null?side===0:side===myIdx}; }
 const HAND=new Set(`
 はこ はし はち はる はい はく はは はつ よる よこ よい よし よく よめ よち よつ ほし ほこ ほろ ほる ほほ ほう
 にく にし にる こい こし こめ ここ ころ こる こう こつ こく いし いち いろ いぬ いく いる いき いう いい いつ
@@ -763,8 +770,8 @@ function oppCount(){ return isOnline()?(S.oppL?S.oppL.length:'？'):S.opp.length
 function lg(who,msg){ if(!S||(who==='me'&&(S.over||S.ending))) return; LOG.push(`${((Date.now()-t0)/1000).toFixed(1)}s ${who==='me'?'自分':'相手'}｜${shown(msg)}　［自分${S.mine.length}・相手${oppCount()}］`); }
 function logText(){ return [`ひらがな分解（仮）ログ ${new Date().toLocaleString('ja-JP')}`,
   isOnline()
-    ? `ふたりで（合言葉の部屋「${NET.pass}」）　今日の字 多め:${TODAY.more.join('')} 少なめ:${TODAY.less.join('')}　一度きり:${once?'あり':'なし'}　辞書:${WORDS.length}語　上限:${CAP}　引く:なし（${FLOOR}こまで1こずつ。0こ→すぐ濁音・1こ→${REFILL_MS/1000}秒後に半濁音・2こ→${REFILL_MS/1000}秒後にふつう）`
-    : `ひとりで（CPU）　速さ:${SPEEDS[speed].name}　今日の字 多め:${TODAY.more.join('')} 少なめ:${TODAY.less.join('')}　一度きり:${once?'あり':'なし'}　辞書:${WORDS.length}語　上限:${CAP}　相手の語:${SPEEDS[speed].deep?'辞書全部・2手先まで読む（つよい。D-051）':SPEEDS[speed].smart?'辞書全部（賢い。D-045）':cpuMax()+'字まで'}　引く:なし（${FLOOR}こまで1こずつ。0こ→すぐ濁音・1こ→${REFILL_MS/1000}秒後に半濁音・2こ→${REFILL_MS/1000}秒後にふつう）`].concat(LOG).join('\n'); }
+    ? `ふたりで（合言葉の部屋「${NET.pass}」）　今日の字 多め:${TODAY.more.join('')} 少なめ:${TODAY.less.join('')}${RARE_TODAY?' レア:'+RARE_TODAY.letter:''}　一度きり:${once?'あり':'なし'}　辞書:${WORDS.length}語　上限:${CAP}　引く:なし（${FLOOR}こまで1こずつ。0こ→すぐ濁音・1こ→${REFILL_MS/1000}秒後に半濁音・2こ→${REFILL_MS/1000}秒後にふつう）`
+    : `ひとりで（CPU）　速さ:${SPEEDS[speed].name}　今日の字 多め:${TODAY.more.join('')} 少なめ:${TODAY.less.join('')}${RARE_TODAY?' レア:'+RARE_TODAY.letter:''}　一度きり:${once?'あり':'なし'}　辞書:${WORDS.length}語　上限:${CAP}　相手の語:${SPEEDS[speed].deep?'辞書全部・2手先まで読む（つよい。D-051）':SPEEDS[speed].smart?'辞書全部（賢い。D-045）':cpuMax()+'字まで'}　引く:なし（${FLOOR}こまで1こずつ。0こ→すぐ濁音・1こ→${REFILL_MS/1000}秒後に半濁音・2こ→${REFILL_MS/1000}秒後にふつう）`].concat(LOG).join('\n'); }
 const els=new Map();
 function newGame(tut){
   HINT=null; clearTimeout(TUT.t); TUT.on=tut===true; TUT.step=TUT.on?'arrive':''; // tut＝true のときだけチュートリアルの一戦（HB-059）
@@ -773,17 +780,19 @@ function newGame(tut){
   lastThrow=null; S={mine:[],opp:[],oppL:null,oppO:null,sel:[],log:[],hintFound:[],used:new Set(),over:null,ending:false,started:false,busy:false,choose:null,
      say:'あなたが動いたら、動き出す'};
   TODAY=makeToday(isOnline()&&NET.matchId?seedRng('today-'+NET.matchId):null); // ふたりでは matchId から。ひとりでは毎戦ランダム
-  const firstHand=()=>[...Array.from({length:START-1},()=>pick(TODAY.bag)),START_PART]; // 最初の手は袋から4枚＋部品「｜」（D-034。二人とも）
-  const first=firstHand();
+  { let myIdx=null; if(isOnline()&&NET.matchId&&NET.lobby){ try{ myIdx=presentIds().indexOf(NET.playerId); }catch(e){ myIdx=-1; } }
+    RARE_TODAY=TUT.on||(isOnline()&&myIdx<0)?null:makeRare(isOnline()&&NET.matchId?seedRng('rare-'+NET.matchId):null, isOnline()&&NET.matchId?myIdx:null); } // 在室の並びが読めないふたりでは出さない（二人でそろえられないため）
+  const firstHand=(rare)=>{ const h=Array.from({length:START-1},()=>pick(TODAY.bag)); if(rare) h[rnd(h.length)]=RARE_TODAY.letter; return [...h,START_PART]; }; // 最初の手は袋から4枚＋部品「｜」（D-034。二人とも）。レアが当たった手は4枚のうち1枚をレアの字に（HB-083）
+  const first=firstHand(!!RARE_TODAY&&RARE_TODAY.toMe);
   games++;
   if(!TUT.on){ first.forEach((l,i)=>S.mine.push(mk(l,{delay:i*70})));
-  firstHand().forEach(l=>S.opp.push(mk(l))); } // チュートリアルはカゴが空から
+  firstHand(!!RARE_TODAY&&!RARE_TODAY.toMe).forEach(l=>S.opp.push(mk(l))); } // チュートリアルはカゴが空から（ふたりでの相手の手は届いたもので置き換わる）
   LOG=[]; t0=Date.now(); lastNg=''; tried=new Set(); sentRejects=new Set();
-  lg('me','今日の字 多め：'+TODAY.more.join('')+' 少なめ：'+TODAY.less.join('')); if(TUT.on) lg('me','チュートリアル'); else { lg('me','はじめの手 '+S.mine.map(letterOf).join('')); if(!isOnline()) lg('op','はじめの手 '+S.opp.map(letterOf).join('')); } // ふたりでの相手の手は届いてから
+  lg('me','今日の字 多め：'+TODAY.more.join('')+' 少なめ：'+TODAY.less.join('')+(RARE_TODAY?'　レア：'+RARE_TODAY.letter:'')); if(TUT.on) lg('me','チュートリアル'); else { lg('me','はじめの手 '+S.mine.map(letterOf).join('')); if(!isOnline()) lg('op','はじめの手 '+S.opp.map(letterOf).join('')); } // ふたりでの相手の手は届いてから
   suddenStart(); // 一戦が始まって suddenAt 秒でサドンデス（HB-082）。チュートリアルでは数えない
   NET.sentSig=null; guideNewGame(); if(TUT.on){ G.active=false; TUT.t=setTimeout(tutArrive,reduced?0:TUT_ARRIVE_MS); }
   $('today').hidden=TUT.on; // チュートリアルでは袋を使わない
-  $('today').innerHTML=`今日の字　多め：${TODAY.more.join('')}　少なめ：${TODAY.less.join('')}<small class="en" lang="en"> Today: more ${TODAY.more.join('')} / fewer ${TODAY.less.join('')}</small>`;
+  $('today').innerHTML=`今日の字　多め：${TODAY.more.join('')}　少なめ：${TODAY.less.join('')}${RARE_TODAY?'　レア：'+RARE_TODAY.letter:''}<small class="en" lang="en"> Today: more ${TODAY.more.join('')} / fewer ${TODAY.less.join('')}${RARE_TODAY?' / rare '+RARE_TODAY.letter:''}</small>`;
   render();
 }
 
@@ -1986,7 +1995,7 @@ function onOpponentLost(){ if(!S||S.over||S.ending) return; finish('win'); }
 if(window.HB_TEST&&typeof window.HB_TEST==='object') Object.assign(window.HB_TEST,{guideShow,GUIDE_TEXT,GUIDE_EN}); // 案内の文（HB-068）
 if(window.HB_TEST&&typeof window.HB_TEST==='object') Object.assign(window.HB_TEST,{SUDDEN,RARE,suddenWhen,suddenChars,suddenCount:()=>sudN,suddenSkip:sec=>{ sudStart-=sec*1000; suddenArm(); }}); // サドンデス：数・落ちる字の一覧・時刻・始まりを早める（HB-082）
 if(window.HB_TEST&&typeof window.HB_TEST==='object') Object.defineProperty(window.HB_TEST,'CAP',{get:()=>CAP,configurable:true}); // 一戦ごとに変わるので値でなく読む（HB-048）
-if(window.HB_TEST&&typeof window.HB_TEST==='object') Object.assign(window.HB_TEST,{TODOME,FX,NET,onStartMessage,KANA,PARTS,RECIPE,MERGE,MERGE_TURN,TURN,BAG,logText,makeToday,seedRng,TODAY:()=>TODAY,HAND,DICT,SPEEDS,key,
+if(window.HB_TEST&&typeof window.HB_TEST==='object') Object.assign(window.HB_TEST,{TODOME,FX,NET,onStartMessage,KANA,PARTS,RECIPE,MERGE,MERGE_TURN,TURN,BAG,logText,makeToday,makeRare,RARE_TODAY:()=>RARE_TODAY,seedRng,TODAY:()=>TODAY,HAND,DICT,SPEEDS,key,
   words:()=>WORDS, S:()=>S, mk,letterOf,checkSel,splitMade,mergeMade,comboOf,cpuOk,tapTile,doSplit,doMerge,doTurn,doThrow,render,newGame,TUT,TUT_SEQ,tutDone,startSolo,cpuAct,cpuThrow,setSpeed,showMeaning,SCENE_OF,exchangeCands,VOTE_TEXT,ALIAS,turnShortcuts,mergeTurnBacks,stepsOf,hintFind,hintPress,HINT:()=>HINT,HINT_TEXT,cpuApply,TURN_NOT_CPU,ATK,ATK_FX,atkKind,atkN,atkVisible,atkCanSplit,OPPFX:()=>OPPFX,onOpponentThrow,onOppBasket,atkThrowOnline,pressAgain,onAgainMessage,onPartnerLeft,onLobbyPresence,againUi,leaveOnline});
 
 newGame();
