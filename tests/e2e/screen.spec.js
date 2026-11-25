@@ -10,6 +10,8 @@ const noOverflow = page => page.evaluate(() => document.documentElement.scrollWi
 test('390px で開いてエラーがない。はじめの画面に ひとりで・ふたりで', async ({ page }, info) => {
   info.ctx = await openGame(page);
   await expect(page.locator('#btnSolo')).toBeVisible();
+  await expect(page.locator('#btnDuo')).toBeVisible();
+  await page.click('#btnDuo'); // 合言葉・入室は ふたりで を押してから出る（HB-076, D-102）
   await expect(page.locator('#btnJoin')).toBeVisible();
   expect(page.viewportSize().width).toBe(390);
   expect(await noOverflow(page)).toBe(true);
@@ -17,12 +19,14 @@ test('390px で開いてエラーがない。はじめの画面に ひとりで�
 
 test('はじめの画面の ひとりで・入室 は var(--me) の塗り。▶ が付く（HB-056, D-090）', async ({ page }, info) => {
   info.ctx = await openGame(page);
+  await page.click('#btnDuo');
   const bg = await page.evaluate(() => {
     const probe = document.createElement('div'); probe.style.background = 'var(--me)'; document.body.appendChild(probe);
     const me = getComputedStyle(probe).backgroundColor; probe.remove();
-    return { me, solo: getComputedStyle(document.getElementById('btnSolo')).backgroundColor, join: getComputedStyle(document.getElementById('btnJoin')).backgroundColor };
+    return { me, solo: getComputedStyle(document.getElementById('btnSolo')).backgroundColor, duo: getComputedStyle(document.getElementById('btnDuo')).backgroundColor, join: getComputedStyle(document.getElementById('btnJoin')).backgroundColor };
   });
   expect(bg.solo).toBe(bg.me);
+  expect(bg.duo).toBe(bg.me);
   expect(bg.join).toBe(bg.me);
   await expect(page.locator('#btnSolo')).toContainText('▶ ひとりで（CPU）');
   expect(await noOverflow(page)).toBe(true);
@@ -115,3 +119,31 @@ test('しくみの「向きの近道」：⊂→つ は1手、て→ん は2手�
   await expect(page.locator('#scList [data-sc="う＋｜→か|裏返す,回す|か"]')).toBeVisible();
   expect(await noOverflow(page)).toBe(true);
 });
+
+test('合言葉・入室は「▶ ふたりで（対人）」を押すと出る。もう一度押すとしまう（HB-076, D-102。作者 2026-11-25）', async ({ page }, info) => {
+  info.ctx = await openGame(page);
+  await expect(page.locator('#btnDuo')).toContainText('▶ ふたりで（対人）');
+  await expect(page.locator('#roomInput')).toBeHidden();
+  await expect(page.locator('#btnJoin')).toBeHidden();
+  await page.click('#btnDuo');
+  await expect(page.locator('#roomInput')).toBeVisible();
+  await expect(page.locator('#btnJoin')).toBeVisible();
+  await expect(page.locator('#btnDuo')).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.locator('#roomInput')).toBeFocused();
+  expect(await noOverflow(page)).toBe(true);
+  await page.click('#btnDuo');
+  await expect(page.locator('#roomInput')).toBeHidden();
+  await expect(page.locator('#btnDuo')).toHaveAttribute('aria-expanded', 'false');
+});
+
+test('ひとりでの強さ選びの間は ふたりで も隠れ、もどると元の開き方に戻る（HB-076）', async ({ page }, info) => {
+  info.ctx = await openGame(page);
+  await page.click('#btnDuo');
+  await page.click('#btnSolo');
+  await expect(page.locator('#btnDuo')).toBeHidden();
+  await expect(page.locator('#menuOnline')).toBeHidden();
+  await page.click('#btnSoloBack');
+  await expect(page.locator('#btnDuo')).toBeVisible();
+  await expect(page.locator('#btnJoin')).toBeVisible();
+});
+
