@@ -47,12 +47,13 @@ test.describe('ひとりで', () => {
     expect(t).toMatch(new RegExp(`今日の字\\s+多め：.+\\s+少なめ：.+\\s+レア：${R.letter}`));
     expect(t).not.toMatch(/あなた|あいて|自分|相手/);
     const log = await page.evaluate(() => window.HB_TEST.logText());
-    expect(log).toContain(` レア:${R.letter}　`);
+    expect(log).toContain(` レア:${R.letter}　`); // ログの頭の行（半角コロン）
+    expect(log).toContain(`　レア：${R.letter}　［`); // ログの「今日の字」の行（全角コロン）
     expect(await page.evaluate(() => document.getElementById('today').scrollWidth <= document.getElementById('today').clientWidth + 1)).toBe(true);
     expect(await noOverflow(page)).toBe(true);
   });
 
-  test('CPU（相手）の手にレアが入る一戦がある。CPU の選び方（cpu.js 側）には手を入れていない', async ({ page }) => {
+  test('CPU（相手）の手にレアが入る一戦がある。CPU の選び方には手を入れていない', async ({ page }) => {
     const r = await page.evaluate(() => { const T = window.HB_TEST; let n = 0, ok = true;
       for (let i = 0; i < 100; i++) { T.newGame(); const R = T.RARE_TODAY(); if (R.toMe) continue; n++; const S = T.S(); ok = ok && S.opp.some(p => p.orig === R.letter); }
       return { n, ok }; });
@@ -104,6 +105,7 @@ test.describe('English / 한국어', () => {
       info.ctx = await openGame(page); await startSolo(page);
       const R = await page.evaluate(() => window.HB_TEST.RARE_TODAY());
       expect((await page.locator('#today').innerText()).replace(/\s+/g, ' ')).toContain('rare ' + R.letter);
+      expect(await page.evaluate(() => document.getElementById('today').scrollWidth <= document.getElementById('today').clientWidth + 1)).toBe(true);
       expect(await noOverflow(page)).toBe(true);
     });
   });
@@ -113,6 +115,7 @@ test.describe('English / 한국어', () => {
       info.ctx = await openGame(page); await startSolo(page);
       const R = await page.evaluate(() => window.HB_TEST.RARE_TODAY());
       expect((await page.locator('#today').innerText()).replace(/\s+/g, ' ')).toContain('레어: ' + R.letter);
+      expect(await page.evaluate(() => document.getElementById('today').scrollWidth <= document.getElementById('today').clientWidth + 1)).toBe(true);
       expect(await noOverflow(page)).toBe(true);
     });
   });
