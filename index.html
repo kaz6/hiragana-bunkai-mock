@@ -780,6 +780,7 @@ function newGame(tut){
   firstHand().forEach(l=>S.opp.push(mk(l))); } // チュートリアルはカゴが空から
   LOG=[]; t0=Date.now(); lastNg=''; tried=new Set(); sentRejects=new Set();
   lg('me','今日の字 多め：'+TODAY.more.join('')+' 少なめ：'+TODAY.less.join('')); if(TUT.on) lg('me','チュートリアル'); else { lg('me','はじめの手 '+S.mine.map(letterOf).join('')); if(!isOnline()) lg('op','はじめの手 '+S.opp.map(letterOf).join('')); } // ふたりでの相手の手は届いてから
+  suddenStart(); // 一戦が始まって suddenAt 秒でサドンデス（HB-082）。チュートリアルでは数えない
   NET.sentSig=null; guideNewGame(); if(TUT.on){ G.active=false; TUT.t=setTimeout(tutArrive,reduced?0:TUT_ARRIVE_MS); }
   $('today').hidden=TUT.on; // チュートリアルでは袋を使わない
   $('today').innerHTML=`今日の字　多め：${TODAY.more.join('')}　少なめ：${TODAY.less.join('')}<small class="en" lang="en"> Today: more ${TODAY.more.join('')} / fewer ${TODAY.less.join('')}</small>`;
@@ -1246,8 +1247,16 @@ function cpuThrow(w,tag){ const had=S.mine.map(p=>p.id), used=[]; for(const ch o
    除くと何も残らないときは除かない（止まらない）。1手先・2手先で言葉ができる手は今までどおり選んでよい */
 const OPP_MEMO=4;
 const bagKey=L=>L.slice().sort().join('');
-function oppMemo(L){ const h=S.oppHist||(S.oppHist=[]); h.push(bagKey(L)); if(h.length>OPP_MEMO+1) h.shift(); }
-function fresh(steps){ const h=S.oppHist||[]; const f=steps.filter(st=>!h.includes(bagKey(st.res))); return f.length?f:steps; }
+function oppMemo(L){ const h=S.oppHist||(S.oppHist=[]), k=bagKey(L); if(h[h.length-1]===k) return; /* 動かずに待っている間は、おぼえた中身を増やさない（古い中身が押し出されて、戻る手がまた出てくるのを防ぐ。HB-082） */ S.oppWait=false; h.push(k); if(h.length>OPP_MEMO+1) h.shift(); }
+function fresh(steps){ const h=S.oppHist||[]; return steps.filter(st=>!h.includes(bagKey(st.res))); } // 戻るだけの手を除く。何も残らなければ空（HB-082。前は「除くと何も残らないときは除かない」）
+/* 言葉にならないときの適当な1手（HB-082）。8こまでは割る・回す・くっつける、9こ以上は くっつけるだけ（前と同じ）。
+   戻るだけの手（おぼえた中身に戻る手）しか無いときは、動かずに待つ（言葉が作れる手・投げる手はここに来ない）。
+   avoidBack：ふつう・つよいは戻る手を除いて選ぶ。ゆるゆる・のんびり・ゆっくりは前どおり全部からランダムに選び、全部が戻る手のときだけ待つ */
+function idleStep(steps,apply,avoidBack){ const pool=(steps.length&&S.opp.length<=8)?steps:steps.filter(s=>s.t==='merge');
+  if(!pool.length){ S.say='手が出ない'; lg('op','手が出ない'); return; }
+  const f=fresh(pool);
+  if(f.length){ apply(pick(avoidBack?f:pool)); return; }
+  S.say='手が出ない'; if(!S.oppWait){ S.oppWait=true; lg('op','手が出ない（戻るだけの手しかない）'); } } // 待つ。ログは待ち始めに1回だけ
 function cpuSmart(){ const L=S.opp.map(letterOf), now=smartBest(L); oppMemo(L);
   const must=S.oppThrowNext; S.oppThrowNext=false;
   if(now&&(must||S.opp.length>=SMART_RUSH)){ cpuThrow(now.w); return; }
@@ -1258,9 +1267,7 @@ function cpuSmart(){ const L=S.opp.map(letterOf), now=smartBest(L); oppMemo(L);
   for(const st of all){ const b=smartBest(st.res); if(!b) continue; if(b.sc>bs){ bs=b.sc; best=[st]; } else if(b.sc===bs&&best.length) best.push(st); }
   if(best.length){ go(pickCheap(best)); return; }
   if(now){ cpuThrow(now.w); return; }
-  const steps=all; // どの1手でも言葉にならないときは、今までの相手と同じく適当に動く（重いときの割り方は上で除いた）。戻るだけの手は除く（D-061）
-  if(steps.length&&S.opp.length<=8) go(pick(fresh(steps)));
-  else { const m=steps.filter(s=>s.t==='merge'); if(m.length) cpuApply(pick(fresh(m))); else { S.say='手が出ない'; lg('op','手が出ない'); } } }
+  idleStep(all,go,true); } // どの1手でも言葉にならないときは、今までの相手と同じく適当に動く（重いときの割り方は上で除いた）。戻るだけの手は除く（D-061）。戻るだけなら待つ（HB-082）
 /* ---- つよい相手（つよい だけ。HB-022, D-051）----
    土台は ふつう（cpuSmart）と同じ：辞書全部・点数＝字数＋重い字×HEAVY_W・8こ以上の割り方の決まり。そこに3つ足す。
    1. 守り：自分（相手側）のカゴが STRONG_GUARD こ以上なら、点数より字数を優先して、いちばん長い言葉をすぐ投げる
@@ -1326,9 +1333,7 @@ function strongMove(t0){ const L=S.opp.map(letterOf), now=smartBest(L); oppMemo(
   if(!heavy){ const order=ok.slice().sort((a,b)=>(b.top?b.top.sc:0)-(a.top?a.top.sc:0)); const p=strongPlan(L,bs,order,t0); if(p){ go(pickCheap(p.firsts),`2手先「${p.w}」${p.sc}点`); return; } }
   if(best.length){ go(pickCheap(best)); return; }
   if(now){ cpuThrow(now.w); return; }
-  const steps=ok; // 戻るだけの手は除く（D-061）
-  if(steps.length&&S.opp.length<=8) go(pick(fresh(steps)));
-  else { const m=steps.filter(s=>s.t==='merge'); if(m.length) cpuApply(pick(fresh(m))); else { S.say='手が出ない'; lg('op','手が出ない'); } } }
+  idleStep(ok,go,true); } // 戻るだけの手は除く（D-061）。戻るだけなら待つ（HB-082）
 function cpuAct(){ if(S.over||S.ending||sheetOpen||guideHolds()||TUT.on) return;
   if(SPEEDS[speed].deep){ cpuStrong(); render(); schedule(); return; }
   if(SPEEDS[speed].smart){ cpuSmart(); render(); schedule(); return; }
@@ -1339,12 +1344,11 @@ function cpuAct(){ if(S.over||S.ending||sheetOpen||guideHolds()||TUT.on) return;
     let bx=''; if(bonus){ const b=mk(pick(TODAY.bag),{delay:[...w].length*110,note:'おまけ'}); S.mine.push(b); bx=letterOf(b); S.say+='（＋おまけ1字）'; }
     lg('op',`投げる「${w}」`+(bx?` 自分におまけ「${bx}」`:'')); showMeaning(w,'op');
     if(S.mine.length>CAP) finish('lose'); else atkReceive(w,had); }
-  else { const steps=cpuSteps(); const good=steps.filter(s=>bestWord(s.res));
+  else { oppMemo(L); const steps=cpuSteps(); const good=steps.filter(s=>bestWord(s.res));
     if(good.length) cpuApply(pick(good));
-    else if(steps.length&&S.opp.length<=8){ cpuApply(pick(steps)); }
-    else { const m=steps.filter(s=>s.t==='merge'); if(m.length) cpuApply(pick(m)); else { S.say='手が出ない'; lg('op','手が出ない'); } } }
+    else idleStep(steps,cpuApply,false); } // 全部が戻る手のときだけ待つ（HB-082）
   render(); schedule(); }
-function finish(kind){ LOG.push(`結果：${RESULT_LABEL[kind]}`); S.ending=true; clearTimeout(cpuT); setTimeout(()=>{ S.over=kind; render(); }, reduced?0:900); }
+function finish(kind){ LOG.push(`結果：${RESULT_LABEL[kind]}`); S.ending=true; clearTimeout(cpuT); clearTimeout(sudT); setTimeout(()=>{ S.over=kind; render(); }, reduced?0:900); }
 
 /* ---- 描画 ---- */
 const basket=$('basket');
@@ -1534,6 +1538,28 @@ const DAKU=Object.keys(RECIPE).filter(k=>KANA.has(k)&&k.normalize('NFD').endsWit
 const HANDAKU=Object.keys(RECIPE).filter(k=>KANA.has(k)&&k.normalize('NFD').endsWith('゚'));
 const DROP_TIER=[{from:DAKU,tag:'濁音'},{from:HANDAKU,tag:'半濁音'},{get from(){return TODAY.bag},tag:''}];
 let refT={me:null,op:null};
+/* ---- サドンデス（HB-082, D-107。数と見た目は編集の仮置き。suddenAt の300秒だけ作者の決定）----
+   一戦が始まって suddenAt 秒たつと、二人のカゴに数秒おきに1字ずつ「ふだん落ちてこない字」が落ちてくる。間は suddenEvery 秒から1字ごとに suddenStep 秒ずつ縮み、suddenMin 秒で止まる。
+   「ふだん落ちてこない字」＝ KANA にあり、BAG に無く、濁音・半濁音でない字（字が増えたら自動で入る）。同じ時刻に二人とも同じ字：ふたりででは matchId から、ひとりででは1つの乱数から。
+   カゴの上限の扱いは変えない（こえたら負け）。チュートリアルでは落ちない。数は rules.js（window.HB_RULES） */
+const RARE=[...KANA].filter(l=>!BAG.includes(l)&&!DAKU.includes(l)&&!HANDAKU.includes(l));
+const ruleNum=(k,def,okFn)=>{ const v=window.HB_RULES&&window.HB_RULES[k]; return typeof v==='number'&&isFinite(v)&&okFn(v)?v:def; }; // 読めない・おかしい値のときは既定の値
+const SUDDEN={at:ruleNum('suddenAt',300,v=>v>0), every:ruleNum('suddenEvery',6,v=>v>0), step:ruleNum('suddenStep',0.5,v=>v>=0), min:ruleNum('suddenMin',2,v=>v>0)};
+const suddenGap=k=>Math.max(SUDDEN.min,SUDDEN.every-SUDDEN.step*k); // k 字めの落ちるあと、次の字まで（秒）
+const suddenWhen=n=>{ let t=SUDDEN.at; for(let k=0;k<n;k++) t+=suddenGap(k); return t; }; // n 字め（0 から）が落ちる、一戦の始めからの秒
+let sudT=null, sudN=0, sudStart=0, sudRng=null;
+function suddenPick(rng){ return RARE[Math.floor(rng()*RARE.length)]; }
+function suddenChars(seed,n){ const r=seedRng('sudden-'+seed); return Array.from({length:n},()=>suddenPick(r)); } // 確かめ用：同じ種なら同じ並び
+function suddenArm(){ clearTimeout(sudT); sudT=null; if(!S||S.over||S.ending||TUT.on||!RARE.length) return;
+  sudT=setTimeout(suddenDrop, Math.max(0,sudStart+suddenWhen(sudN)*1000-Date.now())); } // 始めの時刻からの決まった時刻で数える（ずれが貯まらない）
+function suddenStart(){ clearTimeout(sudT); sudT=null; sudN=0; sudStart=Date.now();
+  sudRng=seedRng('sudden-'+(isOnline()&&NET.matchId?NET.matchId:'solo-'+Math.random())); suddenArm(); }
+function suddenDrop(){ sudT=null; if(!S||S.over||S.ending||TUT.on) return;
+  const ch=suddenPick(sudRng); if(sudN===0) lg('me','サドンデス'); sudN++;
+  for(const side of isOnline()?['me']:['me','op']){ const a=side==='me'?S.mine:S.opp, n=mk(ch); a.push(n); lg(side,'落ちてきた '+letterOf(n)+'（サドンデス）'); } // ふたりででは相手のカゴは相手の端末が同じ字を落とす
+  if(S.mine.length>CAP){ if(isOnline()) sendLoseToOpponent(); finish('lose'); }
+  else if(!isOnline()&&S.opp.length>CAP) finish('win');
+  render(); suddenArm(); }
 function dropOne(side){ const a=side==='me'?S.mine:S.opp; if(a.length>=FLOOR) return;
   const t=DROP_TIER[a.length], n=mk(pick(t.from)); if(side==='me'&&t.from===DAKU) n.kira=true; // 濁音が自分のカゴに落ちたらキラキラ（見た目だけ）
   a.push(n); lg(side,'落ちてきた '+letterOf(n)+(t.tag?`（${t.tag}）`:'')); }
@@ -1958,6 +1984,7 @@ function onOpponentLost(){ if(!S||S.over||S.ending) return; finish('win'); }
 
 /* 自動テストの窓（HB-035）。テストがページを開く前に window.HB_TEST={} を置いたときだけ、中の表と関数を渡す。ふだんの遊びでは何もしない */
 if(window.HB_TEST&&typeof window.HB_TEST==='object') Object.assign(window.HB_TEST,{guideShow,GUIDE_TEXT,GUIDE_EN}); // 案内の文（HB-068）
+if(window.HB_TEST&&typeof window.HB_TEST==='object') Object.assign(window.HB_TEST,{SUDDEN,RARE,suddenWhen,suddenChars,suddenCount:()=>sudN,suddenSkip:sec=>{ sudStart-=sec*1000; suddenArm(); }}); // サドンデス：数・落ちる字の一覧・時刻・始まりを早める（HB-082）
 if(window.HB_TEST&&typeof window.HB_TEST==='object') Object.defineProperty(window.HB_TEST,'CAP',{get:()=>CAP,configurable:true}); // 一戦ごとに変わるので値でなく読む（HB-048）
 if(window.HB_TEST&&typeof window.HB_TEST==='object') Object.assign(window.HB_TEST,{TODOME,FX,NET,onStartMessage,KANA,PARTS,RECIPE,MERGE,MERGE_TURN,TURN,BAG,logText,makeToday,seedRng,TODAY:()=>TODAY,HAND,DICT,SPEEDS,key,
   words:()=>WORDS, S:()=>S, mk,letterOf,checkSel,splitMade,mergeMade,comboOf,cpuOk,tapTile,doSplit,doMerge,doTurn,doThrow,render,newGame,TUT,TUT_SEQ,tutDone,startSolo,cpuAct,cpuThrow,setSpeed,showMeaning,SCENE_OF,exchangeCands,VOTE_TEXT,ALIAS,turnShortcuts,mergeTurnBacks,stepsOf,hintFind,hintPress,HINT:()=>HINT,HINT_TEXT,cpuApply,TURN_NOT_CPU,ATK,ATK_FX,atkKind,atkN,atkVisible,atkCanSplit,OPPFX:()=>OPPFX,onOpponentThrow,onOppBasket,atkThrowOnline,pressAgain,onAgainMessage,onPartnerLeft,onLobbyPresence,againUi,leaveOnline});
