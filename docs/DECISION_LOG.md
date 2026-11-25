@@ -1030,6 +1030,8 @@
 - 決めたこと：JMdict（CC BY-SA 4.0）と IPADIC の表示は、公開ページが誰でも開ける今の時点で要る（参謀）。EDRDG の決まりに固定の文は無く「使ったことと出どころをはっきり示す」こと。置き場所は画面ごと（相談チャットが licence.html・sample.html を読んだ）。入れる英語の一文は相談チャットが決めた（sample.html の型。KANJIDIC は使っていないので JMdict だけ）
 - 中身：①「？ 遊び方」（しくみ）の一番下に「つかったもの」の節（index.html の #credits）。JMdict の英語の一文（JMdict・Electronic Dictionary Research and Development Group・Group's licence にリンク）、CC BY-SA 4.0 のリンク、IPADIC の著作権表示と条件（原文。折りたたみ）と全文のファイルへのリンク、字体（Klee One・Zen Kaku Gothic New。SIL OFL 1.1）、音（自前）。日本語・English・한국어 ②はじめの画面と遊ぶ画面の一番下に小さな一行「辞書：JMdict（EDRDG）・IPADIC」。押すと①が開く（はじめの画面の上にも出る） ③ meanings.js の HB_MEANINGS_NOTICE を英語の一文に置き換えた（tools/build_meanings.py も同じ文を書く。毎日の更新で戻らない） ④ licenses/mecab-ipadic-LICENSE.txt（dict-ipadic.js の原文と同じ） ⑤ CREDITS.md・docs/THIRD_PARTY.md を直した
 - 編集の仮置き：日本語の添え・字体の行・音の行の文、한국어の訳、見出し「つかったもの」／Credits／사용한 것、一行の文と置き場所・見た目（小さい字・下線）、字体のライセンスを OFL 1.1 としたこと（頁では確かめていない）。EDRDG の英語の一文は変えていない
+- 並びが動いたところ（作者が画像で見て直す。390×844 で main と比べた）：遊ぶ画面は一番下に一行が入るので、ログの高さが 185px→150px、カゴの上端が 424→389、操作の色面が 664–844→629–809（35px 上がる）。D-105 の色面の下に地色の帯ができて一行が入る（docs/reports/img/hb-081-play-line.png）。はじめの画面の一行はボタンのすぐ下（「ふたりで」を開くと 336px、強さ選びを開くと 475px に下がる。hb-081-menu-line.png）
+- 作りの注意：はじめの画面から開くと「しくみ」全体が上に出る（上へ送ると「チュートリアルをもう一度」などが押せる。押してもメニューは出たままで害は小さい）。合言葉で待つ間に開いたままだと、相手がそろって始まってもシートが残る。どちらも作者が見て決める
 - 確かめ：tests/e2e/credits.spec.js 6本（語・リンク・折りたたみ・licenses の同一・日本語／English／한국어・390px ではみ出さない）。npm test 全部通る。画像：docs/reports/img/hb-081-*.png
 - 却下：なし
 - 作業：HB-081（係）
