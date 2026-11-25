@@ -133,6 +133,12 @@ button:focus-visible{outline:2px solid var(--me);outline-offset:2px}
 .basket{position:relative;background:var(--field);border-radius:0 0 10px 10px;
   border:2px solid var(--line);border-top:0;flex:none}
 .rim{position:absolute;left:0;right:0;height:0;border-top:2px dashed var(--line);pointer-events:none}
+/* 戦場を向かい合わせにする（HB-080, D-105。作者 2026-11-25 11:18「Cかな！」）：あいての行は相手の色、自分のカゴと操作は自分の色を薄く敷く。
+   色の面だけで分け、線・影は足さない。濃さは --face-op・--face-me の2つで直せる */
+:root{--face-op:24%;--face-me:12%}
+.opp{margin-inline:-16px;padding:10px 16px 8px;background:color-mix(in srgb,var(--opp) var(--face-op),var(--bg))}
+#controls{margin-inline:-16px;padding:6px 16px 12px;margin-bottom:-8px;background:color-mix(in srgb,var(--me) var(--face-me),var(--bg))}
+.basket{background:color-mix(in srgb,var(--me) calc(var(--face-me) * .7),var(--bg));border-color:color-mix(in srgb,var(--me) 45%,var(--line))}
 .rim span{position:absolute;right:6px;bottom:3px;font-size:calc(12px*var(--fz));color:var(--sub)}
 .count{position:absolute;left:8px;top:4px;font:700 calc(14px*var(--fz))/1 var(--f-ui);font-variant-numeric:tabular-nums;color:var(--sub);pointer-events:none}
 .count.full{color:var(--opp)}
