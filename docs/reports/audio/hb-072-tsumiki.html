@@ -43,8 +43,14 @@ button:active small{color:var(--bg)}
 
 <section>
   <h2>ドスン（空になって落ちてくる）</h2>
-  <p class="how">カゴが空になって字が落ちてきたときの音の候補（HB-079・仮）。重い木が落ちる「ドスン」。</p>
+  <p class="how">カゴが空になって字が落ちてきたときの音の候補（HB-079・仮）。重い木が落ちる「ドスン」。G1〜G3 は D3 をもっと低くした「ガンッ！」（HB-084・仮）。</p>
   <div class="row" id="dosun"></div>
+</section>
+
+<section>
+  <h2>投げる C の逆再生</h2>
+  <p class="how">投げる「コロコロ」（C 木の箱）を後ろから鳴らす（HB-085・仮）。R1 は音そのものを逆に（じわっと膨らんで、ぷつっと切れる）。R2 は並びだけ逆に（下がるコロコロ）。くらべ用に元の音も置いた。</p>
+  <div class="row" id="rev"></div>
 </section>
 
 <section>
@@ -78,7 +84,12 @@ var VOLUME = 0.6;
 var DOSUN = {
   D1:{name:'D1 木の箱を置く', sub:'ド・スン', f:150, decay:0.26, sweep:1.5, sweepT:0.05, parts:[[1,1,1],[2.3,0.22,0.5],[4.1,0.05,0.3]], click:{f:500,q:1.0,amp:0.5,dur:0.03}, tone:1600, hits:[{t:0,p:1.5,g:0.35},{t:0.06,p:1,g:1}]},
   D2:{name:'D2 積み木を落とす', sub:'ドン・コッ', f:240, decay:0.18, sweep:1.35, sweepT:0.04, parts:[[1,1,1],[2.76,0.25,0.5],[5.4,0.06,0.3]], click:{f:900,q:1.2,amp:0.45,dur:0.025}, tone:2600, hits:[{t:0,p:1,g:1.8},{t:0.13,p:1.08,g:0.5}]},
-  D3:{name:'D3 ずしん', sub:'低く長い', f:95, decay:0.40, sweep:1.8, sweepT:0.08, parts:[[1,1,1],[2.1,0.2,0.6],[3.6,0.06,0.3]], click:{f:350,q:0.9,amp:0.6,dur:0.04}, tone:1100, hits:[{t:0,p:1,g:2.2}]}
+  D3:{name:'D3 ずしん', sub:'低く長い', f:95, decay:0.40, sweep:1.8, sweepT:0.08, parts:[[1,1,1],[2.1,0.2,0.6],[3.6,0.06,0.3]], click:{f:350,q:0.9,amp:0.6,dur:0.04}, tone:1100, hits:[{t:0,p:1,g:2.2}]},
+  // D3 をもっと低く「ガンッ！」に（作者 2026-11-25 18:52。HB-084・仮）。頭を硬く（打った瞬間の雑音を強く・高く）、終わりを短く切る。
+  // スマホの小さいスピーカーは 100Hz より下がほとんど出ないので、2倍・3倍・4倍の音を太くして「低く聞こえる」ようにした
+  G1:{name:'G1 ガンッ', sub:'硬く短い', f:70, decay:0.22, sweep:2.2, sweepT:0.03, parts:[[1,1,1],[2,0.6,0.6],[3,0.35,0.4],[4.2,0.15,0.25]], click:{f:1500,q:0.8,amp:0.9,dur:0.02}, tone:2400, hits:[{t:0,p:1,g:2.0}]},
+  G2:{name:'G2 ガンッ', sub:'もっと低く', f:55, decay:0.28, sweep:2.5, sweepT:0.035, parts:[[1,1,1],[2,0.65,0.6],[3,0.4,0.45],[4.2,0.18,0.25]], click:{f:1100,q:0.8,amp:1.0,dur:0.025}, tone:2000, hits:[{t:0,p:1,g:2.2}]},
+  G3:{name:'G3 ガ・ンッ', sub:'硬い頭と低い胴', f:65, decay:0.24, sweep:2.0, sweepT:0.03, parts:[[1,1,1],[2,0.6,0.6],[3,0.35,0.4],[4.2,0.15,0.25]], click:{f:2200,q:0.7,amp:1.0,dur:0.015}, tone:2800, hits:[{t:0,p:1.8,g:0.7},{t:0.012,p:1,g:2.0}]}
 };
 
 // ── 鳴らす仕組み ──
@@ -160,6 +171,37 @@ Object.keys(DOSUN).forEach(function(k){
   b.addEventListener('click', function(){ ready(); var t0 = ctx.currentTime + 0.01; d.hits.forEach(function(h){ knock(d, t0+h.t, h.p, h.g); }); if(navigator.vibrate) navigator.vibrate(20); else buzz(); });
   dosunRow.appendChild(b);
 });
+// 投げる C の逆再生（HB-085・仮）。R1＝鳴らした音を一度書き出して、後ろから鳴らす。R2＝打つ順と高さの並びだけ逆にする
+function renderMove(woodKey, move){
+  var sr = ctx.sampleRate, oc = new OfflineAudioContext(1, Math.ceil(sr*0.7), sr);
+  var comp = oc.createDynamicsCompressor(); comp.threshold.value = -10; comp.ratio.value = 6;
+  var g = oc.createGain(); g.gain.value = VOLUME; g.connect(comp); comp.connect(oc.destination);
+  var w = WOOD[woodKey];
+  move.hits.forEach(function(h){ window.HB_SOUND_TRIAL.knockInto(oc, g, w, 0.01+h.t, h.p, h.g); });
+  return oc.startRendering();
+}
+function reverseBuffer(buf){
+  var x = buf.getChannelData(0), n = x.length, first = 0;
+  for(var i=n-1;i>=0;i--){ if(Math.abs(x[i])>0.001){ first = n-1-i; break; } } // 後ろの無音は、逆にすると頭に来るので切る
+  var out = ctx.createBuffer(1, n-first, buf.sampleRate), y = out.getChannelData(0);
+  for(var j=0;j<y.length;j++) y[j] = x[n-1-first-j];
+  return out;
+}
+var THROW = MOVES.filter(function(m){ return m.key==='throw'; })[0];
+var THROW_BACK = {key:'throw-back', name:'投げる（並びだけ逆）', hits:THROW.hits.map(function(h,i,a){ var last=a[a.length-1].t, src=a[a.length-1-i]; return {t:last-src.t, p:src.p, g:src.g}; }).sort(function(a,b){return a.t-b.t;})};
+var REV = {
+  R0:{name:'元', sub:'投げる C そのまま', play:function(){ play('C', THROW); }},
+  R1:{name:'逆再生', sub:'音ごと後ろから', play:function(){ ready(); renderMove('C', THROW).then(function(buf){ var s = ctx.createBufferSource(); s.buffer = reverseBuffer(buf); s.connect(ctx.destination); s.start(); }); }},
+  R2:{name:'並びだけ逆', sub:'下がるコロコロ', play:function(){ play('C', THROW_BACK); }}
+};
+var revRow = document.getElementById('rev');
+Object.keys(REV).forEach(function(k){
+  var r = REV[k], b = document.createElement('button');
+  b.type = 'button'; b.dataset.rev = k;
+  b.innerHTML = k+'<small>'+r.name+'</small><small>'+r.sub+'</small>';
+  b.addEventListener('click', function(){ r.play(); buzz(); });
+  revRow.appendChild(b);
+});
 var seqRow = document.getElementById('seq');
 Object.keys(WOOD).forEach(function(k){
   var b = document.createElement('button');
@@ -177,7 +219,7 @@ Object.keys(WOOD).forEach(function(k){
 });
 
 // 確かめ用（自動テストから読むだけ。遊びには関係ない）
-window.HB_SOUND_TRIAL = {WOOD:WOOD, MOVES:MOVES, DOSUN:DOSUN, knockInto:function(c, dest, w, at, p, g){
+window.HB_SOUND_TRIAL = {WOOD:WOOD, MOVES:MOVES, DOSUN:DOSUN, THROW_BACK:THROW_BACK, knockInto:function(c, dest, w, at, p, g){
   var saveCtx = ctx, saveMaster = master, saveBuf = noiseBuf;
   ctx = c; master = dest;
   noiseBuf = c.createBuffer(1, Math.ceil(c.sampleRate*0.05), c.sampleRate);

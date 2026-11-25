@@ -57,6 +57,53 @@ for (const lv of ['ゆっくり', 'ふつう', 'つよい']) {
   });
 }
 
+// ---- HB-082（D-107）：戻るだけの手しか無いときは、動かずに待つ（゛⇄゜゜ の往復をやめる）----
+for (const lv of LEVELS) {
+  test(`${lv}：カゴが ゛・゜ だけ（゛゜゜）でも、何十手ぶんの時間たっても ゛⇄゜゜ を繰り返さず、待つ`, async ({ page }) => {
+    await startSolo(page, lv);
+    const r = await page.evaluate(() => {
+      const T = window.HB_TEST; T.newGame(); const S = T.S(); S.started = true; S.used = new Set();
+      S.opp = ['゛', '∘', '∘'].map(c => T.mk(c));
+      S.mine = Array.from({ length: 3 }, () => T.mk('よ'));
+      const keys = [];
+      for (let i = 0; i < 60; i++) { T.cpuAct(); keys.push(T.S().opp.map(T.letterOf).sort().join('')); }
+      const changes = keys.filter((k, i) => k !== (i ? keys[i - 1] : '゛∘∘')).length;
+      const tailSame = new Set(keys.slice(20)).size === 1;
+      return { changes, tailSame, keys: [...new Set(keys)], logText: T.logText() };
+    });
+    expect(r.changes).toBeLessThanOrEqual(1); // 動いても1手。そこから ゛⇄゜゜ には戻らない
+    expect(r.tailSame).toBe(true);            // あとは動かず待つ
+    expect((r.logText.match(/手が出ない（戻るだけの手しかない）/g) || []).length).toBeLessThanOrEqual(1); // ログは待ち始めに1回だけ
+  });
+}
+
+for (const lv of LEVELS) {
+  test(`${lv}：言葉が作れるカゴ（い・し）では今までどおり投げる`, async ({ page }) => {
+    await startSolo(page, lv);
+    const r = await page.evaluate(() => {
+      const T = window.HB_TEST; T.newGame(); const S = T.S(); S.started = true; S.used = new Set();
+      S.opp = ['い', 'し'].map(c => T.mk(c)); S.mine = Array.from({ length: 3 }, () => T.mk('よ'));
+      T.cpuAct(); return T.S().log.filter(x => x.who === 'op').map(x => x.word);
+    });
+    expect(r.length).toBe(1); expect(['いし', 'しい']).toContain(r[0]); // い・し の2字の言葉を投げる（どちらかは強さで変わる）
+  });
+}
+
+test('待っていたCPUは、カゴの中身が変われば（落ちてきた・字が足された）また動く', async ({ page }) => {
+  await startSolo(page, 'つよい');
+  const r = await page.evaluate(() => {
+    const T = window.HB_TEST; T.newGame(); const S = T.S(); S.started = true; S.used = new Set();
+    S.opp = ['゛', '∘', '∘'].map(c => T.mk(c)); S.mine = Array.from({ length: 3 }, () => T.mk('よ'));
+    for (let i = 0; i < 10; i++) T.cpuAct();
+    const waiting = T.S().opp.map(T.letterOf).sort().join('');
+    T.S().opp.push(T.mk('ふ')); // カゴの中身が変わった
+    const before = T.S().opp.map(T.letterOf).sort().join('');
+    for (let i = 0; i < 3; i++) T.cpuAct();
+    return { waiting, before, after: T.S().opp.map(T.letterOf).sort().join('') };
+  });
+  expect(r.after).not.toBe(r.before);
+});
+
 // ---- HB-050（D-084）：CPU の回す・裏返すを、人と同じ手数にそろえる ----
 test('CPU の向きの手：TURN は人の最短手順（turnShortcuts）と同じ手数・同じ一言。へ→く・し→つ・て→ん は2手、⊂→つ・い→こ・さ→ち は1手', async ({ page }) => {
   await startSolo(page, 'とまる');

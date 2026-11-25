@@ -36,6 +36,8 @@
 | `tests/e2e/votes.spec.js` | 結果の画面の「やりとり」の候補と いい／いまいち（exchange_votes。D-081） |
 | `tests/e2e/sound.spec.js` | 手触りの音（sound.js。どの動きで鳴らすか・作者が選んだ組。D-100） |
 | `tests/e2e/attack.spec.js` | 特別攻撃ワード（attack-words.js。語・枚数・札の選び方・★・音・食らいエフェクト。D-101） |
+| `tests/e2e/sudden.spec.js` | サドンデス（一戦が始まって300秒で珍しい字が落ちる。一覧・時刻・同じ字・上限・チュートリアル・rules.js の数。D-107） |
+| `tests/e2e/rare.spec.js` | 今日の字のレア（一戦ごとに「ふだん落ちてこない字」1字を二人のどちらかの最初の手に1枚。行・ログ・ふたりでのそろい・チュートリアル。D-108） |
 | `tests/e2e/basket.spec.js` | カゴの上限（14こを超えたら負け。値は rules.js） |
 | `tests/e2e/captext.spec.js` | 画面の文に入る上限の数（日本語・English・한국어。rules.js の cap を変えて開く。HB-068） |
 | `tests/e2e/credits.spec.js` | 出どころの表示（JMdict・EDRDG・CC BY-SA 4.0・IPADIC・字体・音。しくみの「つかったもの」と、はじめの画面・遊ぶ画面の一行。HB-081） |
