@@ -1584,13 +1584,13 @@ function suddenStart(){ clearTimeout(sudT); sudT=null; sudN=0; sudStart=Date.now
   sudRng=seedRng('sudden-'+(isOnline()&&NET.matchId?NET.matchId:'solo-'+Math.random())); suddenArm(); }
 function suddenDrop(){ sudT=null; if(!S||S.over||S.ending||TUT.on||!$('menu').hidden) return;
   const ch=suddenPick(sudRng); if(sudN===0) lg('me','サドンデス'); sudN++;
-  for(const side of isOnline()?['me']:['me','op']){ const a=side==='me'?S.mine:S.opp, n=mk(ch); a.push(n); lg(side,'落ちてきた '+letterOf(n)+'（サドンデス）'); } // ふたりででは相手のカゴは相手の端末が同じ字を落とす
+  for(const side of isOnline()?['me']:['me','op']){ const a=side==='me'?S.mine:S.opp, n=mk(ch); a.push(n); lg(side,'落ちてきた '+letterOf(n)+'（サドンデス）'); if(side==='me') se('drop'); } // ふたりででは相手のカゴは相手の端末が同じ字を落とす
   if(S.mine.length>CAP){ if(isOnline()) sendLoseToOpponent(); finish('lose'); }
   else if(!isOnline()&&S.opp.length>CAP) finish('win');
   render(); suddenArm(); }
 function dropOne(side){ const a=side==='me'?S.mine:S.opp; if(a.length>=FLOOR) return;
   const t=DROP_TIER[a.length], n=mk(pick(t.from)); if(side==='me'&&t.from===DAKU) n.kira=true; // 濁音が自分のカゴに落ちたらキラキラ（見た目だけ）
-  a.push(n); lg(side,'落ちてきた '+letterOf(n)+(t.tag?`（${t.tag}）`:'')); }
+  a.push(n); lg(side,'落ちてきた '+letterOf(n)+(t.tag?`（${t.tag}）`:'')); if(side==='me') se('drop'); } // 自分のカゴに落ちたときだけ鳴らす（HB-086）
 function refill(){ if(!S||S.over||S.ending) return;
   for(const side of isOnline()?['me']:['me','op']){ const cur=side==='me'?S.mine:S.opp; // ふたりででは相手のカゴは相手の端末が動かす
     if(TUT.on){ if(TUT.step==='end'&&side==='me'&&cur.length===0) dropOne('me'); continue; } // チュートリアルは、最後に空になったときの濁音1つだけ（HB-059）
@@ -2018,7 +2018,7 @@ function onOpponentLost(){ if(!S||S.over||S.ending) return; finish('win'); }
 
 /* 自動テストの窓（HB-035）。テストがページを開く前に window.HB_TEST={} を置いたときだけ、中の表と関数を渡す。ふだんの遊びでは何もしない */
 if(window.HB_TEST&&typeof window.HB_TEST==='object') Object.assign(window.HB_TEST,{guideShow,GUIDE_TEXT,GUIDE_EN}); // 案内の文（HB-068）
-if(window.HB_TEST&&typeof window.HB_TEST==='object') Object.assign(window.HB_TEST,{SUDDEN,RARE,suddenWhen,suddenChars,suddenCount:()=>sudN,suddenSkip:sec=>{ sudStart-=sec*1000; suddenArm(); }}); // サドンデス：数・落ちる字の一覧・時刻・始まりを早める（HB-082）
+if(window.HB_TEST&&typeof window.HB_TEST==='object') Object.assign(window.HB_TEST,{SUDDEN,RARE,suddenWhen,suddenChars,suddenCount:()=>sudN,suddenSkip:sec=>{ sudStart-=sec*1000; suddenArm(); },dropOne}); // サドンデス：数・落ちる字の一覧・時刻・始まりを早める（HB-082）
 if(window.HB_TEST&&typeof window.HB_TEST==='object') Object.defineProperty(window.HB_TEST,'CAP',{get:()=>CAP,configurable:true}); // 一戦ごとに変わるので値でなく読む（HB-048）
 if(window.HB_TEST&&typeof window.HB_TEST==='object') Object.assign(window.HB_TEST,{TODOME,FX,NET,onStartMessage,KANA,PARTS,RECIPE,MERGE,MERGE_TURN,TURN,BAG,logText,makeToday,makeRare,RARE_TODAY:()=>RARE_TODAY,seedRng,TODAY:()=>TODAY,HAND,DICT,SPEEDS,key,
   words:()=>WORDS, S:()=>S, mk,letterOf,checkSel,splitMade,mergeMade,comboOf,cpuOk,tapTile,doSplit,doMerge,doTurn,doThrow,render,newGame,TUT,TUT_SEQ,tutDone,startSolo,cpuAct,cpuThrow,setSpeed,showMeaning,SCENE_OF,exchangeCands,VOTE_TEXT,ALIAS,turnShortcuts,mergeTurnBacks,stepsOf,hintFind,hintPress,HINT:()=>HINT,HINT_TEXT,cpuApply,TURN_NOT_CPU,ATK,ATK_FX,atkKind,atkN,atkVisible,atkCanSplit,OPPFX:()=>OPPFX,onOpponentThrow,onOppBasket,atkThrowOnline,pressAgain,onAgainMessage,onPartnerLeft,onLobbyPresence,againUi,leaveOnline});

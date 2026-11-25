@@ -154,7 +154,7 @@ test('音：自分の札に効くとき（CPU の技）も、CPU の札に効か
     S.mine = ['は', 'し', 'よ'].map(l => T.mk(l)); S.opp = ['ま', 'わ', 'る'].map(l => T.mk(l)); T.cpuThrow('まわる'); const a = played.splice(0);
     S.used.clear(); S.mine = ['う', 'ら'].map(l => T.mk(l)); S.opp = ['い', 'い', 'い'].map(l => T.mk(l)); S.sel = S.mine.map(p => p.id); T.doThrow(); const b = played.splice(0);
     S.mine = ['は', 'し'].map(l => T.mk(l)); S.opp = ['い', 'し'].map(l => T.mk(l)); T.cpuThrow('いし'); const c = played.splice(0); return { a, b, c }; });
-  expect(r.a).toEqual(['turn']); expect(r.b).toEqual(['throw', 'flip']); expect(r.c).toEqual([]); // 表に無い語（いし）では鳴らさない
+  expect(r.a).toEqual(['turn']); expect(r.b).toEqual(['throw', 'flip', 'drop']); /* うら を投げてカゴが空になり、すぐ濁音が落ちてきて鳴る（HB-086） */ expect(r.c).toEqual([]); // 表に無い語（いし）では鳴らさない
 });
 
 test('ふたりで：相手の技が届いたら、受けた側の端末で札を選んで効かせる。投げた側は変わった札を見る', async ({ page }) => {

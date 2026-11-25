@@ -11,7 +11,7 @@ test.describe('音あり', () => {
 
   test('作者が選んだ組（割る＝回すのA／回す＝割るのB／裏返す＝B／くっつける＝割るのA／投げる＝A）', async ({ page }) => {
     const m = await page.evaluate(() => window.HB_SOUND.moves);
-    expect(Object.fromEntries(Object.entries(m).map(([k, v]) => [k, v.wood]))).toEqual({ split: 'A', turn: 'B', flip: 'B', merge: 'A', throw: 'A' });
+    expect(Object.fromEntries(Object.entries(m).map(([k, v]) => [k, v.wood]))).toEqual({ split: 'A', turn: 'B', flip: 'B', merge: 'A', throw: 'A', drop: 'C' });
     expect(m.split.hits.length).toBe(1);          // 「コッ」
     expect(m.turn.hits).toEqual(m.merge.hits);    // どちらも「コン・カッ」
     expect(m.throw.hits.length).toBe(3);          // 「コロコロ」
@@ -29,7 +29,7 @@ test.describe('音あり', () => {
     expect((await state(page)).mine).toBe('いし');
     await tapTiles(page, [1]);                                         // できた い は選ばれたまま。し を足して「いし」
     await press(page, '#aThrow');
-    expect(await played(page)).toEqual(['split', 'turn', 'flip', 'merge', 'throw']);
+    expect(await played(page)).toEqual(['split', 'turn', 'flip', 'merge', 'throw', 'drop']); // 投げて空になると、すぐ濁音が落ちてくる（HB-086 から鳴る）
   });
 
   test('音といっしょに「ごく短い」8ms だけ震わせる（作者 2026-11-24 22:51）。失敗では震わせない', async ({ page }) => {
@@ -41,6 +41,23 @@ test.describe('音あり', () => {
     await setBasket(page, ['ぬ', 'ぬ']);
     await tapTiles(page, [0, 1]); await press(page, '#aThrow');
     expect(await page.evaluate(() => window.__vib)).toEqual([8]);
+  });
+
+  test('落ちてきた＝投げる C の逆再生 R2（下がるコロコロ。作者 2026-11-26 8:34・HB-086）', async ({ page }) => {
+    const m = await page.evaluate(() => window.HB_SOUND.moves);
+    expect(m.drop.hits.map(h => h.p)).toEqual([1.5, 1.19, 1]);                     // 投げるの高さを逆に並べた
+    expect(m.drop.hits.map(h => h.t)).toEqual(m.throw.hits.map(h => h.t));        // 間は投げると同じ
+  });
+
+  test('自分のカゴに字が落ちてきたら鳴らす。相手のカゴに落ちたときは鳴らさない（ふだん・サドンデス）', async ({ page }) => {
+    await page.evaluate(() => { const T = window.HB_TEST, S = T.S(); S.mine = [T.mk('よ')]; S.opp = [T.mk('よ')]; T.dropOne('op'); }); // setBasket は3枚まで埋めるので直に置く
+    expect(await played(page)).toEqual([]);
+    await page.evaluate(() => window.HB_TEST.dropOne('me'));
+    expect(await played(page)).toEqual(['drop']);
+    await setBasket(page, ['よ', 'よ', 'よ', 'よ']);
+    await page.evaluate(() => window.HB_TEST.suddenSkip(300));
+    await page.waitForFunction(() => window.HB_TEST.suddenCount() === 1);
+    expect(await played(page)).toEqual(['drop', 'drop']);                           // 二人に落ちても鳴るのは自分のぶんの1回
   });
 
   test('投げられない並びでは鳴らさない。CPU の投げでも鳴らさない', async ({ page }) => {
