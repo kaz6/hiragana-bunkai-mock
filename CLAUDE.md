@@ -40,6 +40,7 @@
 | `tests/e2e/rare.spec.js` | 今日の字のレア（一戦ごとに「ふだん落ちてこない字」1字を二人のどちらかの最初の手に1枚。行・ログ・ふたりでのそろい・チュートリアル。D-108） |
 | `tests/e2e/basket.spec.js` | カゴの上限（14こを超えたら負け。値は rules.js） |
 | `tests/e2e/captext.spec.js` | 画面の文に入る上限の数（日本語・English・한국어。rules.js の cap を変えて開く。HB-068） |
+| `tests/e2e/credits.spec.js` | 出どころの表示（JMdict・EDRDG・CC BY-SA 4.0・IPADIC・字体・音。しくみの「つかったもの」と、はじめの画面・遊ぶ画面の一行。HB-081） |
   | `tests/e2e/rematch.spec.js` | ふたりでの「もう一回」＝同じ部屋での再戦（lobby の知らせ・合図・退室。D-094） |
   | `tests/e2e/cpu.spec.js` | CPU（禁止用語 cpu-ng.js、各強さを短く回す） |
   | `tests/e2e/screen.spec.js` | 画面（390px、遊び方、ひとりでの開始、ページの語数） |

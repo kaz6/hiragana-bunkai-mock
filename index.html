@@ -225,6 +225,11 @@ button:focus-visible{outline:2px solid var(--me);outline-offset:2px}
 .sheet h3{margin:0 0 6px;font:700 calc(14px*var(--fz))/1.4 var(--f-ui)}
 .sheet p,.sheet li{margin:0;font-size:calc(14px*var(--fz));line-height:1.7;overflow-wrap:anywhere} /* 出典の長い URL も折り返す */
 .sheet ul{margin:0;padding-left:1.2em}
+.creditLine{display:block;margin:0 auto;padding:6px 8px;background:none;border:0;font:500 calc(11px*var(--fz))/1.4 var(--f-ui);color:var(--sub);text-decoration:underline;cursor:pointer;text-align:center}
+.creditLine small.en{margin-left:4px;font-size:inherit}
+.menu .creditLine{align-self:center}
+.sheet.over{z-index:40} /* はじめの画面（.menu。z 30）の上に出す（出どころの一行から開くとき。HB-081） */
+#credits p+p,#credits details{margin-top:6px} #credits a{color:var(--me);text-decoration:underline}
 .sheet .head{display:flex;align-items:baseline}
 .stuck{display:flex;flex-wrap:wrap;gap:6px 14px;font:600 calc(20px*var(--fz))/1.5 var(--f-kana)}
 .stuck small{font:500 calc(14px*var(--fz))/1.4 var(--f-ui);color:var(--sub);margin-left:2px}
@@ -414,6 +419,8 @@ small.en.b{display:block;margin-left:0}
     <button class="link" id="btnLeaveRes" type="button" hidden>退室<small class="en" lang="en">Leave</small></button>
     <details><summary>ログを見る（コピーできないときはここから）<small class="en" lang="en">View log (if copying fails)</small></summary><textarea id="logText" readonly></textarea></details>
   </div>
+
+  <button class="creditLine" id="btnCreditPlay" type="button">辞書：JMdict（EDRDG）・IPADIC<small class="en" lang="en">Dictionary: JMdict (EDRDG) · IPADIC</small></button>
 </div>
 
 <div class="menu" id="menu">
@@ -434,6 +441,7 @@ small.en.b{display:block;margin-left:0}
       <p class="menu-note" id="lobbyText"></p>
       <button class="link" id="btnLeave" type="button" hidden>退室<small class="en" lang="en">Leave</small></button>
     </div>
+    <button class="creditLine" id="btnCreditMenu" type="button">辞書：JMdict（EDRDG）・IPADIC<small class="en" lang="en">Dictionary: JMdict (EDRDG) · IPADIC</small></button>
   </div>
 </div>
 
@@ -516,13 +524,24 @@ small.en.b{display:block;margin-left:0}
       <ul>
         <li>落ちてくる字は袋から出る（中身は28種類。濁音・半濁音の字は入れていない）</li>
         <li>使える言葉は <span id="dictN"></span> 語。2字は手で並べたもの、3字以上はそれに IPADIC（固有名詞としてしか載っていない語は有名な地名のほかは除き、形容詞の「〜く」の形を足した。tools/build_dict.js で作る）を足したもの。正しい言葉でも通らないことがある</li>
-        <li>辞書データの出典：mecab-ipadic-2.7.0-20070801。<details><summary>著作権表示と条件（原文）</summary><pre id="ipadicNotice" style="white-space:pre-wrap;font-size:calc(11px*var(--fz));line-height:1.5;margin:6px 0 0"></pre></details></li>
-        <li>意味（漢字・英語）の出典：<span id="meaningsNotice"></span></li>
         <li>ふたりで遊ぶときは、相手は人（合言葉の部屋）。カゴや袋は各自の端末の中で動き、投げた言葉と、カゴの札の並び（「あいて」の行に出る）が相手に届く。自動の相手は、ひとりで遊ぶときだけ</li>
         <li>相手は自動。最初に手を動かすまで待っている。知っているのは手で並べた3字までの言葉だけで、長い言葉は狙わない（IPADIC の言葉は使わない）</li>
         <li>割る・回す・裏返すはボタン。「落として割る」はまだ入れていない</li>
         <li>いくつか選んでいるときの回す・裏返すは、最後に選んだ札（ふちどり）にかかる。選んだままなので、そのまま投げられる</li>
       </ul>
+    </div>
+
+    <div id="credits">
+      <h3>つかったもの<small class="en" lang="en">Credits</small></h3>
+      <!-- 出どころの表示（HB-081）。JMdict の英語の一文は EDRDG の見本の文（sample.html）のまま。文は変えない。どの画面の言葉でも英語のまま出す -->
+      <p>意味は JMdict（EDRDG の辞書）を、その決まり（CC BY-SA 4.0）に従って使っています。<small class="en" lang="en">The meanings come from JMdict, an EDRDG dictionary, used under its licence (CC BY-SA 4.0).</small></p>
+      <p lang="en" id="meaningsNotice"></p>
+      <p lang="en"><a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener">CC BY-SA 4.0</a></p>
+      <p>言葉の表（dict-ipadic.js・dict-renyo.js・dict-meirei.js）は IPADIC（mecab-ipadic-2.7.0-20070801）から作りました。<small class="en" lang="en">The word lists (dict-ipadic.js, dict-renyo.js, dict-meirei.js) are made from IPADIC (mecab-ipadic-2.7.0-20070801).</small></p>
+      <details><summary>著作権表示と条件（原文）<small class="en" lang="en">Copyright notice and terms (original)</small></summary><pre id="ipadicNotice" lang="en" style="white-space:pre-wrap;font-size:calc(11px*var(--fz));line-height:1.5;margin:6px 0 0"></pre><p lang="en"><a href="licenses/mecab-ipadic-LICENSE.txt" target="_blank" rel="noopener">licenses/mecab-ipadic-LICENSE.txt</a></p></details>
+      <p>字体：Klee One・Zen Kaku Gothic New（Google Fonts。SIL Open Font License 1.1）<small class="en" lang="en">Fonts: Klee One and Zen Kaku Gothic New (via Google Fonts), SIL Open Font License 1.1</small></p>
+      <p lang="en"><a href="https://fonts.google.com/specimen/Klee+One" target="_blank" rel="noopener">Klee One</a> · <a href="https://fonts.google.com/specimen/Zen+Kaku+Gothic+New" target="_blank" rel="noopener">Zen Kaku Gothic New</a> · <a href="https://openfontlicense.org/" target="_blank" rel="noopener">SIL OFL 1.1</a></p>
+      <p>音：このページの中で作った自前の音（Web Audio）<small class="en" lang="en">Sounds: original, made inside this page with Web Audio</small></p>
     </div>
   </div>
 </div>
@@ -1709,11 +1728,13 @@ $('btnSpeed').onclick=()=>{ setSpeed((speed+1)%SPEEDS.length); renderOpp(); sche
 let sheetOpener=null, sheetEl=null;
 /* シート（しくみ・辞書）を開く。開いている間は CPU が止まる */
 function openSheet(from,id='sheet',closeBtn='btnClose'){ if(id==='sheet') $('btnGuideAgain').innerHTML=withEn(guideDone()?'案内をもう一度':'次の1戦でまた出ます'); sheetOpener=from; sheetOpen=true; clearTimeout(cpuT); sheetEl=$(id); sheetEl.hidden=false; sheetEl.scrollTop=0; $(closeBtn).focus(); }
-function closeSheet(){ if(!sheetOpen) return; sheetOpen=false; if(sheetEl) sheetEl.hidden=true; schedule(); if(sheetOpener) sheetOpener.focus(); }
+function closeSheet(){ if(!sheetOpen) return; sheetOpen=false; if(sheetEl){ sheetEl.hidden=true; sheetEl.classList.remove('over'); } schedule(); if(sheetOpener) sheetOpener.focus(); }
+function openCredits(from){ openSheet(from); $('sheet').classList.toggle('over',!!from.closest('.menu')); $('credits').scrollIntoView({block:'start'}); } // 出どころの一行（HB-081）：しくみを開いて、出どころの節まで送る
+$('btnCreditMenu').onclick=()=>openCredits($('btnCreditMenu')); $('btnCreditPlay').onclick=()=>openCredits($('btnCreditPlay'));
 $('btnHelp').onclick=()=>openSheet($('btnHelp')); $('btnHow').onclick=()=>openSheet($('btnHow'));
 $('btnZukan').onclick=()=>{ renderZukan(); openSheet($('btnZukan'),'zukan','btnZukanClose'); };
 /* どこをタップしても閉じる（click は指を動かしてスクロールしたときは出ない）。折りたたみの見出しだけは開閉に使う */
-$('sheet').addEventListener('click',e=>{ if(e.target.closest('summary,.meanSet,.guideSet')) return; closeSheet(); }); // 「案内をもう一度」も閉じない（押したことが見えるように） // 意味の設定のボタンも閉じない（HB-007）
+$('sheet').addEventListener('click',e=>{ if(e.target.closest('summary,.meanSet,.guideSet,a')) return; closeSheet(); }); // 「案内をもう一度」も閉じない（押したことが見えるように） // 意味の設定のボタンも閉じない（HB-007）
 /* 辞書も同じ。語のタップは閉じずに、その語の詳しい欄を開け閉めする */
 $('zukan').addEventListener('click',e=>{ const r=e.target.closest('.zk-row'); if(r){ r.setAttribute('aria-expanded',String(r.getAttribute('aria-expanded')!=='true')); return; } closeSheet(); });
 
@@ -1789,7 +1810,11 @@ function buildShortcuts(){ const sym=k=>k==='裏返す'?'⇄':'⟳'; const rows=
   if(!rows.length){ $('shortcuts').innerHTML=''; return; }
   $('shortcuts').innerHTML=`<div class="dg-f"><details><summary>${SC_LABEL[0]}${enTag(SC_LABEL[1])}</summary><p class="dg-t">⟳ 回す　⇄ 裏返す</p><div class="dg-ex" id="scList">${rows.join('')}</div></details></div>`; }
 buildShortcuts();
-$('meaningsNotice').textContent=window.HB_MEANINGS_NOTICE||'（意味のデータを読み込めなかった）';
+{ const el=$('meaningsNotice'), t=window.HB_MEANINGS_NOTICE; el.textContent=''; /* 出どころの英語の一文（EDRDG の見本の文のまま。HB-081）。決まった語にだけリンクを付ける */
+  if(!t) el.textContent='（意味のデータを読み込めなかった）';
+  else{ const L=[['JMdict','https://www.edrdg.org/wiki/index.php/JMdict-EDICT_Dictionary_Project'],['Electronic Dictionary Research and Development Group','https://www.edrdg.org/'],["Group's licence",'https://www.edrdg.org/edrdg/licence.html']]; let rest=t;
+    for(const [w,u] of L){ const i=rest.indexOf(w); if(i<0) continue; el.append(rest.slice(0,i)); const a=document.createElement('a'); a.href=u; a.target='_blank'; a.rel='noopener'; a.textContent=w; el.append(a); rest=rest.slice(i+w.length); }
+    el.append(rest); } }
 applyLang(); $('meanSet').addEventListener('click',e=>{ const b=e.target.closest('button[data-v]'); if(!b) return; meanMode=b.dataset.v; try{localStorage.setItem('hb.meaning',meanMode)}catch(_){} renderMeanSet(); logN=-1; renderLog(); });
 /* 字の大きさ（HB-018, D-046）。小さく 0.85／標準 1／大きく 1.2。この端末のブラウザ（hb.textSize）に覚える。初めは標準 */
 const FZ={s:0.85,m:1,l:1.2}; let fzMode='m'; try{ const v=localStorage.getItem('hb.textSize'); if(FZ[v]) fzMode=v; }catch(e){}
