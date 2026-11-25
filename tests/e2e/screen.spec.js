@@ -147,3 +147,11 @@ test('ひとりでの強さ選びの間は ふたりで も隠れ、もどると
   await expect(page.locator('#btnJoin')).toBeVisible();
 });
 
+
+test('割る・回す・裏返す・くっつける のボタンに +1・±0・−1 を出さない（HB-078, D-104。作者 2026-11-25）', async ({ page }, info) => {
+  info.ctx = await openGame(page); await startSolo(page);
+  for (const id of ['aSplit', 'aRot', 'aFlip', 'aMerge']) {
+    const t = await page.locator('#' + id).innerText();
+    expect(t).not.toMatch(/[+＋−±]\s*[01]/);
+  }
+});
