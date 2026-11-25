@@ -3,7 +3,7 @@
 const { test, expect } = require('@playwright/test');
 const { openGame, startSolo, tapTiles, press, expectClean } = require('../helpers');
 
-test.beforeEach(async ({ page }, info) => { info.ctx = await openGame(page, { extraWords: ['めつ', 'よしよし', 'すのー', 'うら'] }); await startSolo(page); });
+test.beforeEach(async ({ page }, info) => { info.ctx = await openGame(page, { extraWords: ['めつ', 'よしよし', 'すのー', 'うら', 'おもて', 'たたみかえし'] }); await startSolo(page); });
 test.afterEach(async ({}, info) => expectClean(info.ctx));
 
 // 自分→CPU：自分の札 mine を選んで word を投げる。CPU のカゴは opp。投げる前の CPU の札の id・投げたあとの CPU の札の字を返す
@@ -192,4 +192,14 @@ test.describe('食らいエフェクト（動きを許した設定）', () => {
     await expect.poll(() => page.evaluate(() => window.HB_TEST.S().opp.length)).toBe(6);
     await page.waitForFunction(() => !window.HB_TEST.OPPFX());
   });
+});
+
+// お・み が字の表に入った（HB-077, D-103）ので、作者が決めた おもて（お）・たたみかえし（み）も言葉として通り、裏返す技として効く
+test('おもて・たたみかえし が投げられる。裏返す技で相手の札（い→り）が裏返る（D-103）', async ({ page }) => {
+  const a = await throwAt(page, { mine: ['お', 'も', 'て'], opp: ['い', 'し', 'し'] });
+  expect(a.log).toContain('おもて');
+  expect(sorted(a.now)).toBe(sorted(['り', 'し', 'し', 'お', 'も', 'て']));
+  const b = await throwAt(page, { mine: ['た', 'た', 'み', 'か', 'え', 'し'], opp: ['い', 'し', 'し'] });
+  expect(b.now.filter(l => l === 'り').length).toBe(1); // 4字以上なので2枚まで。い は1枚だけ
+  expect(b.log).toContain('たたみかえし');
 });
