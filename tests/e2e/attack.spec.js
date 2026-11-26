@@ -256,6 +256,12 @@ test('全部のせ：ふたりで。相手の投げが届いたら、受けた�
   expect(r.n).toBe(5 + 8 + 1); expect(r.log).toContain('が割れた'); expect(r.log).toContain('が回った'); expect(r.log).toContain('が裏返った');
 });
 
+test('全部のせ：技が先に札を割ったあとで、自分の割るが終わっても、別の札が消えない（レビューの指摘。doSplit の一行）', async ({ page }) => {
+  const r = await page.evaluate(async () => { const T = window.HB_TEST, S = T.S(); S.mine = ['は', 'し', 'よ'].map(l => T.mk(l)); const p = S.mine[0]; S.sel = [p.id]; T.doSplit();
+    S.mine.splice(S.mine.indexOf(p), 1, T.mk('｜'), T.mk('よ')); /* 技が先に割った */ const before = S.mine.map(T.letterOf).join(''); await new Promise(r => setTimeout(r, 50)); return { before, after: S.mine.map(T.letterOf).join('') }; });
+  expect(r.after).toBe(r.before);
+});
+
 test.describe('全部のせの演出（動きを許した設定）', () => {
   test.use({ reducedMotion: 'no-preference' });
   const LOGO = ['ka1', 'ju1', 'yo1', 'ka2', 'ju2', 'yo2', 'ko', 'ro1', 'i', 'ro2'].map(n => 'img/logo/' + n + '.png');

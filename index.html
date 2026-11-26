@@ -877,7 +877,7 @@ const se=k=>{ try{ if(window.HB_SE) window.HB_SE.play(k); }catch(e){} };
 function doSplit(){ const ps0=selPieces(); const p=ps0[ps0.length-1]; if(!p||locked()) return; /* 割るのは選んだ最後の1枚（HB-034, D-070） */ const L=splitLetter(p); const parts=RECIPE[L]; if(!parts||S.mine.length>=CAP) return; if(TUT.on&&!tutOk('split')) return; const skew=!letterOf(p);
   begin(); se('split'); S.busy=true; const el=els.get(p.id); if(el){ el.classList.add('crack'); fxSplit(el,p); }
   setTimeout(()=>{ S.busy=false; if(S.over||S.ending){ render(); return; } // 動きの間に勝ち負けが決まったら、割らない（D-054）
-    const i=S.mine.indexOf(p);
+    const i=S.mine.indexOf(p); if(i<0){ render(); return; } // 動きの間に特別攻撃（HB-090 の全部のせ）がこの札を先に割っていたら、割らない（札が二重に割れて別の札が消えるのを防ぐ）
     const made=splitMade(p,L,parts,{spawn:{x:p.x,y:p.y}}); // 戻すだけの往復は数えない（D-067）
     S.mine.splice(i,1,...made); S.sel=S.sel.filter(id=>id!==p.id); /* 割った2つは選ばない。前に選んだ札はそのまま（D-070） */ lg('me',skew?`割る ${L}（向きずれ）→${parts.join('＋')}`:`割る ${L}→${parts.join('＋')}`); tutAdvance('split'); render(); }, reduced?0:FX.splitMs); }
 
