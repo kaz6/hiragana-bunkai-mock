@@ -808,7 +808,7 @@ function newGame(tut){
   firstHand(!!RARE_TODAY&&!RARE_TODAY.toMe).forEach(l=>S.opp.push(mk(l))); } // チュートリアルはカゴが空から（ふたりでの相手の手は届いたもので置き換わる）
   LOG=[]; t0=Date.now(); lastNg=''; tried=new Set(); sentRejects=new Set();
   lg('me','今日の字 多め：'+TODAY.more.join('')+' 少なめ：'+TODAY.less.join('')+(RARE_TODAY?'　レア：'+RARE_TODAY.letter:'')); if(TUT.on) lg('me','チュートリアル'); else { lg('me','はじめの手 '+S.mine.map(letterOf).join('')); if(!isOnline()) lg('op','はじめの手 '+S.opp.map(letterOf).join('')); } // ふたりでの相手の手は届いてから
-  suddenStart(); // 一戦が始まって suddenAt 秒でサドンデス（HB-082）。チュートリアルでは数えない
+  suddenStart(); // 二人とも suddenIdle 秒投げなければサドンデス（HB-082・HB-087）。チュートリアルでは数えない
   NET.sentSig=null; guideNewGame(); if(TUT.on){ G.active=false; TUT.t=setTimeout(tutArrive,reduced?0:TUT_ARRIVE_MS); }
   $('today').hidden=TUT.on; // チュートリアルでは袋を使わない
   $('today').innerHTML=`今日の字　多め：${TODAY.more.join('')}　少なめ：${TODAY.less.join('')}${RARE_TODAY?'　レア：'+RARE_TODAY.letter:''}<small class="en" lang="en"> Today: more ${TODAY.more.join('')} / fewer ${TODAY.less.join('')}${RARE_TODAY?' / rare '+RARE_TODAY.letter:''}</small>`;
@@ -1209,7 +1209,7 @@ function removeMyPieces(ps){ ps.forEach(p=>{ const el=els.get(p.id); if(el){ els
   S.mine=S.mine.filter(p=>!ps.includes(p)); S.sel=[]; S.choose=null; }
 /* 投げたときのメモ（ログと、工夫の声） */
 function logMyThrow(c,ps,bonusLetter){ const nt=notesOf(ps), k=comboOf(ps);
-  lg('me',`投げる「${c.word}」`+(nt?`（${nt}）`:'')+(k?` ★${COMBO[starsOf(k)]}（工夫${k}）`:'')+(bonusLetter?` 相手におまけ「${bonusLetter}」`:''));
+  lg('me',`投げる「${c.word}」`+(nt?`（${nt}）`:'')+(k?` ★${COMBO[starsOf(k)]}（工夫${k}）`:'')+(bonusLetter?` 相手におまけ「${bonusLetter}」`:'')); suddenQuiet();
   showCombo(k); showMeaning(c.word,'me'); }
 let lastTry='';
 /* 投げられない並びで「投げる」を押したら、何がだめだったかをログに残す（出来そうでできなかった言葉を後で見られるように） */
@@ -1268,7 +1268,7 @@ function smartBest(letters){ const pool={}; letters.forEach(l=>{ if(!l) return; 
 function cpuThrow(w,tag){ const had=S.mine.map(p=>p.id), used=[]; for(const ch of w){ const p=S.opp.find(x=>!used.includes(x)&&asWord(letterOf(x))===ch); used.push(p); }
     S.used.add(w); S.log.push({who:'op',word:w,note:notesOf(used),k:comboOf(used),trail:trailOf(used)}); zkRecord(w,'op',comboOf(used),trailOf(used)); S.opp=S.opp.filter(x=>!used.includes(x));
     [...w].forEach((ch,k)=>S.mine.push(mk(ch==='ー'?'一':ch,{delay:k*110,drop:tierOf(w)}))); S.say=`「${wordShow(w)}」を投げてきた`; landFx(w);
-    lg('op',`投げる「${w}」`+(tag?`（${tag}）`:'')); showMeaning(w,'op');
+    lg('op',`投げる「${w}」`+(tag?`（${tag}）`:'')); showMeaning(w,'op'); suddenQuiet();
     if(S.mine.length>CAP) finish('lose'); else atkReceive(w,had); } // 操作の言葉なら、自分の札に効く（HB-075）
 /* 戻るだけの作り替えをしない（ふつう・つよい。HB-028, D-061）。賢い相手の手のたびに、そのときのカゴの中身（字の集まり。並びは見ない）を
    OPP_MEMO 手分おぼえる。言葉にならないときの適当な1手・くっつけるだけの1手は、そのあとの中身がおぼえた中身と同じになる手を除く。
@@ -1370,7 +1370,7 @@ function cpuAct(){ if(S.over||S.ending||sheetOpen||guideHolds()||TUT.on) return;
     S.used.add(w); S.log.push({who:'op',word:w,note:notesOf(used),k:comboOf(used),trail:trailOf(used)}); zkRecord(w,'op',comboOf(used),trailOf(used)); S.opp=S.opp.filter(x=>!used.includes(x));
     [...w].forEach((ch,k)=>S.mine.push(mk(ch==='ー'?'一':ch,{delay:k*110,drop:tierOf(w)}))); S.say=`「${wordShow(w)}」を投げてきた`; landFx(w);
     let bx=''; if(bonus){ const b=mk(pick(TODAY.bag),{delay:[...w].length*110,note:'おまけ'}); S.mine.push(b); bx=letterOf(b); S.say+='（＋おまけ1字）'; }
-    lg('op',`投げる「${w}」`+(bx?` 自分におまけ「${bx}」`:'')); showMeaning(w,'op');
+    lg('op',`投げる「${w}」`+(bx?` 自分におまけ「${bx}」`:'')); showMeaning(w,'op'); suddenQuiet();
     if(S.mine.length>CAP) finish('lose'); else atkReceive(w,had); }
   else { oppMemo(L); const steps=cpuSteps(); const good=steps.filter(s=>bestWord(s.res));
     if(good.length) cpuApply(pick(good));
@@ -1572,7 +1572,7 @@ let refT={me:null,op:null};
    カゴの上限の扱いは変えない（こえたら負け）。チュートリアルでは落ちない。数は rules.js（window.HB_RULES） */
 const RARE=[...KANA].filter(l=>!BAG.includes(l)&&!DAKU.includes(l)&&!HANDAKU.includes(l));
 const ruleNum=(k,def,okFn)=>{ const v=window.HB_RULES&&window.HB_RULES[k]; return typeof v==='number'&&isFinite(v)&&okFn(v)?v:def; }; // 読めない・おかしい値のときは既定の値
-const SUDDEN={at:ruleNum('suddenAt',300,v=>v>0), every:ruleNum('suddenEvery',6,v=>v>0), step:ruleNum('suddenStep',0.5,v=>v>=0), min:ruleNum('suddenMin',2,v=>v>0)};
+const SUDDEN={at:ruleNum('suddenIdle',60,v=>v>0), every:ruleNum('suddenEvery',6,v=>v>0), step:ruleNum('suddenStep',0.5,v=>v>=0), min:ruleNum('suddenMin',2,v=>v>0)};
 const suddenGap=k=>Math.max(SUDDEN.min,SUDDEN.every-SUDDEN.step*k); // k 字めの落ちるあと、次の字まで（秒）
 const suddenWhen=n=>{ let t=SUDDEN.at; for(let k=0;k<n;k++) t+=suddenGap(k); return t; }; // n 字め（0 から）が落ちる、一戦の始めからの秒
 let sudT=null, sudN=0, sudStart=0, sudRng=null;
@@ -1582,6 +1582,7 @@ function suddenArm(){ clearTimeout(sudT); sudT=null; if(!S||S.over||S.ending||TU
   sudT=setTimeout(suddenDrop, Math.max(0,sudStart+suddenWhen(sudN)*1000-Date.now())); } // 始めの時刻からの決まった時刻で数える（ずれが貯まらない）
 function suddenStart(){ clearTimeout(sudT); sudT=null; sudN=0; sudStart=Date.now();
   sudRng=seedRng('sudden-'+(isOnline()&&NET.matchId?NET.matchId:'solo-'+Math.random())); suddenArm(); }
+function suddenQuiet(){ if(!sudRng) return; clearTimeout(sudT); sudT=null; sudN=0; sudStart=Date.now(); suddenArm(); } // だれかが投げたら止めて、数え直す（作者 2026-11-26 8:57。HB-087）。落ちる字の並び（sudRng）は続きから
 function suddenDrop(){ sudT=null; if(!S||S.over||S.ending||TUT.on||!$('menu').hidden) return;
   const ch=suddenPick(sudRng); if(sudN===0) lg('me','サドンデス'); sudN++;
   for(const side of isOnline()?['me']:['me','op']){ const a=side==='me'?S.mine:S.opp, n=mk(ch); a.push(n); lg(side,'落ちてきた '+letterOf(n)+'（サドンデス）'); if(side==='me') se('drop'); } // ふたりででは相手のカゴは相手の端末が同じ字を落とす
@@ -2009,7 +2010,7 @@ function onOpponentThrow(row){ if(!S||S.over||S.ending) return;
   S.log.push({who:'op',word:row.word,note:'',k:row.stars||0,trail:row.trail||''}); zkRecord(row.word,'op',row.stars||0,row.trail||'');
   [...row.word].forEach((ch,k)=>S.mine.push(mk(ch==='ー'?'一':ch,{delay:k*110,drop:tierOf(row.word)}))); landFx(row.word);
   S.say=`「${wordShow(row.word)}」が届いた`;
-  lg('op',`投げる「${row.word}」`); showMeaning(row.word,'op');
+  lg('op',`投げる「${row.word}」`); showMeaning(row.word,'op'); suddenQuiet();
   if(S.mine.length>CAP){ sendLoseToOpponent(); finish('lose'); return; }
   atkReceive(row.word,had); // 操作の言葉なら、自分の札に効く（HB-075）
   render(); }

@@ -1,4 +1,4 @@
-// サドンデス（HB-082, D-107）。一戦が始まって 300秒（rules.js の suddenAt）たつと、二人のカゴに「ふだん落ちてこない字」が1字ずつ落ちてくる。間は 6→5.5→…→2 秒
+// サドンデス（HB-082・HB-087, D-107）。二人とも 60秒（rules.js の suddenIdle）投げないと、二人のカゴに「ふだん落ちてこない字」が1字ずつ落ちてくる。間は 6→5.5→…→2 秒
 const { test, expect } = require('@playwright/test');
 const { openGame, startSolo, setBasket, expectClean } = require('../helpers');
 
@@ -10,6 +10,26 @@ const T = fn => (page, ...a) => page.evaluate(fn, ...a);
 test.describe('ふつうの一戦', () => {
   test.beforeEach(async ({ page }, info) => { info.ctx = await openGame(page); await startSolo(page); });
 
+  test('だれかが投げたら数え直す（自分の投げ・CPU の投げ。作者 2026-11-26 8:57・HB-087）', async ({ page }) => {
+    await page.evaluate(() => window.HB_TEST.suddenSkip(59));
+    await setBasket(page, ['い', 'し', 'よ']);
+    await page.evaluate(() => { const T = window.HB_TEST, S = T.S(); S.used.clear(); S.sel = S.mine.slice(0, 2).map(p => p.id); T.doThrow(); }); // いし を投げる
+    await page.evaluate(() => window.HB_TEST.suddenSkip(1));
+    await page.waitForTimeout(300);
+    expect(await page.evaluate(() => window.HB_TEST.suddenCount())).toBe(0); // 投げてから1秒なので、まだ
+    await page.evaluate(() => window.HB_TEST.suddenSkip(59));
+    await page.waitForFunction(() => window.HB_TEST.suddenCount() === 1);   // 投げてから60秒で始まる
+    await page.evaluate(() => { const T = window.HB_TEST, S = T.S(); S.opp = ['ぬ', 'の', 'よ'].map(l => T.mk(l)); T.cpuThrow('ぬの'); T.render(); });
+    expect(await page.evaluate(() => window.HB_TEST.suddenCount())).toBe(0); // 落ちている途中でも、投げたら止まる
+    await page.evaluate(() => window.HB_TEST.suddenSkip(30));
+    await page.waitForTimeout(300);
+    expect(await page.evaluate(() => window.HB_TEST.suddenCount())).toBe(0);
+    await page.evaluate(() => window.HB_TEST.suddenSkip(30));
+    await page.waitForFunction(() => window.HB_TEST.suddenCount() === 1);
+    const log = await page.evaluate(() => window.HB_TEST.logText());
+    expect((log.match(/｜サドンデス/g) || []).length).toBe(2);              // 始まるたびにログに一行
+  });
+
   test('落ちる字の一覧は13字（KANA にあり、BAG に無く、濁音・半濁音でない字から作られる）', async ({ page }) => {
     const r = await page.evaluate(() => { const T = window.HB_TEST;
       const daku = c => /[゙゚]/.test(c.normalize('NFD'));
@@ -18,21 +38,21 @@ test.describe('ふつうの一戦', () => {
     expect([...r.viaRules].sort()).toEqual([...r.rare].sort());
   });
 
-  test('時刻：300秒に1字め、あとの間は 6→5.5→5→…→2 で止まる（rules.js の既定の数）', async ({ page }) => {
+  test('時刻：60秒に1字め、あとの間は 6→5.5→5→…→2 で止まる（rules.js の既定の数）', async ({ page }) => {
     const r = await page.evaluate(() => { const T = window.HB_TEST; const w = Array.from({ length: 14 }, (_, n) => T.suddenWhen(n));
       return { cfg: T.SUDDEN, w, gaps: w.slice(1).map((x, i) => +(x - w[i]).toFixed(3)) }; });
-    expect(r.cfg).toEqual({ at: 300, every: 6, step: 0.5, min: 2 });
-    expect(r.w[0]).toBe(300);
+    expect(r.cfg).toEqual({ at: 60, every: 6, step: 0.5, min: 2 });
+    expect(r.w[0]).toBe(60);
     expect(r.gaps).toEqual([6, 5.5, 5, 4.5, 4, 3.5, 3, 2.5, 2, 2, 2, 2, 2]);
   });
 
-  test('300秒より前は落ちない。過ぎると二人に同じ字が落ちる（一覧の字）。そのあとも続く', async ({ page }) => {
+  test('60秒より前は落ちない。過ぎると二人に同じ字が落ちる（一覧の字）。そのあとも続く', async ({ page }) => {
     const before = await page.evaluate(() => { const T = window.HB_TEST, S = T.S(); return { m: S.mine.length, o: S.opp.length }; });
-    await page.evaluate(() => window.HB_TEST.suddenSkip(299));
+    await page.evaluate(() => window.HB_TEST.suddenSkip(59));
     await page.waitForTimeout(300);
     expect(await page.evaluate(() => window.HB_TEST.suddenCount())).toBe(0);
     expect(await page.evaluate(() => { const S = window.HB_TEST.S(); return [S.mine.length, S.opp.length]; })).toEqual([before.m, before.o]);
-    await page.evaluate(() => window.HB_TEST.suddenSkip(1)); // ちょうど 300秒
+    await page.evaluate(() => window.HB_TEST.suddenSkip(1)); // ちょうど 60秒
     await page.waitForFunction(() => window.HB_TEST.suddenCount() === 1);
     const r = await page.evaluate(() => { const T = window.HB_TEST, S = T.S(); const a = T.letterOf(S.mine[S.mine.length - 1]), b = T.letterOf(S.opp[S.opp.length - 1]);
       return { a, b, m: S.mine.length, o: S.opp.length, rare: T.RARE.includes(a), log: T.logText() }; });
@@ -40,20 +60,20 @@ test.describe('ふつうの一戦', () => {
     expect(r.rare).toBe(true);
     expect(r.m).toBe(before.m + 1); expect(r.o).toBe(before.o + 1);
     expect(r.log).toContain('サドンデス');
-    await page.evaluate(() => window.HB_TEST.suddenSkip(6)); // 2字めの時刻（300+6）
+    await page.evaluate(() => window.HB_TEST.suddenSkip(6)); // 2字めの時刻（60+6）
     await page.waitForFunction(() => window.HB_TEST.suddenCount() === 2);
   });
 
   test('上限14で落ちて15になると負け（カゴの上限の扱いは変えない）', async ({ page }) => {
     await setBasket(page, Array.from({ length: 14 }, () => 'よ'));
-    await page.evaluate(() => window.HB_TEST.suddenSkip(300));
+    await page.evaluate(() => window.HB_TEST.suddenSkip(60));
     await expect(page.locator('#resBig')).toContainText('カゴがあふれた。負け');
     expect(await page.evaluate(() => window.HB_TEST.S().over)).toBe('lose');
   });
 
   test('14こ（ちょうど）まではまだ負けない', async ({ page }) => {
     await setBasket(page, Array.from({ length: 13 }, () => 'よ'));
-    await page.evaluate(() => window.HB_TEST.suddenSkip(300));
+    await page.evaluate(() => window.HB_TEST.suddenSkip(60));
     await page.waitForFunction(() => window.HB_TEST.suddenCount() === 1);
     const s = await page.evaluate(() => { const S = window.HB_TEST.S(); return { n: S.mine.length, over: S.over || S.ending }; });
     expect(s.n).toBe(14); expect(s.over).toBeFalsy();
@@ -61,13 +81,13 @@ test.describe('ふつうの一戦', () => {
 
   test('相手（CPU）のカゴが上限をこえたら勝ち', async ({ page }) => {
     await page.evaluate(() => { const T = window.HB_TEST; T.S().opp = Array.from({ length: 14 }, () => T.mk('よ')); T.render(); });
-    await page.evaluate(() => window.HB_TEST.suddenSkip(300));
+    await page.evaluate(() => window.HB_TEST.suddenSkip(60));
     await expect(page.locator('#resBig')).toContainText('相手のカゴがあふれた。勝ち');
   });
 
   test('負けが決まったあとは落ちない', async ({ page }) => {
     await setBasket(page, Array.from({ length: 14 }, () => 'よ'));
-    await page.evaluate(() => window.HB_TEST.suddenSkip(300));
+    await page.evaluate(() => window.HB_TEST.suddenSkip(60));
     await expect(page.locator('#resBig')).toContainText('負け');
     const n = await page.evaluate(() => window.HB_TEST.suddenCount());
     await page.evaluate(() => window.HB_TEST.suddenSkip(20));
@@ -78,7 +98,7 @@ test.describe('ふつうの一戦', () => {
   test('ふたりで：自分のカゴにだけ落とす。字は matchId から決まり、二人の画面で同じ並びになる', async ({ page }) => {
     const r = await page.evaluate(async () => { const T = window.HB_TEST;
       T.NET.mode = 'online'; T.NET.matchId = 'room1-abc'; T.newGame();
-      const S = T.S(), o0 = S.opp.length, m0 = S.mine.length; T.suddenSkip(300);
+      const S = T.S(), o0 = S.opp.length, m0 = S.mine.length; T.suddenSkip(60);
       await new Promise(r => setTimeout(r, 100));
       const S2 = T.S(); return { m: S2.mine.length - m0, o: S2.opp.length - o0, ch: T.letterOf(S2.mine[S2.mine.length - 1]), want: T.suddenChars('room1-abc', 1)[0],
         a: T.suddenChars('room1-abc', 12).join(''), b: T.suddenChars('room1-abc', 12).join(''), c: T.suddenChars('room2-xyz', 12).join('') }; });
@@ -110,7 +130,7 @@ test('チュートリアルの一戦では落ちない', async ({ page }, info) 
 });
 
 test('rules.js の数を変えて開くと、その数で動く（始まり 0.3秒・最初の間 0.2秒・縮み 0.05秒・最短 0.1秒）', async ({ page }, info) => {
-  info.ctx = await openGame(page, { rulesJs: 'window.HB_RULES={ cap:14, suddenAt:0.3, suddenEvery:0.2, suddenStep:0.05, suddenMin:0.1 };' });
+  info.ctx = await openGame(page, { rulesJs: 'window.HB_RULES={ cap:14, suddenIdle:0.3, suddenEvery:0.2, suddenStep:0.05, suddenMin:0.1 };' });
   await startSolo(page);
   const cfg = await page.evaluate(() => ({ c: window.HB_TEST.SUDDEN, w: [0, 1, 2, 3, 4].map(n => +window.HB_TEST.suddenWhen(n).toFixed(3)) }));
   expect(cfg.c).toEqual({ at: 0.3, every: 0.2, step: 0.05, min: 0.1 });
@@ -118,7 +138,7 @@ test('rules.js の数を変えて開くと、その数で動く（始まり 0.3�
   await page.waitForFunction(() => window.HB_TEST.suddenCount() >= 3, null, { timeout: 5000 }); // 本物の時計で落ちていく
 });
 
-test('rules.js が読めない・数でないときは既定の数（300・6・0.5・2）', async ({ page }, info) => {
-  info.ctx = await openGame(page, { rulesJs: 'window.HB_RULES={ cap:14, suddenAt:"はやく", suddenEvery:-1, suddenStep:null, suddenMin:0 };' });
-  expect(await page.evaluate(() => window.HB_TEST.SUDDEN)).toEqual({ at: 300, every: 6, step: 0.5, min: 2 });
+test('rules.js が読めない・数でないときは既定の数（60・6・0.5・2）', async ({ page }, info) => {
+  info.ctx = await openGame(page, { rulesJs: 'window.HB_RULES={ cap:14, suddenIdle:"はやく", suddenEvery:-1, suddenStep:null, suddenMin:0 };' });
+  expect(await page.evaluate(() => window.HB_TEST.SUDDEN)).toEqual({ at: 60, every: 6, step: 0.5, min: 2 });
 });
