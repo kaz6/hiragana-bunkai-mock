@@ -55,7 +55,7 @@ test.describe('音あり', () => {
     await page.evaluate(() => window.HB_TEST.dropOne('me'));
     expect(await played(page)).toEqual(['drop']);
     await setBasket(page, ['よ', 'よ', 'よ', 'よ']);
-    await page.evaluate(() => window.HB_TEST.suddenSkip(300));
+    await page.evaluate(() => window.HB_TEST.suddenSkip(60));
     await page.waitForFunction(() => window.HB_TEST.suddenCount() === 1);
     expect(await played(page)).toEqual(['drop', 'drop']);                           // 二人に落ちても鳴るのは自分のぶんの1回
   });
