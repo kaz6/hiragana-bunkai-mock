@@ -1131,7 +1131,7 @@ function atkThrowOnline(w){ const kind=atkKind(w); if(!kind||TUT.on||!S) return;
     const go=()=>{ if(S!==S0||S.over||S.ending) return; if(reduced){ if(ATK_FX.throwerSound) atkSeAll(); return; }
       const ks=atkAllKinds(), roll=atkRoll($('oppSlots'),ks.length); if(ATK_FX.throwerSound) ks.forEach((k,i)=>setTimeout(()=>{ if(S===S0) se(k); },roll.hitAt[i])); };
     if(lag) setTimeout(go,lag); else go(); return; }
-  if(kind==='merge'){ /* くっつける：投げた側は音だけ。相手のカゴで寄った札は D-033 の並びでそのまま見える（札ごとの動きは付けない。仮）。並びが縮むので atkWait は使わない */
+  if(kind==='merge'){ S.atkWait=null; /* 前の回す・裏返すの待ちが残っていたら外す（並びが縮むので、関係のない札に動きが出ないように）。くっつける：投げた側は音だけ。相手のカゴで寄った札は D-033 の並びでそのまま見える（札ごとの動きは付けない。仮）。並びが縮むので atkWait は使わない */
     const go=()=>{ if(S!==S0||S.over||S.ending) return; if(ATK_FX.throwerSound) se('merge'); };
     if(lag) setTimeout(go,lag); else go(); return; }
   if(kind!=='split') S.atkWait={kind,before:(S.oppL||[]).slice(),beforeO:(S.oppO||[]).slice(),until:Date.now()+8000};

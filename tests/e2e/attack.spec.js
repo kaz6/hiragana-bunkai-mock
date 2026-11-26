@@ -479,3 +479,16 @@ test.describe('くっつける：食らいエフェクト（動きを許した�
     await page.waitForFunction(() => !window.HB_TEST.OPPFX());
   });
 });
+
+test('ふたりで：前の回す・裏返すの待ちが残っていても、つく を投げたら外れる（関係のない札に動きが出ない。レビューの指摘）', async ({ page }) => {
+  const r = await page.evaluate(() => { const T = window.HB_TEST, S = T.S(); T.NET.mode = 'online'; S.oppL = ['ろ', 'ろ', '｜', 'よ']; S.oppO = [0, 0, 0, 0];
+    S.atkWait = { kind: 'flip', before: ['ろ', 'ろ', '｜', 'よ'], beforeO: [0, 0, 0, 0], until: Date.now() + 8000 }; T.atkThrowOnline('つく'); const w = S.atkWait; T.NET.mode = 'cpu'; return { w }; });
+  expect(r.w).toBeNull();
+});
+
+test('自分のカゴでくっついた か は、自分の くっつける と同じ向き（裏返して回した向き）で出る。CPU の札はふつうの向き（仮）', async ({ page }) => {
+  const a = await cpuThrows(page, { mine: ['う', '｜'], word: 'つく' });
+  expect(a.now.filter(l => l === null).length).toBe(1); expect(a.log).toContain('う＋｜→か');
+  const b = await throwAt(page, { mine: ['つ', 'く'], opp: ['う', '｜'] });
+  expect(b.now).toContain('か');
+});
