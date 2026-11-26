@@ -155,3 +155,16 @@ test('割る・回す・裏返す・くっつける のボタンに +1・±0・�
     expect(t).not.toMatch(/[+＋−±]\s*[01]/);
   }
 });
+
+test('相手のいちばん左の枠は落書きで隠す。字も部品の色も出さない。ほかの枠と相手の札そのものは変わらない（作者 2026-11-26 9:00・HB-088）', async ({ page }, info) => {
+  info.ctx = await openGame(page); await startSolo(page);
+  const r = await page.evaluate(() => { const T = window.HB_TEST, S = T.S(); S.opp = ['゛', 'に', 'よ', 'こ'].map(l => T.mk(l)); T.render();
+    const sp = [...document.querySelectorAll('#oppSlots span')], bg = getComputedStyle(sp[0]).backgroundImage, cls = sp[0].className, txt = sp[0].textContent, rest = sp.slice(1, 4).map(e => e.textContent).join('');
+    const online = (() => { T.NET.mode = 'online'; S.oppL = ['ゆ', 'に']; S.oppO = [0, 0]; T.render(); const a = [...document.querySelectorAll('#oppSlots span')].slice(0, 2).map(e => e.className + ':' + e.textContent); T.NET.mode = 'cpu'; T.render(); return a; })();
+    return { cls, txt, bg, rest, opp: S.opp.map(T.letterOf).join(''), online }; });
+  expect(r.cls).toBe('hid'); expect(r.txt).toBe('');
+  expect(r.bg).toContain('img/mask-scribble.png');
+  expect(r.rest).toBe('によこ');
+  expect(r.opp).toBe('゛によこ');                 // 隠すのは見た目だけ
+  expect(r.online).toEqual(['hid:', 'fill:に']);  // ふたりででも同じ
+});

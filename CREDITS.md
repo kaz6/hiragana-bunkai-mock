@@ -22,6 +22,12 @@
 | Klee One（600） | Google Fonts https://fonts.google.com/specimen/Klee+One | SIL Open Font License 1.1（係の見込み。頁では確かめていない） | 札の字（index.html の --f-kana） |
 | Zen Kaku Gothic New（400・500・700） | Google Fonts https://fonts.google.com/specimen/Zen+Kaku+Gothic+New | SIL Open Font License 1.1（係の見込み。頁では確かめていない） | 画面の文（index.html の --f-ui）。ページが Google Fonts から読む（リポジトリには入れていない） |
 
+## 絵
+
+| Asset | 作者・置き場 | ライセンス | 何に使ったか |
+|---|---|---|---|
+| 落書きの線（img/mask-scribble.png） | 作者（かずき）がスクリーンショットに描いた赤い線を切り出したもの（2026-11-26） | 自前 | 相手のいちばん左の枠を隠す（HB-088・D-109） |
+
 ## 画面の表示（HB-081）
 
 - JMdict：EDRDG の見本の文（https://www.edrdg.org/edrdg/sample.html）の型。「This game uses the JMdict dictionary files. These files are the property of the Electronic Dictionary Research and Development Group, and are used in conformance with the Group's licence.」を meanings.js の HB_MEANINGS_NOTICE に置き、画面は JMdict・Electronic Dictionary Research and Development Group・Group's licence にリンクを付けて出す。この文は変えない（tools/build_meanings.py も同じ文を書く）

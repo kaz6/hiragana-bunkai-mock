@@ -104,6 +104,7 @@ button:focus-visible{outline:2px solid var(--me);outline-offset:2px}
 .slots span.fill{background:var(--tile)}
 .slots span.part{background:var(--off);color:var(--off-ink)}
 .slots span.out{background:var(--opp);color:var(--me-ink)}
+.slots span.hid{background:var(--tile) url(img/mask-scribble.png) center/80% 90% no-repeat} /* 相手のいちばん左の枠を隠す落書き（作者が描いた線をそのまま使う。HB-088） */
 
 /* リスト */
 .log{flex:1 1 88px;min-height:88px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;padding-block:4px}
@@ -1421,6 +1422,7 @@ function renderOpp(){ const online=isOnline();
   $('btnSpeed').hidden=online;
   $('btnSpeed').innerHTML=escH('速さ：'+SPEEDS[speed].name)+enTag('Speed: '+(SPEED_EN[SPEEDS[speed].name]||''));
   let h=''; for(let i=0;i<Math.max(CAP,n);i++){ const l=L[i]; if(l===undefined){ h+='<span></span>'; continue; }
+    if(i===0&&i<CAP){ h+='<span class="hid" aria-label="かくれた字"></span>'; continue; } // いちばん左の枠は落書きで隠す（作者 2026-11-26 9:00。HB-088）。字も、部品かどうかの色も出さない
     h+=`<span class="${i>=CAP?'out':(O[i]||(PARTS.has(l)&&l!=='一'))?'part':'fill'}">${escH(shown(l))}</span>`; }
   $('oppSlots').innerHTML=h; oppFxPaint(); }
 /* ---- 結果の画面の「やりとり」の候補（HB-047, D-081）----
