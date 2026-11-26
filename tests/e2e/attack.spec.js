@@ -284,3 +284,85 @@ test.describe('全部のせの演出（動きを許した設定）', () => {
     expect(r.n).toBe(5 + 8 + 1); expect(r.log).toContain('が割れた'); expect(r.log).toContain('が回った');
   });
 });
+
+// のいず（HB-091・D-110）。受けた側は自分のカゴと相手の列に、投げた側も相手の列に、3秒ノイズ（長さ・濃さは編集の仮置き。attack-words.js の fx）。
+// ひとり（CPU 戦）では、投げた側が CPU を3秒止める（仮）。入力は止めない。動きを減らす設定では粒が動かない
+const NOISE_WORD = 'のいず', hasNoisy = (page, sel) => page.evaluate(s => document.querySelector(s).classList.contains('noisy'), sel);
+
+test('のいず：語の表と長さ・濃さ（仮）。ほかの技の表は変わらない', async ({ page }) => {
+  const r = await page.evaluate(() => { const T = window.HB_TEST; return { noise: [...T.ATK.map].filter(([, v]) => v === 'noise').map(([w]) => w), kind: T.atkKind('のいず'),
+    ms: T.ATK_FX.noiseMs, alpha: T.ATK_FX.noiseAlpha, others: [T.atkKind('きる'), T.atkKind('ころころ'), T.atkKind('はんてん'), T.atkKind('かなかなころころ'), T.atkKind('のい')], count: T.ATK.count }; });
+  expect(r.noise).toEqual(['のいず']); expect(r.kind).toBe('noise');
+  expect(r.ms).toBe(3000); expect(r.alpha).toBe(0.5);
+  expect(r.others).toEqual(['split', 'turn', 'flip', 'all', null]); expect(r.count).toEqual({ split: [1, 1], turn: [1, 2], flip: [1, 2] });
+});
+
+test('のいず：CPU に投げると、あいての並びにだけノイズが出る（自分のカゴには出ない）。CPU は ノイズの間 動かない。札は変わらない', async ({ page }) => {
+  const r = await throwAt(page, { mine: [...NOISE_WORD], opp: ['は', 'い', 'し'] });
+  expect(r.log).toContain('自分の「のいず」で あいての並びにノイズが3秒走った');
+  expect(sorted(r.now)).toBe(sorted(['は', 'い', 'し', 'の', 'い', 'ず'])); // 札を割る・回すことはしない
+  expect(await hasNoisy(page, '#oppSlots')).toBe(true); expect(await hasNoisy(page, '#basket')).toBe(false);
+  const hold = await page.evaluate(() => window.HB_TEST.S().cpuHoldUntil - Date.now()); expect(hold).toBeGreaterThan(2500); expect(hold).toBeLessThanOrEqual(3000);
+  expect(await page.evaluate(() => window.HB_TEST.S().busy)).toBe(false); // 入力は止めない
+});
+
+test('のいず：CPU が ノイズの間は動かない（投げず、札も変えない）。過ぎたら動ける', async ({ page }) => {
+  const r = await page.evaluate(async () => { const T = window.HB_TEST, S = T.S(); S.opp = ['き', 'る'].map(l => T.mk(l)); S.used.clear(); const n0 = S.log.length, o0 = S.opp.length;
+    S.cpuHoldUntil = Date.now() + 400; T.cpuAct(); const held = { log: S.log.length - n0, opp: S.opp.length - o0 };
+    S.cpuHoldUntil = 0; T.cpuAct(); return { held, after: S.log.length - n0 }; });
+  expect(r.held).toEqual({ log: 0, opp: 0 }); expect(r.after).toBeGreaterThan(0); // 止まっている間は何もしない。止めを外すと投げる
+});
+
+test('のいず：CPU が投げると、自分のカゴと相手の列に出る。入力は止まらない（札は選べる）。時間が来たら消える', async ({ page }) => {
+  const r = await cpuThrows(page, { mine: ['は', 'い'], word: NOISE_WORD });
+  expect(r.log).toContain('「のいず」で ノイズが3秒走った'); expect(r.tiles.length).toBe(2 + 3);
+  expect(await hasNoisy(page, '#basket')).toBe(true); expect(await hasNoisy(page, '#oppSlots')).toBe(true);
+  const sel = await page.evaluate(() => { const T = window.HB_TEST, S = T.S(); T.tapTile(S.mine[0].id); return { busy: S.busy, sel: S.sel.length, hold: S.cpuHoldUntil || 0 }; });
+  expect(sel).toEqual({ busy: false, sel: 1, hold: 0 }); // 受けた側は止めない・CPU も止めない
+  await page.evaluate(() => { const T = window.HB_TEST; T.ATK_FX.noiseMs = 200; T.atkNoiseOn(document.getElementById('basket')); });
+  await expect(page.locator('#basket')).not.toHaveClass(/noisy/, { timeout: 3000 });
+});
+
+test('のいず：ふたりで。相手の投げが届いたら、受けた側（自分のカゴと相手の列）にノイズ。投げた側は あいての列だけ', async ({ page }) => {
+  const r = await page.evaluate(() => { const T = window.HB_TEST, S = T.S(); T.NET.mode = 'online'; S.used.clear(); S.mine = ['は', 'い'].map(l => T.mk(l));
+    T.onOpponentThrow({ player: 'x', word: 'のいず', stars: 0, trail: '' });
+    const recv = { basket: document.getElementById('basket').classList.contains('noisy'), opp: document.getElementById('oppSlots').classList.contains('noisy'), n: S.mine.length };
+    document.getElementById('basket').classList.remove('noisy'); document.getElementById('oppSlots').classList.remove('noisy');
+    T.atkThrowOnline('のいず');
+    const thrower = { basket: document.getElementById('basket').classList.contains('noisy'), opp: document.getElementById('oppSlots').classList.contains('noisy'), hold: S.cpuHoldUntil || 0 };
+    T.NET.mode = 'cpu'; return { recv, thrower }; });
+  expect(r.recv).toEqual({ basket: true, opp: true, n: 5 }); expect(r.thrower).toEqual({ basket: false, opp: true, hold: 0 });
+});
+
+test('のいず：ほかの技・ふつうの言葉ではノイズは出ない。新しい一戦ではノイズが消える', async ({ page }) => {
+  await throwAt(page, { mine: ['き', 'る'], opp: ['は', 'し', 'し'] });
+  expect(await hasNoisy(page, '#oppSlots')).toBe(false);
+  await page.evaluate(() => { const T = window.HB_TEST; T.atkNoiseOn(document.getElementById('basket')); T.atkNoiseOn(document.getElementById('oppSlots')); T.newGame(); });
+  expect(await hasNoisy(page, '#basket')).toBe(false); expect(await hasNoisy(page, '#oppSlots')).toBe(false);
+});
+
+test('のいず：動きを減らす設定では粒が動かない（アニメなし）', async ({ page }) => {
+  await throwAt(page, { mine: [...NOISE_WORD], opp: ['は'] });
+  expect(await page.evaluate(() => getComputedStyle(document.getElementById('oppSlots'), '::after').animationName)).toBe('none');
+});
+
+test.describe('のいず（動きを許した設定）', () => {
+  test.use({ reducedMotion: 'no-preference' });
+  test('粒が動く。投げた側は あいての列だけ、約3秒で消える（長さは数を縮めて確かめる）', async ({ page }) => {
+    await page.evaluate(() => { const T = window.HB_TEST, S = T.S(); T.ATK_FX.noiseMs = 700; S.used.clear(); S.mine = [...'のいず'].map(l => T.mk(l)); S.opp = ['は', 'い'].map(l => T.mk(l)); S.sel = S.mine.map(p => p.id); T.doThrow(); });
+    await expect(page.locator('#oppSlots')).toHaveClass(/noisy/, { timeout: 2000 });
+    expect(await page.evaluate(() => getComputedStyle(document.getElementById('oppSlots'), '::after').animationName)).toBe('hbNoise');
+    expect(await hasNoisy(page, '#basket')).toBe(false);
+    await expect(page.locator('#oppSlots')).not.toHaveClass(/noisy/, { timeout: 3000 });
+  });
+});
+
+test('のいず：ノイズは「しくみ」などのシート（z-index 20）より下。決着したらノイズは消える（レビューの指摘）', async ({ page }) => {
+  const r = await page.evaluate(() => { const T = window.HB_TEST, S = T.S(); T.atkNoiseOn(document.getElementById('basket'));
+    const z = +getComputedStyle(document.getElementById('basket'), '::after').zIndex, sheet = +getComputedStyle(document.querySelector('.sheet')).zIndex;
+    S.over = 'win'; return { z, sheet }; });
+  expect(r.z).toBeLessThan(r.sheet);
+  await page.evaluate(() => { const T = window.HB_TEST, S = T.S(); S.over = null; S.ending = false; T.atkNoiseOn(document.getElementById('basket')); T.atkNoiseOn(document.getElementById('oppSlots')); });
+  await page.evaluate(() => { const S = window.HB_TEST.S(); S.used.clear(); S.opp = [...'のいず'].map(l => window.HB_TEST.mk(l)); S.mine = Array.from({ length: 15 }, () => window.HB_TEST.mk('は')); window.HB_TEST.cpuThrow('のいず'); });
+  expect(await hasNoisy(page, '#basket')).toBe(false); // 負けて終わったら消える
+});

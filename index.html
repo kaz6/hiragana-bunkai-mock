@@ -98,6 +98,12 @@ button:focus-visible{outline:2px solid var(--me);outline-offset:2px}
 .slots{position:relative}
 .atkline{position:absolute;left:50%;top:50%;height:4px;margin-top:-2px;border-radius:2px;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.3),0 0 10px 3px rgba(255,255,255,.9);pointer-events:none;z-index:6;transform-origin:50% 50%}
 .atkline.opp{height:3px;margin-top:-1.5px}
+.noisy{position:relative}
+.noisy::after{content:"";position:absolute;inset:0;z-index:15;pointer-events:none;border-radius:inherit;
+  background-image:radial-gradient(circle at 20% 30%,rgba(0,0,0,.75) 0 1px,transparent 1.6px),radial-gradient(circle at 70% 60%,rgba(255,255,255,.85) 0 1px,transparent 1.6px),radial-gradient(circle at 40% 85%,rgba(0,0,0,.6) 0 .8px,transparent 1.4px),linear-gradient(rgba(128,128,128,var(--na,.5)),rgba(128,128,128,var(--na,.5)));
+  background-size:7px 7px,5px 5px,9px 9px,auto;animation:hbNoise .25s steps(1) infinite}
+@keyframes hbNoise{0%{background-position:0 0,0 0,0 0,0 0}25%{background-position:-3px 2px,2px -3px,4px 1px,0 0}50%{background-position:2px -4px,-4px 1px,-2px 3px,0 0}75%{background-position:-1px 3px,3px 2px,1px -4px,0 0}}
+@media (prefers-reduced-motion: reduce){ .noisy::after{animation:none} } /* のいず（HB-091）：動きを減らす設定では粒が動かない */
 .rollfx{position:fixed;top:0;overflow:hidden;pointer-events:none;z-index:40} .rollfx img{position:absolute;left:0;top:0;object-fit:contain;filter:drop-shadow(0 2px 5px rgba(0,0,0,.4));will-change:transform;-webkit-user-drag:none} /* 全部のせ「かなかなころころ」のロゴの字（HB-090）。動きを減らす設定では作らない */
 .slots{display:flex;gap:2px;margin-top:4px}
 .slots span{flex:1 1 0;max-width:26px;height:28px;display:grid;place-items:center;font:600 18px/1 var(--f-kana);
@@ -796,7 +802,7 @@ function logText(){ return [`ひらがな分解（仮）ログ ${new Date().toLo
 const els=new Map();
 function newGame(tut){
   HINT=null; clearTimeout(TUT.t); TUT.on=tut===true; TUT.step=TUT.on?'arrive':''; // tut＝true のときだけチュートリアルの一戦（HB-059）
-  clearTimeout(cpuT); clearTimeout(refT.me); clearTimeout(refT.op); refT={me:null,op:null}; els.forEach(el=>el.remove()); els.clear();
+  clearTimeout(cpuT); clearTimeout(refT.me); clearTimeout(refT.op); refT={me:null,op:null}; els.forEach(el=>el.remove()); els.clear(); atkNoiseClear();
   CAP=CAP_FIXED; // 上限は固定（HB-066）
   lastThrow=null; S={mine:[],opp:[],oppL:null,oppO:null,sel:[],log:[],hintFound:[],used:new Set(),over:null,ending:false,started:false,busy:false,choose:null,
      say:'あなたが動いたら、動き出す'};
@@ -926,7 +932,7 @@ function notesOf(ps){ const out=[]; ps.forEach(p=>{ if(p.note){ const s=`${asWor
    優先は attack-words.js の prefer で戻せる（'いいえ' なら全部の札から）。
    技で変わった札は★に数えない（仮）：技で変わった後の字を、その札のもとの字として道すじ・印を作り直す。割った2枚には「割る前の札の写し」だけ残し、くっつけ直すと元に戻る（往復は数えない。D-067） */
 const ATK=(()=>{ const A=window.HB_ATTACK||{}, W=A.words||{}, map=new Map();
-  ['split','turn','flip','all'].forEach(k=>String(W[k]||'').split(/\s+/).filter(Boolean).forEach(w=>{ if(!map.has(w)) map.set(w,k); }));
+  ['split','turn','flip','all','noise'].forEach(k=>String(W[k]||'').split(/\s+/).filter(Boolean).forEach(w=>{ if(!map.has(w)) map.set(w,k); }));
   return {map,count:A.count||{},prefer:A.prefer||{},all:A.allCount||{split:1,turn:2,flip:2},fx:A.fx||{}}; })(); // all＝全部のせ（HB-090）：語と きる・くるくる・はんてん の枚数は attack-words.js の words.all・allCount・fx
 const atkKind=w=>ATK.map.get(String(w))||null;
 const atkN=(kind,w)=>{ const c=ATK.count[kind]||[1,1]; return Math.max(0,+(([...String(w)].length>=4?c[1]:c[0]))||0); };
@@ -939,7 +945,13 @@ const ATK_FX={ lineMs:240, lineSpan:.9, // 斬撃：線が走る時間／カゴ�
   throwerSound:true,                     // 投げた側でも同じ音を鳴らす（編集の仮置き。外すときは false）
   rollMs:Math.max(600,+ATK.fx.rollMs||1800), // 全部のせ：ロゴの字が縁を転がって列を抜けるまでの全体（ミリ秒。数は attack-words.js の fx.rollMs）
   rollLap:.55,                           // 全部のせ：転がる時間のうち、画面の縁を一周する割合（残りが列を横切る）
+  noiseMs:Math.max(300,+ATK.fx.noiseMs||3000), noiseAlpha:Math.min(.9,Math.max(.1,Number.isFinite(+ATK.fx.noiseAlpha)&&ATK.fx.noiseAlpha!==null?+ATK.fx.noiseAlpha:.5)), // のいず（HB-091・D-110）：ノイズの長さ・字のかすかさ（数は attack-words.js の fx。仮 3秒・.5）
   throwerLagMs:260 };                    // 投げた側の画面で技が出るまでの待ち
+/* のいず（HB-091・D-110）：host（自分のカゴ・相手の列）にノイズを重ねる。CSS だけ（絵を足さない）。入力は止めない。同じ host に続けて来たら、時間を数え直す */
+const NOISE_T=new Map();
+function atkNoiseOn(host){ if(!host) return; clearTimeout(NOISE_T.get(host)); host.style.setProperty('--na',ATK_FX.noiseAlpha); host.classList.add('noisy');
+  NOISE_T.set(host,setTimeout(()=>{ host.classList.remove('noisy'); NOISE_T.delete(host); },ATK_FX.noiseMs)); }
+function atkNoiseClear(){ NOISE_T.forEach((t,h)=>{ clearTimeout(t); h.classList.remove('noisy'); }); NOISE_T.clear(); }
 const atkShuf=a=>{ a=a.slice(); for(let i=a.length-1;i>0;i--){ const j=rnd(i+1); [a[i],a[j]]=[a[j],a[i]]; } return a; };
 const atkCanSplit=p=>{ const L=splitLetter(p); return !!(L&&RECIPE[L]); };
 function atkOp(p,kind){ const q={root:p.root,r:p.r,f:p.f}; if(kind==='turn') q.r=(q.r+1)%4; else { q.r=(4-q.r)%4; q.f=q.f?0:1; } norm(q); return q; } // その操作を1回したあとの向き（doTurn と同じ計算）
@@ -1026,6 +1038,7 @@ function atkRunAll(S0,w,elig){ if(S!==S0||S.over||S.ending) return;
     run(0); },roll.hitAt[k])); }
 function atkRunMine(S0,kind,w,elig,tries){ if(S!==S0||S.over||S.ending) return;
   if(kind==='all'){ atkRunAll(S0,w,elig); return; }
+  if(kind==='noise'){ atkNoiseOn(basket); atkNoiseOn($('oppSlots')); lg('op',`相手の「${wordShow(w)}」で ノイズが${ATK_FX.noiseMs/1000}秒走った（自分のカゴと あいての並び）`); render(); return; } // 受けた側：自分のカゴと相手の列に。入力は止めない（S.busy を立てない）
   if(S.busy&&tries<40){ setTimeout(()=>atkRunMine(S0,kind,w,elig,tries+1),80); return; }
   const picks=atkPick(S.mine.filter(p=>elig.has(p.id)),kind,atkN(kind,w),false); se(kind);
   const apply=()=>{ if(S!==S0) return; if(S.over||S.ending){ S.busy=false; render(); return; }
@@ -1071,6 +1084,9 @@ function atkThrowSoloAll(w,had,S0,lag){
   if(lag) setTimeout(go,lag); else go(); }
 function atkThrowSolo(w,had){ const kind=atkKind(w); if(!kind||TUT.on||!S) return; const S0=S, elig=new Set(had), lag=reduced?0:ATK_FX.throwerLagMs;
   if(kind==='all'){ atkThrowSoloAll(w,elig,S0,lag); return; }
+  if(kind==='noise'){ const go=()=>{ if(S!==S0||S.over||S.ending) return; atkNoiseOn($('oppSlots')); S.cpuHoldUntil=Date.now()+ATK_FX.noiseMs; // 代償：投げた側も あいての並びが見えにくい。CPU は画面を見ないので、仮に ノイズの間は動かない
+      lg('me',`自分の「${wordShow(w)}」で あいての並びにノイズが${ATK_FX.noiseMs/1000}秒走った（CPU も${ATK_FX.noiseMs/1000}秒動かない）`); render(); };
+    if(lag) setTimeout(go,lag); else go(); return; }
   const go=()=>{ if(S!==S0||S.over||S.ending) return; if(ATK_FX.throwerSound) se(kind);
     const picks=atkPick(S.opp.filter(p=>elig.has(p.id)),kind,atkN(kind,w),true), idx=[], rs=[];
     picks.forEach(p=>{ const i=S.opp.indexOf(p); const r=atkApplyTo(S.opp,p,kind,true); if(!r) return; rs.push(r); if(kind==='split'){ if(!r.miss) for(let k=0;k<r.n;k++) idx.push(i+k); } else idx.push(i); });
@@ -1080,6 +1096,8 @@ function atkThrowSolo(w,had){ const kind=atkKind(w); if(!kind||TUT.on||!S) retur
     render(); };
   if(lag) setTimeout(go,lag); else go(); }
 function atkThrowOnline(w){ const kind=atkKind(w); if(!kind||TUT.on||!S) return; const S0=S, lag=reduced?0:ATK_FX.throwerLagMs;
+  if(kind==='noise'){ const go=()=>{ if(S!==S0||S.over||S.ending) return; atkNoiseOn($('oppSlots')); lg('me',`自分の「${wordShow(w)}」で あいての並びにノイズが${ATK_FX.noiseMs/1000}秒走った`); render(); }; // 投げた側：見えている相手の列に（代償）。音は付けない（仮）
+    if(lag) setTimeout(go,lag); else go(); return; }
   if(kind==='all'){ /* 全部のせ：投げた側は、ロゴの字が あいての行を横切るのと、音を見せる。相手のカゴで変わった札は D-033 の並びでそのまま見える（札ごとの動きは付けない。仮） */
     const go=()=>{ if(S!==S0||S.over||S.ending) return; if(reduced){ if(ATK_FX.throwerSound) atkSeAll(); return; }
       const ks=atkAllKinds(), roll=atkRoll($('oppSlots'),ks.length); if(ATK_FX.throwerSound) ks.forEach((k,i)=>setTimeout(()=>{ if(S===S0) se(k); },roll.hitAt[i])); };
@@ -1435,6 +1453,7 @@ function strongMove(t0){ const L=S.opp.map(letterOf), now=smartBest(L); oppMemo(
   if(now){ cpuThrow(now.w); return; }
   idleStep(ok,go,true); } // 戻るだけの手は除く（D-061）。戻るだけなら待つ（HB-082）
 function cpuAct(){ if(S.over||S.ending||sheetOpen||guideHolds()||TUT.on) return;
+  { const hold=(S.cpuHoldUntil||0)-Date.now(); if(hold>0){ clearTimeout(cpuT); cpuT=setTimeout(cpuAct,hold+30); return; } } // のいず（HB-091）：投げた側のノイズの間、CPU は動かない（編集の仮置き）
   if(SPEEDS[speed].deep){ cpuStrong(); render(); schedule(); return; }
   if(SPEEDS[speed].smart){ cpuSmart(); render(); schedule(); return; }
   const L=S.opp.map(letterOf); const w=bestWord(L);
@@ -1448,7 +1467,7 @@ function cpuAct(){ if(S.over||S.ending||sheetOpen||guideHolds()||TUT.on) return;
     if(good.length) cpuApply(pick(good));
     else idleStep(steps,cpuApply,false); } // 全部が戻る手のときだけ待つ（HB-082）
   render(); schedule(); }
-function finish(kind){ LOG.push(`結果：${RESULT_LABEL[kind]}`); S.ending=true; clearTimeout(cpuT); clearTimeout(sudT); setTimeout(()=>{ S.over=kind; render(); }, reduced?0:900); }
+function finish(kind){ atkNoiseClear(); LOG.push(`結果：${RESULT_LABEL[kind]}`); S.ending=true; clearTimeout(cpuT); clearTimeout(sudT); setTimeout(()=>{ S.over=kind; render(); }, reduced?0:900); }
 
 /* ---- 描画 ---- */
 const basket=$('basket');
@@ -2095,7 +2114,7 @@ if(window.HB_TEST&&typeof window.HB_TEST==='object') Object.assign(window.HB_TES
 if(window.HB_TEST&&typeof window.HB_TEST==='object') Object.assign(window.HB_TEST,{SUDDEN,RARE,suddenWhen,suddenChars,suddenCount:()=>sudN,suddenSkip:sec=>{ sudStart-=sec*1000; suddenArm(); },dropOne}); // サドンデス：数・落ちる字の一覧・時刻・始まりを早める（HB-082）
 if(window.HB_TEST&&typeof window.HB_TEST==='object') Object.defineProperty(window.HB_TEST,'CAP',{get:()=>CAP,configurable:true}); // 一戦ごとに変わるので値でなく読む（HB-048）
 if(window.HB_TEST&&typeof window.HB_TEST==='object') Object.assign(window.HB_TEST,{TODOME,FX,NET,onStartMessage,KANA,PARTS,RECIPE,MERGE,MERGE_TURN,TURN,BAG,logText,makeToday,makeRare,RARE_TODAY:()=>RARE_TODAY,seedRng,TODAY:()=>TODAY,HAND,DICT,SPEEDS,key,
-  words:()=>WORDS, S:()=>S, mk,letterOf,checkSel,splitMade,mergeMade,comboOf,cpuOk,tapTile,doSplit,doMerge,doTurn,doThrow,render,newGame,TUT,TUT_SEQ,tutDone,startSolo,cpuAct,cpuThrow,setSpeed,showMeaning,SCENE_OF,exchangeCands,VOTE_TEXT,ALIAS,turnShortcuts,mergeTurnBacks,stepsOf,hintFind,hintPress,HINT:()=>HINT,HINT_TEXT,cpuApply,TURN_NOT_CPU,ATK,ATK_FX,atkKind,atkPickAll,atkAllKinds,atkN,atkVisible,atkCanSplit,OPPFX:()=>OPPFX,onOpponentThrow,onOppBasket,atkThrowOnline,pressAgain,onAgainMessage,onPartnerLeft,onLobbyPresence,againUi,leaveOnline});
+  words:()=>WORDS, S:()=>S, mk,letterOf,checkSel,splitMade,mergeMade,comboOf,cpuOk,tapTile,doSplit,doMerge,doTurn,doThrow,render,newGame,TUT,TUT_SEQ,tutDone,startSolo,cpuAct,cpuThrow,setSpeed,showMeaning,SCENE_OF,exchangeCands,VOTE_TEXT,ALIAS,turnShortcuts,mergeTurnBacks,stepsOf,hintFind,hintPress,HINT:()=>HINT,HINT_TEXT,cpuApply,TURN_NOT_CPU,ATK,ATK_FX,atkKind,atkPickAll,atkAllKinds,atkN,atkVisible,atkCanSplit,OPPFX:()=>OPPFX,onOpponentThrow,onOppBasket,atkThrowOnline,atkNoiseOn,atkReceive,pressAgain,onAgainMessage,onPartnerLeft,onLobbyPresence,againUi,leaveOnline});
 
 newGame();
 showMenu();
