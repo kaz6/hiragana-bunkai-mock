@@ -29,8 +29,8 @@ test('語の表と枚数（作者が決めた。attack-words.js）', async ({ pa
   expect(r.split).toEqual('きる わる さく きざむ きりさく きりきざむ きりつける きりふせる きりまくる きりかかる ぶつたぎる ちよんぎる たちきる たちわる まつぷたつ りようだん いつとうりようだん せつだん'.split(' '));
   expect(r.turn).toEqual('ころころ くるくる ぐるぐる かいてん だいかいてん せんかい まわる まわす ころがる ころがす ころぶ ころげる'.split(' '));
   expect(r.flip).toEqual('うらがえし うらがえす はんてん どんでんがえし でんぐりがえし つばめがえし かえし うら おもて たたみかえし'.split(' '));
-  expect(r.count).toEqual({ split: [1, 1], turn: [1, 2], flip: [1, 2] }); // 割るはいつも1枚。回す・裏返すは3字まで1枚、4字以上2枚
-  expect(r.prefer).toEqual({ split: 'はい', turn: 'はい', flip: 'はい' });
+  expect(r.count).toEqual({ split: [1, 1], turn: [1, 2], flip: [1, 2], merge: [1, 2] }); // 割るはいつも1枚。回す・裏返すは3字まで1枚、4字以上2枚。くっつけるは3字まで1組、4字以上2組（HB-092）
+  expect(r.prefer).toEqual({ split: 'はい', turn: 'はい', flip: 'はい', merge: 'はい' });
   expect(r.n).toEqual({ きる: 1, きりさく: 1, まわる: 1, ころころ: 2, うら: 1, うらがえし: 2 });
 });
 
@@ -214,7 +214,7 @@ test('全部のせ：語の表（all）と枚数。ほかの技の表は変わ�
     kinds: T.atkAllKinds(), count: T.ATK.count, rollMs: T.ATK_FX.rollMs, others: [T.atkKind('きる'), T.atkKind('ころころ'), T.atkKind('はんてん'), T.atkKind('かなかな')] }; });
   expect(r.all).toEqual(['かなかなころころ']); expect(r.kind).toBe('all');
   expect(r.n).toEqual({ split: 1, turn: 2, flip: 2 }); expect(r.kinds).toEqual(['split', 'turn', 'turn', 'flip', 'flip']);
-  expect(r.count).toEqual({ split: [1, 1], turn: [1, 2], flip: [1, 2] }); // 既存の枚数は変えていない
+  expect(r.count).toEqual({ split: [1, 1], turn: [1, 2], flip: [1, 2], merge: [1, 2] }); // 既存の枚数は変えていない（merge は HB-092 で足した）
   expect(r.rollMs).toBe(1800); expect(r.others).toEqual(['split', 'turn', 'flip', null]);
 });
 
@@ -294,7 +294,7 @@ test('のいず：語の表と長さ・濃さ（仮）。ほかの技の表は�
     ms: T.ATK_FX.noiseMs, alpha: T.ATK_FX.noiseAlpha, others: [T.atkKind('きる'), T.atkKind('ころころ'), T.atkKind('はんてん'), T.atkKind('かなかなころころ'), T.atkKind('のい')], count: T.ATK.count }; });
   expect(r.noise).toEqual(['のいず']); expect(r.kind).toBe('noise');
   expect(r.ms).toBe(3000); expect(r.alpha).toBe(0.5);
-  expect(r.others).toEqual(['split', 'turn', 'flip', 'all', null]); expect(r.count).toEqual({ split: [1, 1], turn: [1, 2], flip: [1, 2] });
+  expect(r.others).toEqual(['split', 'turn', 'flip', 'all', null]); expect(r.count).toEqual({ split: [1, 1], turn: [1, 2], flip: [1, 2], merge: [1, 2] });
 });
 
 test('のいず：CPU に投げると、あいての並びにだけノイズが出る（自分のカゴには出ない）。CPU は ノイズの間 動かない。札は変わらない', async ({ page }) => {
@@ -365,4 +365,117 @@ test('のいず：ノイズは「しくみ」などのシート（z-index 20）�
   await page.evaluate(() => { const T = window.HB_TEST, S = T.S(); S.over = null; S.ending = false; T.atkNoiseOn(document.getElementById('basket')); T.atkNoiseOn(document.getElementById('oppSlots')); });
   await page.evaluate(() => { const S = window.HB_TEST.S(); S.used.clear(); S.opp = [...'のいず'].map(l => window.HB_TEST.mk(l)); S.mine = Array.from({ length: 15 }, () => window.HB_TEST.mk('は')); window.HB_TEST.cpuThrow('のいず'); });
   expect(await hasNoisy(page, '#basket')).toBe(false); // 負けて終わったら消える
+});
+
+// くっつける（HB-092・D-111）：「つく」「くつつく」「くつつける」。相手のカゴの札から、くっつけて字になる2枚の組を勝手にくっつける。
+// 組の数（編集の仮置き）・選び方・食らいエフェクトの中身は仮。語は作者が決めた
+test('くっつける：語の表・組の数・優先・動きの長さ（仮）。ほかの技の語は変わらない', async ({ page }) => {
+  const r = await page.evaluate(() => { const T = window.HB_TEST, by = k => [...T.ATK.map].filter(([, v]) => v === k).map(([w]) => w);
+    return { merge: by('merge'), kind: T.atkKind('くつつける'), n: [T.atkN('merge', 'つく'), T.atkN('merge', 'くつつく'), T.atkN('merge', 'くつつける')], prefer: T.ATK.prefer.merge, ms: T.ATK_FX.mergeMs,
+      others: ['きる', 'ころころ', 'うら', 'かなかなころころ', 'のいず', 'ことば'].map(T.atkKind), splitN: T.atkN('split', 'きりさく') }; });
+  expect(r.merge).toEqual(['つく', 'くつつく', 'くつつける']); expect(r.kind).toBe('merge');
+  expect(r.n).toEqual([1, 2, 2]); expect(r.prefer).toBe('はい'); expect(r.ms).toBe(420);
+  expect(r.others).toEqual(['split', 'turn', 'flip', 'all', 'noise', null]); expect(r.splitN).toBe(1);
+});
+
+test('CPU に つく を投げると、字になる2組のうち1組だけくっつく（重ならない）。届いた字（つ・く）は使わない', async ({ page }) => {
+  const r = await throwAt(page, { mine: ['つ', 'く'], opp: ['｜', 'よ', 'つ', '゛'] }); // 字になる組は ｜＋よ→は と つ＋゛→づ の2つだけ
+  expect(r.now.length).toBe(4 + 2 - 1); // 4＋届いた2−1組＝5
+  expect(['は', 'づ'].filter(l => r.now.includes(l)).length).toBe(1);
+  expect(r.log).toMatch(/自分の「つく」で CPU の (｜＋よ|つ＋゛) がくっついた（(｜＋よ→は|つ＋゛→づ)）/);
+});
+
+test('くつつく・くつつける は4字以上なので2組（組は重ならない）', async ({ page }) => {
+  const r = await throwAt(page, { mine: ['く', 'つ', 'つ', 'く'], opp: ['つ', '゛', 'ま', '｜'] }); // つ＋゛→づ、ま＋｜→ほ の2組だけが字になる
+  expect(sorted(r.now)).toBe(sorted(['づ', 'ほ', 'く', 'つ', 'つ', 'く']));
+  expect(r.log).toContain('がくっついた');
+});
+
+test('くっつけて字になる組が無ければ空振り（ログに出す）。札は変わらない', async ({ page }) => {
+  const r = await throwAt(page, { mine: ['つ', 'く'], opp: ['ろ', 'ろ', 'ろ'] });
+  expect(sorted(r.now)).toBe(sorted(['ろ', 'ろ', 'ろ', 'つ', 'く'])); expect(r.log).toContain('自分の「つく」は空振り');
+});
+
+test('字になる組と ならない札が混ざっていても、字になる組が選ばれる（40回）', async ({ page }) => {
+  const r = await page.evaluate(() => { const T = window.HB_TEST, S = T.S(); const out = new Set();
+    for (let i = 0; i < 40; i++) { S.used.clear(); S.mine = ['つ', 'く'].map(l => T.mk(l)); S.opp = ['へ', '｜', 'へ', 'よ', 'へ'].map(l => T.mk(l)); S.sel = S.mine.map(p => p.id); T.doThrow(); out.add(S.opp.map(T.letterOf).sort().join('')); }
+    return [...out]; });
+  expect(r).toEqual([['へ', 'へ', 'へ', 'は', 'つ', 'く'].sort().join('')]);
+});
+
+test('優先の切り替え：いいえ にすると全部の札から2枚ずつ組にして、字にならない組は空振り', async ({ page }) => {
+  const r = await page.evaluate(() => { const T = window.HB_TEST, S = T.S(); let hit = 0, miss = 0; T.ATK.prefer.merge = 'いいえ';
+    for (let i = 0; i < 60; i++) { S.used.clear(); S.mine = ['つ', 'く'].map(l => T.mk(l)); S.opp = ['｜', 'よ', 'ろ', 'ろ'].map(l => T.mk(l)); S.sel = S.mine.map(p => p.id); T.doThrow();
+      if (S.opp.length === 5) hit++; else miss++; /* くっつけば 4−1＋2＝5、空振りは 4＋2＝6 */ }
+    T.ATK.prefer.merge = 'はい'; return { hit, miss }; });
+  expect(r.hit).toBeGreaterThan(0); expect(r.miss).toBeGreaterThan(0);
+});
+
+test('「どっち」の組（い＋一 は せ か け）は、ランダムにどちらか（60回）', async ({ page }) => {
+  const r = await page.evaluate(() => { const T = window.HB_TEST, S = T.S(); const out = new Set(); S.used.clear();
+    for (let i = 0; i < 60; i++) { S.used.clear(); S.mine = ['つ', 'く'].map(l => T.mk(l)); S.opp = ['い', '一'].map(l => T.mk(l)); S.sel = S.mine.map(p => p.id); T.doThrow(); out.add(S.opp.map(T.letterOf).filter(l => l === 'せ' || l === 'け').join('')); }
+    return [...out].sort(); });
+  expect(r).toEqual(['け', 'せ']);
+});
+
+test('CPU の札にも自分と同じ組み方（できた字はその位置）。道すじには工夫が付かない', async ({ page }) => {
+  const r = await page.evaluate(() => { const T = window.HB_TEST, S = T.S(); S.used.clear(); S.mine = ['つ', 'く'].map(l => T.mk(l)); S.opp = ['へ', '｜', 'よ', 'へ'].map(l => T.mk(l)); S.sel = S.mine.map(p => p.id); T.doThrow();
+    return { opp: S.opp.map(T.letterOf), d: S.opp.map(p => p.d) }; });
+  expect(r.opp.slice(0, 3)).toEqual(['へ', 'は', 'へ']); expect(r.d[1]).toBe('は');
+});
+
+test('受けた側（自分のカゴ）：届く前からあった札だけが組になる。届いた字は使わない', async ({ page }) => {
+  const a = await cpuThrows(page, { mine: ['｜', 'よ'], word: 'つく' });
+  expect(sorted(a.now)).toBe(sorted(['は', 'つ', 'く'])); expect(a.log).toContain('相手の「つく」で ｜＋よ がくっついた（｜＋よ→は）');
+  const b = await cpuThrows(page, { mine: ['｜'], word: 'つく' }); // ｜＋く は い になるが、く は届いた字なので使わない
+  expect(sorted(b.now)).toBe(sorted(['｜', 'つ', 'く'])); expect(b.log).toContain('相手の「つく」は空振り');
+});
+
+test('技でくっついた札は★に数えない。割ればもとの2枚に戻る（往復は数えない）', async ({ page }) => {
+  const r = await cpuThrows(page, { mine: ['｜', 'よ'], word: 'つく' });
+  const t = r.tiles.find(x => x.L === 'は'); expect(t.d).toBe('は');
+  const s = await page.evaluate(() => new Promise(res => { const T = window.HB_TEST, S = T.S(); const p = S.mine.find(q => T.letterOf(q) === 'は'); S.sel = [p.id]; T.doSplit();
+    setTimeout(() => res(S.mine.filter(q => ['｜', 'よ'].includes(T.letterOf(q))).map(q => q.d)), 100); }));
+  expect(s).toEqual(['｜', 'よ']); // もとの2枚の道すじ（→ が付かない）
+});
+
+test('割れた2枚をくっつけ直す技は、もとの札に戻す（往復は数えない）', async ({ page }) => {
+  const r = await page.evaluate(() => { const T = window.HB_TEST, S = T.S(); S.used.clear(); const p = T.mk('は'); S.mine = [p]; S.opp = ['つ', 'く'].map(l => T.mk(l)); S.sel = [p.id]; T.doSplit();
+    return new Promise(res => setTimeout(() => { const before = S.mine.map(T.letterOf).join(''); T.cpuThrow('つく'); res({ before, now: S.mine.map(T.letterOf).sort().join(''), d: S.mine.find(q => T.letterOf(q) === 'は') && S.mine.find(q => T.letterOf(q) === 'は').d }); }, 400)); });
+  expect(r.before).toBe('｜よ'); expect(r.now).toBe(['は', 'つ', 'く'].sort().join('')); expect(r.d).toBe('は');
+});
+
+test('投げた側（ひとり）：CPU の札が寄って1枚になる印が付く（動きを減らす設定では付かない）', async ({ page }) => {
+  const r = await page.evaluate(() => { const T = window.HB_TEST, S = T.S(); S.used.clear(); S.mine = ['つ', 'く'].map(l => T.mk(l)); S.opp = ['｜', 'よ'].map(l => T.mk(l)); S.sel = S.mine.map(p => p.id); T.doThrow(); return { opp: S.opp.map(T.letterOf), fx: T.OPPFX() }; });
+  expect(r.opp.slice(0, 1)).toEqual(['は']); expect(r.fx).toBeNull(); // 動きを減らす設定（テストの設定）では動きの印は付かない
+});
+
+test('ふたりで：相手の投げが届いたら受けた側の端末でくっつける。投げた側は音だけで、並びを待たない', async ({ page }) => {
+  const r = await page.evaluate(() => { const T = window.HB_TEST, S = T.S(); T.NET.mode = 'online'; S.used.clear(); S.mine = ['｜', 'よ', 'へ'].map(l => T.mk(l));
+    T.onOpponentThrow({ player: 'x', word: 'つく', stars: 0, trail: '' }); const mine = S.mine.map(T.letterOf).sort().join('');
+    S.atkWait = null; T.atkThrowOnline('つく'); const w = !!S.atkWait; T.NET.mode = 'cpu'; return { mine, w }; });
+  expect(r.mine).toBe(['は', 'へ', 'つ', 'く'].sort().join('')); expect(r.w).toBe(false);
+});
+
+test('音：くっつけるが効くとき（自分のカゴ・CPU の札）は くっつける の音が鳴る', async ({ page }) => {
+  const r = await page.evaluate(() => { const T = window.HB_TEST, S = T.S(); const log = []; window.HB_SE = { play: k => log.push(k) };
+    S.used.clear(); S.mine = ['｜', 'よ'].map(l => T.mk(l)); S.opp = ['つ', 'く'].map(l => T.mk(l)); S.sel = []; T.cpuThrow('つく'); const a = log.slice();
+    log.length = 0; S.used.clear(); S.mine = ['つ', 'く'].map(l => T.mk(l)); S.opp = ['｜', 'よ'].map(l => T.mk(l)); S.sel = S.mine.map(p => p.id); T.doThrow(); return { a, b: log.slice() }; });
+  expect(r.a).toContain('merge'); expect(r.b).toContain('merge');
+});
+
+test.describe('くっつける：食らいエフェクト（動きを許した設定）', () => {
+  test.use({ reducedMotion: 'no-preference' });
+  test('自分のカゴ：2枚の残像が寄って1枚になる（くっつけると同じ動き）。入力は止めない', async ({ page }) => {
+    await page.evaluate(() => { const T = window.HB_TEST, S = T.S(); T.FX.pullMs = 1500; S.used.clear(); S.mine = ['｜', 'よ', 'へ'].map(l => T.mk(l)); S.opp = ['つ', 'く'].map(l => T.mk(l)); S.sel = []; T.cpuThrow('つく'); T.render(); });
+    await expect(page.locator('#basket .ghost')).toHaveCount(2);
+    expect(await page.evaluate(() => window.HB_TEST.S().busy)).toBe(false);
+    await expect(page.locator('#basket .ghost')).toHaveCount(0);
+    expect(await page.evaluate(() => window.HB_TEST.S().mine.map(window.HB_TEST.letterOf).sort().join(''))).toBe(['は', 'へ', 'つ', 'く'].sort().join(''));
+  });
+  test('投げた側（ひとり）：あいての行の、できた札に動きが付く', async ({ page }) => {
+    await page.evaluate(() => { const T = window.HB_TEST, S = T.S(); T.ATK_FX.mergeMs = 1500; S.used.clear(); S.mine = ['つ', 'く'].map(l => T.mk(l)); S.opp = ['｜', 'よ'].map(l => T.mk(l)); S.sel = S.mine.map(p => p.id); T.doThrow(); });
+    await expect.poll(() => page.evaluate(() => { const f = window.HB_TEST.OPPFX(); return f && f.kind; })).toBe('merge');
+    await page.waitForFunction(() => !window.HB_TEST.OPPFX());
+  });
 });
