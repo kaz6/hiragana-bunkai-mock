@@ -925,14 +925,14 @@ function trailOf(ps){ return shown(ps.filter(p=>p.d&&p.d.includes('→')).map(p=
 function notesOf(ps){ const out=[]; ps.forEach(p=>{ if(p.note){ const s=`${asWord(letterOf(p))}←${p.note}`; if(!out.includes(s)) out.push(s); } }); return shown(out.slice(0,3).join('　')); }
 
 /* ---- 特別攻撃ワード（HB-075, D-101）----
-   操作の言葉（割る・回す・裏返す。語と枚数は attack-words.js）を投げると、受けた側のカゴの札にランダムでその操作が効く。
+   操作の言葉（割る・回す・裏返す・くっつける。語と枚数は attack-words.js）を投げると、受けた側のカゴの札にランダムでその操作が効く。
    自分→CPU（doThrow）・CPU→自分（cpuThrow）・ふたり（onOpponentThrow）で同じ決まり。ふたりでは受けた側の端末で札を選んで効かせ、
    変わった札は D-033 のカゴの送り合いで投げた側にも見える（新しい表・送る形は変えない）。CPU に狙う手は足さない。チュートリアルでは効かない。
    札の選び方（仮）：届いた字を足す前からカゴにあった札から、重ならずに枚数ぶん。割る＝割れる札から（無ければ空振り）。回す・裏返す＝見た目が変わる札から（足りないときだけ変わらない札も）。
    優先は attack-words.js の prefer で戻せる（'いいえ' なら全部の札から）。
    技で変わった札は★に数えない（仮）：技で変わった後の字を、その札のもとの字として道すじ・印を作り直す。割った2枚には「割る前の札の写し」だけ残し、くっつけ直すと元に戻る（往復は数えない。D-067） */
 const ATK=(()=>{ const A=window.HB_ATTACK||{}, W=A.words||{}, map=new Map();
-  ['split','turn','flip','all','noise'].forEach(k=>String(W[k]||'').split(/\s+/).filter(Boolean).forEach(w=>{ if(!map.has(w)) map.set(w,k); }));
+  ['split','turn','flip','all','noise','merge'].forEach(k=>String(W[k]||'').split(/\s+/).filter(Boolean).forEach(w=>{ if(!map.has(w)) map.set(w,k); }));
   return {map,count:A.count||{},prefer:A.prefer||{},all:A.allCount||{split:1,turn:2,flip:2},fx:A.fx||{}}; })(); // all＝全部のせ（HB-090）：語と きる・くるくる・はんてん の枚数は attack-words.js の words.all・allCount・fx
 const atkKind=w=>ATK.map.get(String(w))||null;
 const atkN=(kind,w)=>{ const c=ATK.count[kind]||[1,1]; return Math.max(0,+(([...String(w)].length>=4?c[1]:c[0]))||0); };
@@ -946,6 +946,7 @@ const ATK_FX={ lineMs:240, lineSpan:.9, // 斬撃：線が走る時間／カゴ�
   rollMs:Math.max(600,+ATK.fx.rollMs||1800), // 全部のせ：ロゴの字が縁を転がって列を抜けるまでの全体（ミリ秒。数は attack-words.js の fx.rollMs）
   rollLap:.55,                           // 全部のせ：転がる時間のうち、画面の縁を一周する割合（残りが列を横切る）
   noiseMs:Math.max(300,+ATK.fx.noiseMs||3000), noiseAlpha:Math.min(.9,Math.max(.1,Number.isFinite(+ATK.fx.noiseAlpha)&&ATK.fx.noiseAlpha!==null?+ATK.fx.noiseAlpha:.5)), // のいず（HB-091・D-110）：ノイズの長さ・字のかすかさ（数は attack-words.js の fx。仮 3秒・.5）
+  mergeMs:Math.max(120,+ATK.fx.mergeMs||420), // くっつける（HB-092・D-111）：投げた側の画面（あいての列）で、できた札が寄って1枚になる時間（数は attack-words.js の fx.mergeMs。仮 420）
   throwerLagMs:260 };                    // 投げた側の画面で技が出るまでの待ち
 /* のいず（HB-091・D-110）：host（自分のカゴ・相手の列）にノイズを重ねる。CSS だけ（絵を足さない）。入力は止めない。同じ host に続けて来たら、時間を数え直す */
 const NOISE_T=new Map();
@@ -963,6 +964,21 @@ function atkPick(pool,kind,n,cpu){ const pref=ATK.prefer[kind]!=='いいえ';
   else if(pref) list=atkShuf(pool.filter(good)).concat(atkShuf(pool.filter(p=>!good(p))));
   else list=atkShuf(pool);
   return list.slice(0,n); }
+/* くっつける（HB-092・D-111）：「つく」「くつつく」「くつつける」。札の組を n 組、重ならずに選ぶ。いまの「くっつける」の決まり（MERGE。字は letterOf＝いまの向き）で字になる組だけ（prefer が 'いいえ' なら全部の札から2枚ずつ。字にならない組は空振り）。結果が2つある組（「どっち」）は atkApplyMerge がランダムに */
+const atkMergeRes=(a,b)=>{ const la=letterOf(a), lb=letterOf(b); return (la&&lb&&MERGE[key(la,lb)])||null; };
+function atkPickMerge(pool,n){ const out=[], used=new Set();
+  if(ATK.prefer.merge==='いいえ'){ const l=atkShuf(pool); for(let i=0;i+1<l.length&&out.length<n;i+=2) out.push([l[i],l[i+1]]); return out; }
+  const pairs=[]; for(let i=0;i<pool.length;i++) for(let j=i+1;j<pool.length;j++) if(atkMergeRes(pool[i],pool[j])) pairs.push([pool[i],pool[j]]);
+  for(const [a,b] of atkShuf(pairs)){ if(out.length>=n) break; if(used.has(a)||used.has(b)) continue; used.add(a); used.add(b); out.push([a,b]); }
+  return out; }
+/* 組を勝手にくっつける（arr＝そのカゴ）。できた札は2枚のうち前の位置に入る。返り値：{miss:true,a,b} 字にならない／{a,b,to,n:新しい札}。くっつけて字になった札には、くっつける前の2枚の写し（jn）だけ残す＝割ればもとの2枚に戻る。技でできた札は工夫に数えない：道すじ・印は、その字を もとの字として作り直す（割ったときと同じ。D-067）。割って出た2枚をくっつけ直したときは、もとの札に戻る（mergeMade の決まり） */
+function atkApplyMerge(arr,a,b,cpu){ const ia=arr.indexOf(a), ib=arr.indexOf(b); if(ia<0||ib<0) return null; const la=letterOf(a)||'〓', lb=letterOf(b)||'〓', rs=atkMergeRes(a,b);
+  if(!rs) return {miss:true,a:la,b:lb};
+  const res=rs[rnd(rs.length)], back=!!(a.sp&&a.sp===b.sp&&a.sp.L===res), i=Math.min(ia,ib);
+  const n=mergeMade(a,b,res,cpu?{}:{spawn:{x:a.x,y:a.y}},!cpu);
+  if(!back) Object.assign(n,{d:res,d0:res,note:'',base:'',orig:res,was:res});
+  arr.splice(Math.max(ia,ib),1); arr.splice(i,1,n);
+  return {a:la,b:lb,to:letterOf(n)||res,n,i}; }
 /* 全部のせ（HB-090・D-110）：「かなかなころころ」。きる・くるくる・はんてん が同時に。札は重ならずに、割る → 回す → 裏返す の順に、ふつうの選び方（atkPick）で選ぶ。足りない分は空振り */
 const atkAllKinds=()=>{ const o=[]; ['split','turn','flip'].forEach(k=>{ for(let i=0;i<Math.max(0,+ATK.all[k]||0);i++) o.push(k); }); return o; };
 function atkPickAll(pool,cpu){ const used=new Set(), out=[];
@@ -1007,6 +1023,9 @@ function atkLog(who,w,kind,rs,cpuSide){ const wh=who==='me'?'自分':'相手', h
     else lg(who,`${head}は空振り`+(rs.length?`（${rs.map(r=>r.from).join('・')}）`:'')); return; }
   if(!rs.length){ lg(who,`${head}は空振り`); return; }
   lg(who,`${head}で ${cpuSide?'CPU の ':''}${rs.map(r=>r.from).join('・')} が${kind==='turn'?'回った':'裏返った'}（${rs.map(r=>r.from+'→'+r.to).join('・')}）`); }
+function atkLogMerge(who,w,rs,cpuSide){ const head=`${who==='me'?'自分':'相手'}の「${wordShow(w)}」`, h=rs.filter(r=>!r.miss);
+  if(h.length) lg(who,`${head}で ${cpuSide?'CPU の ':''}${h.map(r=>r.a+'＋'+r.b).join('・')} がくっついた（${h.map(r=>r.a+'＋'+r.b+'→'+r.to).join('、')}）`);
+  else lg(who,`${head}は空振り`+(rs.length?`（${rs.map(r=>r.a+'＋'+r.b).join('・')}）`:'')); }
 function atkLine(host,len,cls,cx){ const i=document.createElement('i'); i.className='atkline'+(cls?' '+cls:''); i.setAttribute('aria-hidden','true');
   i.style.width=len+'px'; i.style.marginLeft=(-len/2)+'px'; if(cx!=null) i.style.left=cx+'px'; host.appendChild(i); const a=-FX.angle;
   const an=i.animate([{transform:`rotate(${a}deg) scaleX(0)`,opacity:1},{transform:`rotate(${a}deg) scaleX(1)`,opacity:1,offset:.7},{transform:`rotate(${a}deg) scaleX(1)`,opacity:0}],{duration:ATK_FX.lineMs,easing:'ease-out',fill:'forwards'});
@@ -1038,6 +1057,11 @@ function atkRunAll(S0,w,elig){ if(S!==S0||S.over||S.ending) return;
     run(0); },roll.hitAt[k])); }
 function atkRunMine(S0,kind,w,elig,tries){ if(S!==S0||S.over||S.ending) return;
   if(kind==='all'){ atkRunAll(S0,w,elig); return; }
+  if(kind==='merge'){ if(S.busy&&tries<40){ setTimeout(()=>atkRunMine(S0,kind,w,elig,tries+1),80); return; }
+    const picks=atkPickMerge(S.mine.filter(p=>elig.has(p.id)),atkN(kind,w)); se('merge'); // 受けた側：2枚が寄って1枚になる（自分の くっつける と同じ動きと音。入力は止めない）
+    const gh=picks.map(([a,b])=>(atkMergeRes(a,b)?fxGhosts([a,b]):[])), rs=picks.map(([a,b])=>atkApplyMerge(S.mine,a,b,false)).filter(Boolean);
+    S.sel=S.sel.filter(id=>S.mine.some(p=>p.id===id)); S.choose=null; atkLogMerge('op',w,rs,false); render();
+    rs.forEach((r,k)=>{ if(!r.miss) fxMerge(gh[k]||[],r.n); }); return; }
   if(kind==='noise'){ atkNoiseOn(basket); atkNoiseOn($('oppSlots')); lg('op',`相手の「${wordShow(w)}」で ノイズが${ATK_FX.noiseMs/1000}秒走った（自分のカゴと あいての並び）`); render(); return; } // 受けた側：自分のカゴと相手の列に。入力は止めない（S.busy を立てない）
   if(S.busy&&tries<40){ setTimeout(()=>atkRunMine(S0,kind,w,elig,tries+1),80); return; }
   const picks=atkPick(S.mine.filter(p=>elig.has(p.id)),kind,atkN(kind,w),false); se(kind);
@@ -1057,7 +1081,7 @@ function atkRunMine(S0,kind,w,elig,tries){ if(S!==S0||S.over||S.ending) return;
   setTimeout(done,ms); }
 /* 投げた側の画面（あいての行）。ひとり：CPU の札にその場で効かせて見せる。ふたり：一閃は投げたときに出し、札の動きは相手のカゴが届いて変わった所に出す */
 let OPPFX=null; // {kind, idx[], t0}
-const atkOppMs=kind=>kind==='split'?ATK_FX.lineMs+FX.splitMs:kind==='turn'?ATK_FX.spinMs:ATK_FX.flipMs;
+const atkOppMs=kind=>kind==='merge'?ATK_FX.mergeMs:kind==='split'?ATK_FX.lineMs+FX.splitMs:kind==='turn'?ATK_FX.spinMs:ATK_FX.flipMs;
 function oppFxStart(kind,idx){ if(reduced) return; OPPFX={kind,idx:idx||[],t0:performance.now()}; renderOpp(); setTimeout(()=>{ if(OPPFX&&performance.now()-OPPFX.t0>=atkOppMs(OPPFX.kind)) OPPFX=null; },atkOppMs(kind)+60); }
 function oppFxPaint(){ const fx=OPPFX; if(!fx||reduced) return; const el=performance.now()-fx.t0;
   if(fx.kind==='all'){ fx.items.forEach(it=>oppFxPaintOne(it.kind,it.idx,el-it.at)); return; } // 全部のせ：当たった時刻ごとの動きを重ねる（HB-090）
@@ -1068,6 +1092,7 @@ function oppFxPaintOne(kind,idx,el){ const total=atkOppMs(kind); if(el<0||el>=to
     if(el<ATK_FX.lineMs){ const f=[...kids].filter(s=>s.textContent), a=f[0], b=f[f.length-1]; // 線は、いま入っている札の真ん中に走らせる
       const an=atkLine(box,ATK_FX.oppLinePx,'opp',a&&b?(a.offsetLeft+b.offsetLeft+b.offsetWidth)/2:null); an.currentTime=el; }
     idx.forEach((k,j)=>{ const s=kids[k]; if(!s) return; at(s.animate([{opacity:0,transform:`translateX(${j?-6:6}px) scale(.5)`},{opacity:0,transform:`translateX(${j?-6:6}px) scale(.5)`,offset:lf},{opacity:1,transform:'none'}],{duration:total,easing:'ease-out',fill:'both'})); }); return; }
+  if(kind==='merge'){ idx.forEach(k=>{ const s=kids[k]; if(s) at(s.animate([{opacity:.15,transform:'scaleX(2.4)'},{opacity:1,transform:'none'}],{duration:total,easing:'ease-out',fill:'both'})); }); return; } // 寄って1枚に（できた札が横に広がった所から縮んで着く）
   idx.forEach(k=>{ const s=kids[k]; if(!s) return; at(s.animate(kind==='turn'?[{transform:'rotate(0deg)'},{transform:`rotate(${ATK_FX.spinDeg}deg)`}]:[{transform:'scaleX(1)'},{transform:'scaleX(.04)',offset:.5},{transform:'scaleX(1)'}],{duration:total,easing:'ease-in-out'})); }); }
 /* 投げた側（全部のせ）：ひとり。ロゴの字が あいての行を横切り、当たった CPU の札から順に効く。動きは当たった時刻ごとに OPPFX の items に足す */
 function atkThrowSoloAll(w,had,S0,lag){
@@ -1087,6 +1112,10 @@ function atkThrowSolo(w,had){ const kind=atkKind(w); if(!kind||TUT.on||!S) retur
   if(kind==='noise'){ const go=()=>{ if(S!==S0||S.over||S.ending) return; atkNoiseOn($('oppSlots')); S.cpuHoldUntil=Date.now()+ATK_FX.noiseMs; // 代償：投げた側も あいての並びが見えにくい。CPU は画面を見ないので、仮に ノイズの間は動かない
       lg('me',`自分の「${wordShow(w)}」で あいての並びにノイズが${ATK_FX.noiseMs/1000}秒走った（CPU も${ATK_FX.noiseMs/1000}秒動かない）`); render(); };
     if(lag) setTimeout(go,lag); else go(); return; }
+  if(kind==='merge'){ const go=()=>{ if(S!==S0||S.over||S.ending) return; if(ATK_FX.throwerSound) se('merge');
+      const picks=atkPickMerge(S.opp.filter(p=>elig.has(p.id)),atkN(kind,w)), rs=picks.map(([a,b])=>atkApplyMerge(S.opp,a,b,true)).filter(Boolean);
+      atkLogMerge('me',w,rs,true); const idx=rs.filter(r=>!r.miss).map(r=>S.opp.indexOf(r.n)); if(idx.length) oppFxStart('merge',idx); render(); };
+    if(lag) setTimeout(go,lag); else go(); return; }
   const go=()=>{ if(S!==S0||S.over||S.ending) return; if(ATK_FX.throwerSound) se(kind);
     const picks=atkPick(S.opp.filter(p=>elig.has(p.id)),kind,atkN(kind,w),true), idx=[], rs=[];
     picks.forEach(p=>{ const i=S.opp.indexOf(p); const r=atkApplyTo(S.opp,p,kind,true); if(!r) return; rs.push(r); if(kind==='split'){ if(!r.miss) for(let k=0;k<r.n;k++) idx.push(i+k); } else idx.push(i); });
@@ -1101,6 +1130,9 @@ function atkThrowOnline(w){ const kind=atkKind(w); if(!kind||TUT.on||!S) return;
   if(kind==='all'){ /* 全部のせ：投げた側は、ロゴの字が あいての行を横切るのと、音を見せる。相手のカゴで変わった札は D-033 の並びでそのまま見える（札ごとの動きは付けない。仮） */
     const go=()=>{ if(S!==S0||S.over||S.ending) return; if(reduced){ if(ATK_FX.throwerSound) atkSeAll(); return; }
       const ks=atkAllKinds(), roll=atkRoll($('oppSlots'),ks.length); if(ATK_FX.throwerSound) ks.forEach((k,i)=>setTimeout(()=>{ if(S===S0) se(k); },roll.hitAt[i])); };
+    if(lag) setTimeout(go,lag); else go(); return; }
+  if(kind==='merge'){ S.atkWait=null; /* 前の回す・裏返すの待ちが残っていたら外す（並びが縮むので、関係のない札に動きが出ないように）。くっつける：投げた側は音だけ。相手のカゴで寄った札は D-033 の並びでそのまま見える（札ごとの動きは付けない。仮）。並びが縮むので atkWait は使わない */
+    const go=()=>{ if(S!==S0||S.over||S.ending) return; if(ATK_FX.throwerSound) se('merge'); };
     if(lag) setTimeout(go,lag); else go(); return; }
   if(kind!=='split') S.atkWait={kind,before:(S.oppL||[]).slice(),beforeO:(S.oppO||[]).slice(),until:Date.now()+8000};
   const go=()=>{ if(S!==S0||S.over||S.ending) return; if(ATK_FX.throwerSound) se(kind); if(kind==='split') oppFxStart('split',[]); };
