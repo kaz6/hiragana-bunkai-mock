@@ -99,7 +99,7 @@ button:focus-visible{outline:2px solid var(--me);outline-offset:2px}
 .atkline{position:absolute;left:50%;top:50%;height:4px;margin-top:-2px;border-radius:2px;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.3),0 0 10px 3px rgba(255,255,255,.9);pointer-events:none;z-index:6;transform-origin:50% 50%}
 .atkline.opp{height:3px;margin-top:-1.5px}
 .noisy{position:relative}
-.noisy::after{content:"";position:absolute;inset:0;z-index:30;pointer-events:none;border-radius:inherit;
+.noisy::after{content:"";position:absolute;inset:0;z-index:15;pointer-events:none;border-radius:inherit;
   background-image:radial-gradient(circle at 20% 30%,rgba(0,0,0,.75) 0 1px,transparent 1.6px),radial-gradient(circle at 70% 60%,rgba(255,255,255,.85) 0 1px,transparent 1.6px),radial-gradient(circle at 40% 85%,rgba(0,0,0,.6) 0 .8px,transparent 1.4px),linear-gradient(rgba(128,128,128,var(--na,.5)),rgba(128,128,128,var(--na,.5)));
   background-size:7px 7px,5px 5px,9px 9px,auto;animation:hbNoise .25s steps(1) infinite}
 @keyframes hbNoise{0%{background-position:0 0,0 0,0 0,0 0}25%{background-position:-3px 2px,2px -3px,4px 1px,0 0}50%{background-position:2px -4px,-4px 1px,-2px 3px,0 0}75%{background-position:-1px 3px,3px 2px,1px -4px,0 0}}
@@ -945,7 +945,7 @@ const ATK_FX={ lineMs:240, lineSpan:.9, // 斬撃：線が走る時間／カゴ�
   throwerSound:true,                     // 投げた側でも同じ音を鳴らす（編集の仮置き。外すときは false）
   rollMs:Math.max(600,+ATK.fx.rollMs||1800), // 全部のせ：ロゴの字が縁を転がって列を抜けるまでの全体（ミリ秒。数は attack-words.js の fx.rollMs）
   rollLap:.55,                           // 全部のせ：転がる時間のうち、画面の縁を一周する割合（残りが列を横切る）
-  noiseMs:Math.max(300,+ATK.fx.noiseMs||3000), noiseAlpha:Math.min(.9,Math.max(.1,ATK.fx.noiseAlpha==null?.5:+ATK.fx.noiseAlpha)), // のいず（HB-091・D-110）：ノイズの長さ・字のかすかさ（数は attack-words.js の fx。仮 3秒・.5）
+  noiseMs:Math.max(300,+ATK.fx.noiseMs||3000), noiseAlpha:Math.min(.9,Math.max(.1,Number.isFinite(+ATK.fx.noiseAlpha)&&ATK.fx.noiseAlpha!==null?+ATK.fx.noiseAlpha:.5)), // のいず（HB-091・D-110）：ノイズの長さ・字のかすかさ（数は attack-words.js の fx。仮 3秒・.5）
   throwerLagMs:260 };                    // 投げた側の画面で技が出るまでの待ち
 /* のいず（HB-091・D-110）：host（自分のカゴ・相手の列）にノイズを重ねる。CSS だけ（絵を足さない）。入力は止めない。同じ host に続けて来たら、時間を数え直す */
 const NOISE_T=new Map();
@@ -1467,7 +1467,7 @@ function cpuAct(){ if(S.over||S.ending||sheetOpen||guideHolds()||TUT.on) return;
     if(good.length) cpuApply(pick(good));
     else idleStep(steps,cpuApply,false); } // 全部が戻る手のときだけ待つ（HB-082）
   render(); schedule(); }
-function finish(kind){ LOG.push(`結果：${RESULT_LABEL[kind]}`); S.ending=true; clearTimeout(cpuT); clearTimeout(sudT); setTimeout(()=>{ S.over=kind; render(); }, reduced?0:900); }
+function finish(kind){ atkNoiseClear(); LOG.push(`結果：${RESULT_LABEL[kind]}`); S.ending=true; clearTimeout(cpuT); clearTimeout(sudT); setTimeout(()=>{ S.over=kind; render(); }, reduced?0:900); }
 
 /* ---- 描画 ---- */
 const basket=$('basket');

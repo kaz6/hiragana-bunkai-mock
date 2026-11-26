@@ -356,3 +356,13 @@ test.describe('のいず（動きを許した設定）', () => {
     await expect(page.locator('#oppSlots')).not.toHaveClass(/noisy/, { timeout: 3000 });
   });
 });
+
+test('のいず：ノイズは「しくみ」などのシート（z-index 20）より下。決着したらノイズは消える（レビューの指摘）', async ({ page }) => {
+  const r = await page.evaluate(() => { const T = window.HB_TEST, S = T.S(); T.atkNoiseOn(document.getElementById('basket'));
+    const z = +getComputedStyle(document.getElementById('basket'), '::after').zIndex, sheet = +getComputedStyle(document.querySelector('.sheet')).zIndex;
+    S.over = 'win'; return { z, sheet }; });
+  expect(r.z).toBeLessThan(r.sheet);
+  await page.evaluate(() => { const T = window.HB_TEST, S = T.S(); S.over = null; S.ending = false; T.atkNoiseOn(document.getElementById('basket')); T.atkNoiseOn(document.getElementById('oppSlots')); });
+  await page.evaluate(() => { const S = window.HB_TEST.S(); S.used.clear(); S.opp = [...'のいず'].map(l => window.HB_TEST.mk(l)); S.mine = Array.from({ length: 15 }, () => window.HB_TEST.mk('は')); window.HB_TEST.cpuThrow('のいず'); });
+  expect(await hasNoisy(page, '#basket')).toBe(false); // 負けて終わったら消える
+});
