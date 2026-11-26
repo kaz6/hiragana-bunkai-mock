@@ -98,6 +98,7 @@ button:focus-visible{outline:2px solid var(--me);outline-offset:2px}
 .slots{position:relative}
 .atkline{position:absolute;left:50%;top:50%;height:4px;margin-top:-2px;border-radius:2px;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.3),0 0 10px 3px rgba(255,255,255,.9);pointer-events:none;z-index:6;transform-origin:50% 50%}
 .atkline.opp{height:3px;margin-top:-1.5px}
+.rollfx{position:fixed;top:0;overflow:hidden;pointer-events:none;z-index:40} .rollfx img{position:absolute;left:0;top:0;object-fit:contain;filter:drop-shadow(0 2px 5px rgba(0,0,0,.4));will-change:transform;-webkit-user-drag:none} /* 全部のせ「かなかなころころ」のロゴの字（HB-090）。動きを減らす設定では作らない */
 .slots{display:flex;gap:2px;margin-top:4px}
 .slots span{flex:1 1 0;max-width:26px;height:28px;display:grid;place-items:center;font:600 18px/1 var(--f-kana);
   background:var(--field);border-radius:4px;color:var(--ink)}
@@ -876,7 +877,7 @@ const se=k=>{ try{ if(window.HB_SE) window.HB_SE.play(k); }catch(e){} };
 function doSplit(){ const ps0=selPieces(); const p=ps0[ps0.length-1]; if(!p||locked()) return; /* 割るのは選んだ最後の1枚（HB-034, D-070） */ const L=splitLetter(p); const parts=RECIPE[L]; if(!parts||S.mine.length>=CAP) return; if(TUT.on&&!tutOk('split')) return; const skew=!letterOf(p);
   begin(); se('split'); S.busy=true; const el=els.get(p.id); if(el){ el.classList.add('crack'); fxSplit(el,p); }
   setTimeout(()=>{ S.busy=false; if(S.over||S.ending){ render(); return; } // 動きの間に勝ち負けが決まったら、割らない（D-054）
-    const i=S.mine.indexOf(p);
+    const i=S.mine.indexOf(p); if(i<0){ render(); return; } // 動きの間に特別攻撃（HB-090 の全部のせ）がこの札を先に割っていたら、割らない（札が二重に割れて別の札が消えるのを防ぐ）
     const made=splitMade(p,L,parts,{spawn:{x:p.x,y:p.y}}); // 戻すだけの往復は数えない（D-067）
     S.mine.splice(i,1,...made); S.sel=S.sel.filter(id=>id!==p.id); /* 割った2つは選ばない。前に選んだ札はそのまま（D-070） */ lg('me',skew?`割る ${L}（向きずれ）→${parts.join('＋')}`:`割る ${L}→${parts.join('＋')}`); tutAdvance('split'); render(); }, reduced?0:FX.splitMs); }
 
@@ -925,8 +926,8 @@ function notesOf(ps){ const out=[]; ps.forEach(p=>{ if(p.note){ const s=`${asWor
    優先は attack-words.js の prefer で戻せる（'いいえ' なら全部の札から）。
    技で変わった札は★に数えない（仮）：技で変わった後の字を、その札のもとの字として道すじ・印を作り直す。割った2枚には「割る前の札の写し」だけ残し、くっつけ直すと元に戻る（往復は数えない。D-067） */
 const ATK=(()=>{ const A=window.HB_ATTACK||{}, W=A.words||{}, map=new Map();
-  ['split','turn','flip'].forEach(k=>String(W[k]||'').split(/\s+/).filter(Boolean).forEach(w=>{ if(!map.has(w)) map.set(w,k); }));
-  return {map,count:A.count||{},prefer:A.prefer||{}}; })();
+  ['split','turn','flip','all'].forEach(k=>String(W[k]||'').split(/\s+/).filter(Boolean).forEach(w=>{ if(!map.has(w)) map.set(w,k); }));
+  return {map,count:A.count||{},prefer:A.prefer||{},all:A.allCount||{split:1,turn:2,flip:2},fx:A.fx||{}}; })(); // all＝全部のせ（HB-090）：語と きる・くるくる・はんてん の枚数は attack-words.js の words.all・allCount・fx
 const atkKind=w=>ATK.map.get(String(w))||null;
 const atkN=(kind,w)=>{ const c=ATK.count[kind]||[1,1]; return Math.max(0,+(([...String(w)].length>=4?c[1]:c[0]))||0); };
 /* 食らいエフェクト（作者が決めた三つ：斬撃の一閃・回転 ♺・裏返し ■→□。数字はここだけ。動きを減らす設定では出さない）。音は自分の操作と同じ（split・turn・flip） */
@@ -936,6 +937,8 @@ const ATK_FX={ lineMs:240, lineSpan:.9, // 斬撃：線が走る時間／カゴ�
   flipMs:520,                            // 裏返す：札が横に薄くなって反対側から開く時間（■→□）。半ばで裏返す
   landMs:380,                            // 届いた字が着いてから、技が出るまでの待ち（字ごとの待ち 110ms は別に足す）
   throwerSound:true,                     // 投げた側でも同じ音を鳴らす（編集の仮置き。外すときは false）
+  rollMs:Math.max(600,+ATK.fx.rollMs||1800), // 全部のせ：ロゴの字が縁を転がって列を抜けるまでの全体（ミリ秒。数は attack-words.js の fx.rollMs）
+  rollLap:.55,                           // 全部のせ：転がる時間のうち、画面の縁を一周する割合（残りが列を横切る）
   throwerLagMs:260 };                    // 投げた側の画面で技が出るまでの待ち
 const atkShuf=a=>{ a=a.slice(); for(let i=a.length-1;i>0;i--){ const j=rnd(i+1); [a[i],a[j]]=[a[j],a[i]]; } return a; };
 const atkCanSplit=p=>{ const L=splitLetter(p); return !!(L&&RECIPE[L]); };
@@ -948,6 +951,33 @@ function atkPick(pool,kind,n,cpu){ const pref=ATK.prefer[kind]!=='いいえ';
   else if(pref) list=atkShuf(pool.filter(good)).concat(atkShuf(pool.filter(p=>!good(p))));
   else list=atkShuf(pool);
   return list.slice(0,n); }
+/* 全部のせ（HB-090・D-110）：「かなかなころころ」。きる・くるくる・はんてん が同時に。札は重ならずに、割る → 回す → 裏返す の順に、ふつうの選び方（atkPick）で選ぶ。足りない分は空振り */
+const atkAllKinds=()=>{ const o=[]; ['split','turn','flip'].forEach(k=>{ for(let i=0;i<Math.max(0,+ATK.all[k]||0);i++) o.push(k); }); return o; };
+function atkPickAll(pool,cpu){ const used=new Set(), out=[];
+  ['split','turn','flip'].forEach(k=>{ atkPick(pool.filter(p=>!used.has(p)),k,Math.max(0,+ATK.all[k]||0),cpu).forEach(p=>{ used.add(p); out.push({p,kind:k}); }); });
+  return out; }
+const atkSeAll=()=>{ ['split','turn','flip'].forEach(se); };
+/* ロゴの字が、画面の縁を一周してから row（技が当たる列）を横に転がり抜ける。字は img/logo/ の10枚（HB-089。か・十・よ・か・十・よ・こ・ろ・い・ろ）。n 回ぶんの「当たる時刻」を返す（先頭の字が列を横切る間に等しく）。動きを減らす設定では呼ばない */
+const ROLL_IMGS=['ka1','ju1','yo1','ka2','ju2','yo2','ko','ro1','i','ro2'].map(n=>'img/logo/'+n+'.png');
+function atkRoll(row,n){ const ar=document.querySelector('.app').getBoundingClientRect(), W=ar.width, H=innerHeight, sz=Math.round(Math.min(56,W*.14)), m=sz/2+4;
+  const rr=row.getBoundingClientRect(), y=Math.min(H-m,Math.max(m,rr.top+rr.height/2));
+  const lap=[[m,y],[m,m],[W-m,m],[W-m,H-m],[m,H-m],[m,y]], cross=[[m,y],[W+sz,y]];
+  const len=pts=>pts.slice(1).reduce((a,q,i)=>a+Math.hypot(q[0]-pts[i][0],q[1]-pts[i][1]),0);
+  const at=(pts,s)=>{ for(let i=1;i<pts.length;i++){ const a=pts[i-1],b=pts[i],d=Math.hypot(b[0]-a[0],b[1]-a[1]); if(s<=d||i===pts.length-1){ const u=d?Math.min(1,s/d):1; return [a[0]+(b[0]-a[0])*u,a[1]+(b[1]-a[1])*u]; } s-=d; } return pts[pts.length-1]; };
+  const L1=len(lap), L2=len(cross), T=ATK_FX.rollMs, N=ROLL_IMGS.length, gap=Math.min(70,T*.04), travel=T-(N-1)*gap, lapMs=travel*ATK_FX.rollLap, crossMs=travel-lapMs;
+  const box=document.createElement('div'); box.className='rollfx'; box.setAttribute('aria-hidden','true');
+  box.style.cssText=`left:${ar.left}px;width:${W}px;height:${H}px`;
+  ROLL_IMGS.forEach((src,i)=>{ const im=document.createElement('img'); im.src=src; im.alt=''; im.draggable=false; im.style.cssText=`width:${sz}px;height:${sz}px;margin:${-sz/2}px 0 0 ${-sz/2}px`; box.appendChild(im);
+    const kf=[], K=90; for(let j=0;j<=K;j++){ const t=T*j/K, tt=t-i*gap, vis=tt>0&&tt<travel; let x=m,yy=y,dist=0;
+      if(vis){ if(tt<lapMs){ dist=L1*tt/lapMs; [x,yy]=at(lap,dist); } else { const d2=L2*(tt-lapMs)/crossMs; dist=L1+d2; [x,yy]=at(cross,d2); } }
+      kf.push({offset:j/K,opacity:vis?1:0,transform:`translate(${x}px,${yy}px) rotate(${(dist/(sz/2))*180/Math.PI}deg)`}); }
+    im.animate(kf,{duration:T,fill:'both'}); });
+  document.body.appendChild(box); setTimeout(()=>box.remove(),T+150);
+  return {hitAt:Array.from({length:n},(_,k)=>lapMs+crossMs*(k+1)/(n+1)),total:T}; }
+function atkLogAll(who,w,list,cpuSide){ const head=`${who==='me'?'自分':'相手'}の「${wordShow(w)}」`, seg=[];
+  const sp=list.filter(r=>r.kind==='split'&&!r.miss); if(sp.length) seg.push(`${sp.map(r=>r.from).join('・')} が割れた（${sp.map(r=>r.parts.join('＋')).join('、')}）`);
+  [['turn','回った'],['flip','裏返った']].forEach(([k,v])=>{ const h=list.filter(r=>r.kind===k&&!r.miss&&!r.same); if(h.length) seg.push(`${h.map(r=>r.from).join('・')} が${v}（${h.map(r=>r.from+'→'+r.to).join('・')}）`); });
+  lg(who,seg.length?`${head}で ${cpuSide?'CPU の ':''}${seg.join('、')}`:`${head}は空振り`); }
 /* 札に技を効かせる（arr＝そのカゴ）。返り値：{miss:true,from} 空振り／{same:true,from,to} 変わらず／{from,parts|to} */
 function atkApplyTo(arr,p,kind,cpu){ const i=arr.indexOf(p); if(i<0) return null; const L0=letterOf(p)||'〓';
   if(kind==='split'){ const L=splitLetter(p), parts=L&&RECIPE[L]; if(!parts) return {miss:true,from:L0};
@@ -975,7 +1005,27 @@ function atkSpin(el,kind){ const f=el&&el.querySelector('.face'); if(!f) return;
 /* 受けた側（自分のカゴ）で効かせる。S.busy の間は待つ（割る・回すの動きの途中の札を変えない）。動きの間は自分の手を止める */
 function atkReceive(w,had){ const kind=atkKind(w); if(!kind||TUT.on||!S) return; const S0=S, elig=new Set(had);
   const ms=reduced?0:[...String(w)].length*110+ATK_FX.landMs; if(ms) setTimeout(()=>atkRunMine(S0,kind,w,elig,0),ms); else atkRunMine(S0,kind,w,elig,0); }
+/* 受けた側（全部のせ）：ロゴの字が自分の画面の縁を回って、自分のカゴの上を横切る。当たった札から、割る → 回す → 裏返す の順に効く。入力は止めない（S.busy を立てない。自分の動きの途中の札だけは待つ） */
+function atkRunAll(S0,w,elig){ if(S!==S0||S.over||S.ending) return;
+  const picks=atkPickAll(S.mine.filter(p=>elig.has(p.id)),false), list=[]; let pending=picks.length;
+  const conclude=()=>{ if(S!==S0||S.over||S.ending) return; atkLogAll('op',w,list.filter(Boolean),false);
+    if(S.mine.length>CAP){ if(isOnline()) sendLoseToOpponent(); finish('lose'); } else render(); };
+  const apply=(it,k)=>{ const r=atkApplyTo(S.mine,it.p,it.kind,false); if(r) list[k]=Object.assign({kind:it.kind},r); S.sel=S.sel.filter(id=>S.mine.some(p=>p.id===id)); S.choose=null; };
+  if(!picks.length){ if(!reduced) atkRoll(basket,atkAllKinds().length); else atkSeAll(); conclude(); return; }
+  if(reduced){ atkSeAll(); picks.forEach(apply); conclude(); return; }
+  const roll=atkRoll(basket,picks.length);
+  picks.forEach((it,k)=>setTimeout(()=>{ const run=tr=>{ if(S!==S0||S.over||S.ending) return; if(S.busy&&tr<40){ setTimeout(()=>run(tr+1),80); return; }
+      se(it.kind); const end=()=>{ if(--pending===0) conclude(); };
+      if(it.kind==='split'){ atkLine(basket,Math.min(basket.clientHeight*ATK_FX.lineSpan/Math.sin(FX.angle*Math.PI/180),basket.clientWidth*.95));
+        setTimeout(()=>{ if(S!==S0) return; const e=els.get(it.p.id); if(e&&atkCanSplit(it.p)){ e.classList.add('crack'); fxSplit(e,it.p); } },ATK_FX.lineMs);
+        setTimeout(()=>{ if(S!==S0) return; apply(it,k); render(); end(); },ATK_FX.lineMs+(atkCanSplit(it.p)?FX.splitMs:0)); return; }
+      const ms=it.kind==='turn'?ATK_FX.spinMs:ATK_FX.flipMs; atkSpin(els.get(it.p.id),it.kind);
+      setTimeout(()=>{ if(S!==S0) return; const g=()=>els.get(it.p.id)&&els.get(it.p.id).querySelector('.g'); if(g()) g().style.transition='none';
+        apply(it,k); render(); if(g()){ void g().offsetWidth; g().style.transition=''; } },ms/2);
+      setTimeout(end,ms); };
+    run(0); },roll.hitAt[k])); }
 function atkRunMine(S0,kind,w,elig,tries){ if(S!==S0||S.over||S.ending) return;
+  if(kind==='all'){ atkRunAll(S0,w,elig); return; }
   if(S.busy&&tries<40){ setTimeout(()=>atkRunMine(S0,kind,w,elig,tries+1),80); return; }
   const picks=atkPick(S.mine.filter(p=>elig.has(p.id)),kind,atkN(kind,w),false); se(kind);
   const apply=()=>{ if(S!==S0) return; if(S.over||S.ending){ S.busy=false; render(); return; }
@@ -996,14 +1046,31 @@ function atkRunMine(S0,kind,w,elig,tries){ if(S!==S0||S.over||S.ending) return;
 let OPPFX=null; // {kind, idx[], t0}
 const atkOppMs=kind=>kind==='split'?ATK_FX.lineMs+FX.splitMs:kind==='turn'?ATK_FX.spinMs:ATK_FX.flipMs;
 function oppFxStart(kind,idx){ if(reduced) return; OPPFX={kind,idx:idx||[],t0:performance.now()}; renderOpp(); setTimeout(()=>{ if(OPPFX&&performance.now()-OPPFX.t0>=atkOppMs(OPPFX.kind)) OPPFX=null; },atkOppMs(kind)+60); }
-function oppFxPaint(){ const fx=OPPFX; if(!fx||reduced) return; const el=performance.now()-fx.t0, total=atkOppMs(fx.kind); if(el>=total){ OPPFX=null; return; }
+function oppFxPaint(){ const fx=OPPFX; if(!fx||reduced) return; const el=performance.now()-fx.t0;
+  if(fx.kind==='all'){ fx.items.forEach(it=>oppFxPaintOne(it.kind,it.idx,el-it.at)); return; } // 全部のせ：当たった時刻ごとの動きを重ねる（HB-090）
+  const total=atkOppMs(fx.kind); if(el>=total){ OPPFX=null; return; } oppFxPaintOne(fx.kind,fx.idx,el); }
+function oppFxPaintOne(kind,idx,el){ const total=atkOppMs(kind); if(el<0||el>=total) return;
   const box=$('oppSlots'), kids=box.querySelectorAll('span'), at=a=>{ a.currentTime=el; return a; };
-  if(fx.kind==='split'){ const lf=ATK_FX.lineMs/total;
+  if(kind==='split'){ const lf=ATK_FX.lineMs/total;
     if(el<ATK_FX.lineMs){ const f=[...kids].filter(s=>s.textContent), a=f[0], b=f[f.length-1]; // 線は、いま入っている札の真ん中に走らせる
       const an=atkLine(box,ATK_FX.oppLinePx,'opp',a&&b?(a.offsetLeft+b.offsetLeft+b.offsetWidth)/2:null); an.currentTime=el; }
-    fx.idx.forEach((k,j)=>{ const s=kids[k]; if(!s) return; at(s.animate([{opacity:0,transform:`translateX(${j?-6:6}px) scale(.5)`},{opacity:0,transform:`translateX(${j?-6:6}px) scale(.5)`,offset:lf},{opacity:1,transform:'none'}],{duration:total,easing:'ease-out',fill:'both'})); }); return; }
-  fx.idx.forEach(k=>{ const s=kids[k]; if(!s) return; at(s.animate(fx.kind==='turn'?[{transform:'rotate(0deg)'},{transform:`rotate(${ATK_FX.spinDeg}deg)`}]:[{transform:'scaleX(1)'},{transform:'scaleX(.04)',offset:.5},{transform:'scaleX(1)'}],{duration:total,easing:'ease-in-out'})); }); }
+    idx.forEach((k,j)=>{ const s=kids[k]; if(!s) return; at(s.animate([{opacity:0,transform:`translateX(${j?-6:6}px) scale(.5)`},{opacity:0,transform:`translateX(${j?-6:6}px) scale(.5)`,offset:lf},{opacity:1,transform:'none'}],{duration:total,easing:'ease-out',fill:'both'})); }); return; }
+  idx.forEach(k=>{ const s=kids[k]; if(!s) return; at(s.animate(kind==='turn'?[{transform:'rotate(0deg)'},{transform:`rotate(${ATK_FX.spinDeg}deg)`}]:[{transform:'scaleX(1)'},{transform:'scaleX(.04)',offset:.5},{transform:'scaleX(1)'}],{duration:total,easing:'ease-in-out'})); }); }
+/* 投げた側（全部のせ）：ひとり。ロゴの字が あいての行を横切り、当たった CPU の札から順に効く。動きは当たった時刻ごとに OPPFX の items に足す */
+function atkThrowSoloAll(w,had,S0,lag){
+  const go=()=>{ if(S!==S0||S.over||S.ending) return; const picks=atkPickAll(S.opp.filter(p=>had.has(p.id)),true), list=[];
+    const apply=it=>{ const i=S.opp.indexOf(it.p), r=atkApplyTo(S.opp,it.p,it.kind,true); if(!r) return null; list.push(Object.assign({kind:it.kind},r));
+      const idx=[]; if(it.kind==='split'){ if(!r.miss) for(let k=0;k<r.n;k++) idx.push(i+k); } else idx.push(i); return idx; };
+    const conclude=()=>{ if(S!==S0||S.over||S.ending) return; atkLogAll('me',w,list,true); if(S.opp.length>CAP) finish('win'); else render(); };
+    if(reduced){ if(ATK_FX.throwerSound) atkSeAll(); picks.forEach(apply); conclude(); return; }
+    const roll=atkRoll($('oppSlots'),picks.length||atkAllKinds().length), fx=OPPFX={kind:'all',items:[],t0:performance.now()}; let pending=picks.length;
+    picks.forEach((it,k)=>setTimeout(()=>{ if(S!==S0||S.over||S.ending) return; if(ATK_FX.throwerSound) se(it.kind);
+      const idx=apply(it); if(idx&&(it.kind==='split'||idx.length)) fx.items.push({kind:it.kind,idx,at:performance.now()-fx.t0}); renderOpp(); if(--pending===0) conclude(); },roll.hitAt[k]));
+    if(!picks.length) setTimeout(conclude,roll.total);
+    setTimeout(()=>{ if(OPPFX===fx) OPPFX=null; },roll.total+Math.max(ATK_FX.lineMs+FX.splitMs,ATK_FX.spinMs,ATK_FX.flipMs)+80); };
+  if(lag) setTimeout(go,lag); else go(); }
 function atkThrowSolo(w,had){ const kind=atkKind(w); if(!kind||TUT.on||!S) return; const S0=S, elig=new Set(had), lag=reduced?0:ATK_FX.throwerLagMs;
+  if(kind==='all'){ atkThrowSoloAll(w,elig,S0,lag); return; }
   const go=()=>{ if(S!==S0||S.over||S.ending) return; if(ATK_FX.throwerSound) se(kind);
     const picks=atkPick(S.opp.filter(p=>elig.has(p.id)),kind,atkN(kind,w),true), idx=[], rs=[];
     picks.forEach(p=>{ const i=S.opp.indexOf(p); const r=atkApplyTo(S.opp,p,kind,true); if(!r) return; rs.push(r); if(kind==='split'){ if(!r.miss) for(let k=0;k<r.n;k++) idx.push(i+k); } else idx.push(i); });
@@ -1013,6 +1080,10 @@ function atkThrowSolo(w,had){ const kind=atkKind(w); if(!kind||TUT.on||!S) retur
     render(); };
   if(lag) setTimeout(go,lag); else go(); }
 function atkThrowOnline(w){ const kind=atkKind(w); if(!kind||TUT.on||!S) return; const S0=S, lag=reduced?0:ATK_FX.throwerLagMs;
+  if(kind==='all'){ /* 全部のせ：投げた側は、ロゴの字が あいての行を横切るのと、音を見せる。相手のカゴで変わった札は D-033 の並びでそのまま見える（札ごとの動きは付けない。仮） */
+    const go=()=>{ if(S!==S0||S.over||S.ending) return; if(reduced){ if(ATK_FX.throwerSound) atkSeAll(); return; }
+      const ks=atkAllKinds(), roll=atkRoll($('oppSlots'),ks.length); if(ATK_FX.throwerSound) ks.forEach((k,i)=>setTimeout(()=>{ if(S===S0) se(k); },roll.hitAt[i])); };
+    if(lag) setTimeout(go,lag); else go(); return; }
   if(kind!=='split') S.atkWait={kind,before:(S.oppL||[]).slice(),beforeO:(S.oppO||[]).slice(),until:Date.now()+8000};
   const go=()=>{ if(S!==S0||S.over||S.ending) return; if(ATK_FX.throwerSound) se(kind); if(kind==='split') oppFxStart('split',[]); };
   if(lag) setTimeout(go,lag); else go(); }
@@ -2024,7 +2095,7 @@ if(window.HB_TEST&&typeof window.HB_TEST==='object') Object.assign(window.HB_TES
 if(window.HB_TEST&&typeof window.HB_TEST==='object') Object.assign(window.HB_TEST,{SUDDEN,RARE,suddenWhen,suddenChars,suddenCount:()=>sudN,suddenSkip:sec=>{ sudStart-=sec*1000; suddenArm(); },dropOne}); // サドンデス：数・落ちる字の一覧・時刻・始まりを早める（HB-082）
 if(window.HB_TEST&&typeof window.HB_TEST==='object') Object.defineProperty(window.HB_TEST,'CAP',{get:()=>CAP,configurable:true}); // 一戦ごとに変わるので値でなく読む（HB-048）
 if(window.HB_TEST&&typeof window.HB_TEST==='object') Object.assign(window.HB_TEST,{TODOME,FX,NET,onStartMessage,KANA,PARTS,RECIPE,MERGE,MERGE_TURN,TURN,BAG,logText,makeToday,makeRare,RARE_TODAY:()=>RARE_TODAY,seedRng,TODAY:()=>TODAY,HAND,DICT,SPEEDS,key,
-  words:()=>WORDS, S:()=>S, mk,letterOf,checkSel,splitMade,mergeMade,comboOf,cpuOk,tapTile,doSplit,doMerge,doTurn,doThrow,render,newGame,TUT,TUT_SEQ,tutDone,startSolo,cpuAct,cpuThrow,setSpeed,showMeaning,SCENE_OF,exchangeCands,VOTE_TEXT,ALIAS,turnShortcuts,mergeTurnBacks,stepsOf,hintFind,hintPress,HINT:()=>HINT,HINT_TEXT,cpuApply,TURN_NOT_CPU,ATK,ATK_FX,atkKind,atkN,atkVisible,atkCanSplit,OPPFX:()=>OPPFX,onOpponentThrow,onOppBasket,atkThrowOnline,pressAgain,onAgainMessage,onPartnerLeft,onLobbyPresence,againUi,leaveOnline});
+  words:()=>WORDS, S:()=>S, mk,letterOf,checkSel,splitMade,mergeMade,comboOf,cpuOk,tapTile,doSplit,doMerge,doTurn,doThrow,render,newGame,TUT,TUT_SEQ,tutDone,startSolo,cpuAct,cpuThrow,setSpeed,showMeaning,SCENE_OF,exchangeCands,VOTE_TEXT,ALIAS,turnShortcuts,mergeTurnBacks,stepsOf,hintFind,hintPress,HINT:()=>HINT,HINT_TEXT,cpuApply,TURN_NOT_CPU,ATK,ATK_FX,atkKind,atkPickAll,atkAllKinds,atkN,atkVisible,atkCanSplit,OPPFX:()=>OPPFX,onOpponentThrow,onOppBasket,atkThrowOnline,pressAgain,onAgainMessage,onPartnerLeft,onLobbyPresence,againUi,leaveOnline});
 
 newGame();
 showMenu();
