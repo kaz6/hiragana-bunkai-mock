@@ -3,7 +3,7 @@
 const { test, expect } = require('@playwright/test');
 const { openGame, startSolo, tapTiles, press, expectClean } = require('../helpers');
 
-test.beforeEach(async ({ page }, info) => { info.ctx = await openGame(page, { extraWords: ['めつ', 'よしよし', 'すのー', 'うら', 'おもて', 'たたみかえし'] }); await startSolo(page); });
+test.beforeEach(async ({ page }, info) => { info.ctx = await openGame(page, { extraWords: ['めつ', 'よしよし', 'すのー', 'うら', 'おもて', 'たたみかえし', 'かなかなころころ'] }); await startSolo(page); });
 test.afterEach(async ({}, info) => expectClean(info.ctx));
 
 // 自分→CPU：自分の札 mine を選んで word を投げる。CPU のカゴは opp。投げる前の CPU の札の id・投げたあとの CPU の札の字を返す
@@ -202,4 +202,79 @@ test('おもて・たたみかえし が投げられる。裏返す技で相手�
   const b = await throwAt(page, { mine: ['た', 'た', 'み', 'か', 'え', 'し'], opp: ['い', 'し', 'し'] });
   expect(b.now.filter(l => l === 'り').length).toBe(1); // 4字以上なので2枚まで。い は1枚だけ
   expect(b.log).toContain('たたみかえし');
+});
+
+// 全部のせ「かなかなころころ」（HB-090・D-110）。きる・くるくる・はんてん が同時に。ロゴの字が縁を転がって、当たった札から 切れる → 回る → 裏返る。
+// 枚数（きる1・くるくる2・はんてん2）は編集の仮置き（attack-words.js の allCount）。「かなかなころころ」は辞書に無い語なので、公開ページでは作者が extra_words に足すまで投げられない（テストは EXTRA で足して通す）
+const ALL_WORD = 'かなかなころころ', ALL_MINE = [...ALL_WORD];
+const OPP5 = ['は', 'い', 'い', 'い', 'い']; // 5＋届いた8字＋割れて1枚＝14（上限14をこえない）
+
+test('全部のせ：語の表（all）と枚数。ほかの技の表は変わらない', async ({ page }) => {
+  const r = await page.evaluate(() => { const T = window.HB_TEST; return { all: [...T.ATK.map].filter(([, v]) => v === 'all').map(([w]) => w), kind: T.atkKind('かなかなころころ'), n: T.ATK.all,
+    kinds: T.atkAllKinds(), count: T.ATK.count, rollMs: T.ATK_FX.rollMs, others: [T.atkKind('きる'), T.atkKind('ころころ'), T.atkKind('はんてん'), T.atkKind('かなかな')] }; });
+  expect(r.all).toEqual(['かなかなころころ']); expect(r.kind).toBe('all');
+  expect(r.n).toEqual({ split: 1, turn: 2, flip: 2 }); expect(r.kinds).toEqual(['split', 'turn', 'turn', 'flip', 'flip']);
+  expect(r.count).toEqual({ split: [1, 1], turn: [1, 2], flip: [1, 2] }); // 既存の枚数は変えていない
+  expect(r.rollMs).toBe(1800); expect(r.others).toEqual(['split', 'turn', 'flip', null]);
+});
+
+test('全部のせ：札は重ならず、割る1・回す2・裏返す2（40回）。足りない分は空振り', async ({ page }) => {
+  const r = await page.evaluate(() => { const T = window.HB_TEST, out = [];
+    for (let i = 0; i < 40; i++) { const pool = ['は', 'い', 'い', 'い', 'い'].map(l => T.mk(l)), got = T.atkPickAll(pool, false);
+      out.push({ n: got.length, uniq: new Set(got.map(g => g.p.id)).size, kinds: ['split', 'turn', 'flip'].map(k => got.filter(g => g.kind === k).length), splitOk: got.filter(g => g.kind === 'split').every(g => T.atkCanSplit(g.p)) }); }
+    const few = T.atkPickAll(['し', 'し', 'し'].map(l => T.mk(l)), false), none = T.atkPickAll([], false);
+    return { out, few: ['split', 'turn', 'flip'].map(k => few.filter(g => g.kind === k).length), none: none.length }; });
+  r.out.forEach(o => { expect(o.n).toBe(5); expect(o.uniq).toBe(5); expect(o.kinds).toEqual([1, 2, 2]); expect(o.splitOk).toBe(true); });
+  expect(r.few).toEqual([0, 2, 1]); // 割れる札が無い→割るは空振り。のこり3枚を 回す2・裏返す1（札が足りない）
+  expect(r.none).toBe(0);
+});
+
+test('全部のせ：CPU に投げると、割れる・回る・裏返るが同時に効く（動きを減らす設定＝演出なしで、効きはすぐ）', async ({ page }) => {
+  const r = await throwAt(page, { mine: ALL_MINE, opp: OPP5 });
+  expect(r.log).toContain('自分の「かなかなころころ」で CPU の ');
+  expect(r.log).toContain('が割れた'); expect(r.log).toContain('が回った'); expect(r.log).toContain('が裏返った');
+  expect(r.now.length).toBe(5 + 8 + 1); // CPU の札5＋届いた8字＋割れて1枚増える
+  expect(await page.evaluate(() => document.querySelectorAll('.rollfx').length)).toBe(0); // 転がる演出は出ない
+});
+
+test('全部のせ：CPU の札が無いときは空振り（ログに出す）', async ({ page }) => {
+  const r = await throwAt(page, { mine: ALL_MINE, opp: [] });
+  expect(r.log).toContain('自分の「かなかなころころ」は空振り');
+});
+
+test('全部のせ：受けた側（自分のカゴ）にも同じ効き。届いた字は変わらない（動きを減らす設定）', async ({ page }) => {
+  const r = await cpuThrows(page, { mine: OPP5, word: ALL_WORD });
+  expect(r.log).toContain('「かなかなころころ」で ');
+  expect(r.log).toContain('が割れた'); expect(r.log).toContain('が回った'); expect(r.log).toContain('が裏返った');
+  expect(r.tiles.length).toBe(5 + 8 + 1);
+  expect(r.tiles.filter(t => ALL_MINE.includes(t.L)).length).toBeGreaterThanOrEqual(8); // 届いた8字（か・な・こ・ろ）はそのまま
+});
+
+test('全部のせ：ふたりで。相手の投げが届いたら、受けた側の端末で札を選んで効かせる', async ({ page }) => {
+  const r = await page.evaluate(() => { const T = window.HB_TEST, S = T.S(); T.NET.mode = 'online'; S.used.clear(); S.mine = ['は', 'い', 'い', 'い', 'い'].map(l => T.mk(l));
+    T.onOpponentThrow({ player: 'x', word: 'かなかなころころ', stars: 0, trail: '' }); const n = S.mine.length, log = T.logText(); T.NET.mode = 'cpu'; return { n, log }; });
+  expect(r.n).toBe(5 + 8 + 1); expect(r.log).toContain('が割れた'); expect(r.log).toContain('が回った'); expect(r.log).toContain('が裏返った');
+});
+
+test.describe('全部のせの演出（動きを許した設定）', () => {
+  test.use({ reducedMotion: 'no-preference' });
+  const LOGO = ['ka1', 'ju1', 'yo1', 'ka2', 'ju2', 'yo2', 'ko', 'ro1', 'i', 'ro2'].map(n => 'img/logo/' + n + '.png');
+  test('投げた側：ロゴの字10枚（img/logo/）が あいての行を転がり、終わると消える。札は当たった順に変わる', async ({ page }) => {
+    await page.evaluate(() => { const T = window.HB_TEST, S = T.S(); T.ATK_FX.rollMs = 2400; S.used.clear(); S.mine = [...'かなかなころころ'].map(l => T.mk(l)); S.opp = ['は', 'い', 'い', 'い', 'い'].map(l => T.mk(l)); S.sel = S.mine.map(p => p.id); T.doThrow(); });
+    await expect(page.locator('.rollfx img')).toHaveCount(10);
+    expect(await page.evaluate(() => [...document.querySelectorAll('.rollfx img')].map(i => new URL(i.src).pathname.slice(1)))).toEqual(LOGO);
+    expect(await page.evaluate(() => window.HB_TEST.S().busy)).toBe(false); // 入力は止めない
+    await expect(page.locator('.rollfx')).toHaveCount(0, { timeout: 8000 });
+    await expect.poll(() => page.evaluate(() => window.HB_TEST.logText())).toContain('が割れた');
+    expect(await page.evaluate(() => window.HB_TEST.S().opp.length)).toBe(5 + 8 + 1);
+  });
+  test('受けた側：ロゴの字が自分のカゴの上を転がり、入力は止まらない。終わると きる・くるくる・はんてん が効いている', async ({ page }) => {
+    await page.evaluate(() => { const T = window.HB_TEST, S = T.S(); T.ATK_FX.rollMs = 2400; S.mine = ['は', 'い', 'い', 'い', 'い'].map(l => T.mk(l)); S.opp = [...'かなかなころころ'].map(l => T.mk(l)); S.sel = []; T.cpuThrow('かなかなころころ'); T.render(); });
+    await expect(page.locator('.rollfx img')).toHaveCount(10, { timeout: 8000 });
+    expect(await page.evaluate(() => window.HB_TEST.S().busy)).toBe(false);
+    await expect(page.locator('.rollfx')).toHaveCount(0, { timeout: 8000 });
+    await expect.poll(() => page.evaluate(() => window.HB_TEST.logText()), { timeout: 8000 }).toContain('が裏返った');
+    const r = await page.evaluate(() => { const T = window.HB_TEST, S = T.S(); return { n: S.mine.length, log: T.logText() }; });
+    expect(r.n).toBe(5 + 8 + 1); expect(r.log).toContain('が割れた'); expect(r.log).toContain('が回った');
+  });
 });
