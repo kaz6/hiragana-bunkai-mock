@@ -28,6 +28,7 @@
 |---|---|---|---|
 | ロゴ（img/logo/kanakanakorokoro.png）と、字ごとに切り出したもの（img/logo/ka1・ju1・yo1・ka2・ju2・yo2・ko・ro1・i・ro2.png） | 参謀（Claude）の B 案（板と棒で組んだ字。字形は M PLUS Rounded 1c を輪郭にしたもの）を、作者（かずき）が手を入れて作った透過 PNG（2026-11-26）。字ごとの切り出しは相談チャット | 自前。字形の元の M PLUS Rounded 1c は SIL Open Font License 1.1（参謀の記録による。相談チャットは頁で確かめていない） | かなかなころころ の特殊演出（HB-090 から）。題名のロゴ |
 | 落書きの線（img/mask-scribble.png） | 作者（かずき）がスクリーンショットに描いた赤い線を切り出したもの（2026-11-26） | 自前 | 相手のいちばん左の枠を隠す（HB-088・D-109） |
+| 木目（img/wood-grain.png） | 相談チャット（Claude）が Python（numpy・Pillow）でノイズから作った透過 PNG（2026-11-27。外の素材は使っていない） | 自前 | 札の白木の木目（HB-098・D-117） |
 
 ## 画面の表示（HB-081）
 

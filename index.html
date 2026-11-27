@@ -154,10 +154,16 @@ button:focus-visible{outline:2px solid var(--me);outline-offset:2px}
   touch-action:manipulation;transition:transform .34s cubic-bezier(.34,1.3,.6,1),opacity .22s}
 .face{position:absolute;inset:0;border-radius:7px;background:var(--tile);color:var(--ink);display:grid;place-items:center;
   font:600 30px/1 var(--f-kana)}
-.tile.off .face{background:var(--off);color:var(--off-ink)}
+/* 札は白木の板に墨の字（D-117・HB-098）。木目は img/wood-grain.png（相談チャットが作った）。--gx・--gy で札ごとに木目の場所をずらす。部品（off）は濃い木の部材で木目なし */
+.tile,.slots span.fill,.slots span.hid{--tile:#F2E1BD;--ink:#1D1813}
+.slots span.part{--off:#D3A86F;--off-ink:#1D1813;background-image:none} /* 相手の列の部品も濃い木の部材（HB-098） */
+.face{background-image:url(img/wood-grain.png);background-size:480px 480px;background-position:var(--gx,0) var(--gy,0);box-shadow:0 3px 0 #C29A66}
+.slots span.fill{background-image:url(img/wood-grain.png);background-size:480px 480px;box-shadow:0 2px 0 #C29A66}
+.tile.off .face{--off:#D3A86F;--off-ink:#1D1813;background:var(--off);color:var(--off-ink)}
 .tile.sel .face{background:var(--me);color:var(--me-ink)}
 .tile.over:not(.sel) .face{box-shadow:inset 0 0 0 2px var(--opp)}
 .tile.tgt .face{box-shadow:inset 0 0 0 3px var(--ink)}
+.tile.sel:not(.tgt) .face{box-shadow:0 3px 0 #173A57} /* 選んだ札の厚みは青の濃い色（HB-098） */
 .g{display:block;transition:transform .17s ease-out}
 .g.mark{font-size:1.9em;line-height:1;translate:.18em .12em} /* ゜と゛は字のままだと小さく左上に寄るので、大きくして真ん中へ（HB-013） */
 .ord{position:absolute;right:4px;top:3px;font:700 12px/1 var(--f-ui);color:var(--me-ink)}
@@ -166,6 +172,7 @@ button:focus-visible{outline:2px solid var(--me);outline-offset:2px}
 .tile.cut .face{opacity:0}
 .tile .half{position:absolute;inset:0;border-radius:7px;background:var(--tile);color:var(--ink);display:grid;place-items:center;font:600 30px/1 var(--f-kana);pointer-events:none;
   transition:transform var(--fx-split,.26s) cubic-bezier(.2,.8,.3,1)}
+.tile .half{background-image:url(img/wood-grain.png);background-size:480px 480px;background-position:var(--gx,0) var(--gy,0);box-shadow:0 3px 0 #C29A66} /* 割れた半分も白木（HB-098） */
 .tile .half.sel{background:var(--me);color:var(--me-ink)}
 .tile .slash{position:absolute;left:50%;top:50%;width:150%;height:3px;margin:-1.5px 0 0 -75%;transform:rotate(-57deg) scaleX(0);background:#fff;border-radius:2px;box-shadow:0 0 6px 1px rgba(255,255,255,.9);
   pointer-events:none;opacity:0}
@@ -1528,6 +1535,7 @@ function renderBasket(){ const {W,H}=measure(); const sel=S.sel;
     if(!el){ el=document.createElement('button'); el.type='button'; el.className='tile';
       el.innerHTML='<span class="face"><span class="g"></span></span><span class="ord"></span>';
       el.addEventListener('click',()=>tapTile(p.id)); basket.appendChild(el); els.set(p.id,el);
+      { const h=[...String(p.id)].reduce((v,ch)=>(v*31+ch.charCodeAt(0))>>>0,7); el.style.setProperty('--gx',-(h%400)+'px'); el.style.setProperty('--gy',-((h>>>9)%400)+'px'); } // 札ごとに木目の場所をずらす（HB-098）
       const sx=p.spawn?p.spawn.x:pos.x, sy=p.spawn?p.spawn.y:-TILE-14;
       el.style.transition='none'; el.style.transform=`translate(${sx}px,${sy}px)`; void el.offsetWidth; el.style.transition='';
       el.style.transitionDelay=(p.delay||0)+'ms';

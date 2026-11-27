@@ -1,6 +1,6 @@
 // 画面：390px で開いてエラーがない。遊び方が開く。ひとりでが始まる。辞書の語数
 const { test, expect } = require('@playwright/test');
-const { openGame, startSolo, expectClean, EXTRA_WORDS } = require('../helpers');
+const { openGame, startSolo, setBasket, tapTiles, expectClean, EXTRA_WORDS } = require('../helpers');
 const { DICT_WORDS_NOW, PAGE_WORDS_NOW, MIN_RATIO } = require('../counts');
 
 test.afterEach(async ({}, info) => expectClean(info.ctx));
@@ -167,4 +167,22 @@ test('相手のいちばん左の枠は落書きで隠す。字も部品の色�
   expect(r.rest).toBe('によこ');
   expect(r.opp).toBe('゛によこ');                 // 隠すのは見た目だけ
   expect(r.online).toEqual(['hid:', 'fill:に']);  // ふたりででも同じ
+});
+
+test('札は白木の板に木目。部品と選んだ札は木目なし。札ごとに木目の場所が違う。相手の列も白木（作者 2026-11-27 19:26「薄いが好きかも」・HB-098）', async ({ page }, info) => {
+  info.ctx = await openGame(page); await startSolo(page);
+  await setBasket(page, ['か', 'な', '｜', 'こ']);
+  await tapTiles(page, [0]);
+  const r = await page.evaluate(() => {
+    const faces = [...document.querySelectorAll('#basket .tile')].map(t => ({ sel: t.classList.contains('sel'), off: t.classList.contains('off'), bg: getComputedStyle(t.querySelector('.face')).backgroundImage, pos: getComputedStyle(t.querySelector('.face')).backgroundPosition, color: getComputedStyle(t.querySelector('.face')).backgroundColor }));
+    const fill = document.querySelector('#oppSlots span.fill');
+    return { faces, opp: fill && getComputedStyle(fill).backgroundImage };
+  });
+  const plain = r.faces.filter(f => !f.sel && !f.off);
+  expect(plain.length).toBeGreaterThan(1);
+  for (const f of plain) { expect(f.bg).toContain('img/wood-grain.png'); expect(f.color).toBe('rgb(242, 225, 189)'); }
+  expect(new Set(plain.map(f => f.pos)).size).toBeGreaterThan(1);   // 同じ板の繰り返しに見せない
+  expect(r.faces.filter(f => f.off).every(f => !f.bg.includes('wood-grain'))).toBe(true);
+  expect(r.faces.filter(f => f.sel).every(f => !f.bg.includes('wood-grain'))).toBe(true);
+  expect(r.opp).toContain('img/wood-grain.png');
 });
