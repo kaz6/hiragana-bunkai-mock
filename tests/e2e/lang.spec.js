@@ -38,8 +38,8 @@ test.describe('en-US：English が主。日本語の画面の文は出ない（�
     expect(await page.locator('#aSplit').innerText()).not.toMatch(/割る/);
     // 札はひらがなのまま
     expect(await page.locator('#basket .tile').first().innerText()).toMatch(/[ぁ-ん一｜十ー∘゛゜]/);
-    // 英語の無い文は日本語のまま（見出し「ひらがな分解（仮）」）
-    expect(await page.locator('.top h1').innerText()).toContain('ひらがな分解');
+    // 英語の無い文は日本語のまま（見出し「かなかなころころ」）
+    expect(await page.locator('.top h1').innerText()).toContain('かなかなころころ');
     expect(await noOverflow(page)).toBe(true);
   });
   test('声：あいさつ！が English で出る（日本語の文は出ない）', async ({ page }, info) => {

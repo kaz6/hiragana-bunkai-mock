@@ -1,13 +1,13 @@
 <!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
-<title>ひらがな分解（仮）</title>
+<title>かなかなころころ</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Klee+One:wght@600&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
 <style>
 /* 配置：上から 相手 → 言葉の往復（リスト）→ 自分のカゴ（主役）→ 台 → 手。色面で分け、囲みはカゴだけ。 */
 :root{
-  --bg:#E4ECEA; --field:#D2DEDB; --ink:#1B2A36; --sub:#52646C;
-  --tile:#FCFDFB; --off:#EDE0A0; --off-ink:#55460A;
-  --me:#23557F; --me-ink:#FFFFFF; --opp:#AE4129; --line:#93A8A5;
+  --bg:#F1E6D3; --field:#E6D7BF; --ink:#33251A; --sub:#715E4A;
+  --tile:#FFF9EE; --off:#EDE0A0; --off-ink:#55460A;
+  --me:#23557F; --me-ink:#FFFFFF; --opp:#AE4129; --line:#BFA684;
   --f-kana:"Klee One","Hiragino Maru Gothic ProN","Yu Mincho","Noto Serif CJK JP",serif;
   --f-ui:"Zen Kaku Gothic New","Hiragino Kaku Gothic ProN","Yu Gothic","Noto Sans CJK JP",sans-serif;
   --s:52px;
@@ -16,15 +16,15 @@
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
-    --bg:#141C23; --field:#1D2832; --ink:#E6EDEE; --sub:#96A7AD;
-    --tile:#2B3A47; --off:#4A4320; --off-ink:#EBDD9A;
-    --me:#7DB2E2; --me-ink:#0E1820; --opp:#EC8A72; --line:#445663; color-scheme:dark;
+    --bg:#211A14; --field:#2D241C; --ink:#F2E9DC; --sub:#B4A28C;
+    --tile:#3E3227; --off:#4A4320; --off-ink:#EBDD9A;
+    --me:#7DB2E2; --me-ink:#0E1820; --opp:#EC8A72; --line:#5E4D3D; color-scheme:dark;
   }
 }
 :root[data-theme="dark"]{
-  --bg:#141C23; --field:#1D2832; --ink:#E6EDEE; --sub:#96A7AD;
-  --tile:#2B3A47; --off:#4A4320; --off-ink:#EBDD9A;
-  --me:#7DB2E2; --me-ink:#0E1820; --opp:#EC8A72; --line:#445663; color-scheme:dark;
+  --bg:#211A14; --field:#2D241C; --ink:#F2E9DC; --sub:#B4A28C;
+  --tile:#3E3227; --off:#4A4320; --off-ink:#EBDD9A;
+  --me:#7DB2E2; --me-ink:#0E1820; --opp:#EC8A72; --line:#5E4D3D; color-scheme:dark;
 }
 html,body{height:100%}
 body{background:var(--bg);color:var(--ink);font:500 calc(14px*var(--fz))/1.5 var(--f-ui);-webkit-tap-highlight-color:transparent}
@@ -277,7 +277,7 @@ small.en.b{display:block;margin-left:0}
 .en-main .top .link small.en{font-size:inherit!important}
 .langBtn{min-width:48px;justify-content:center;letter-spacing:.02em}
 .langSet{margin:0 0 6px}
-.menu-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.menu-head{display:flex;align-items:center;justify-content:flex-end;gap:12px}
 .top .link small.en{display:block;margin:0;font-size:calc(10px*var(--fz));line-height:1.2}
 .act small.en{margin:0 3px 0 0;font-size:calc(11px*var(--fz))}
 .act.throw small.en,.guide small.en{color:inherit;opacity:.75}
@@ -321,8 +321,11 @@ small.en.b{display:block;margin-left:0}
 .menu{position:fixed;inset:0;background:var(--bg);overflow-y:auto;z-index:30;
   padding-top:calc(24px + env(safe-area-inset-top,0px));padding-bottom:calc(24px + env(safe-area-inset-bottom,0px));
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
-.menu-in{max-width:448px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
-.menu h2{margin:0;font:700 calc(18px*var(--fz))/1.3 var(--f-ui)}
+.menu-in{max-width:448px;margin:0 auto;display:flex;flex-direction:column;gap:18px;min-height:100%} /* 名義の一行を画面のいちばん下へ送るため、画面の高さまで伸ばす（HB-096） */
+.menu-logo{display:block;width:100%;height:auto}
+.menu-sub{margin:-6px 0 0;text-align:center;font:700 calc(15px*var(--fz))/1.4 var(--f-ui);letter-spacing:.12em;color:var(--sub)}
+.menu-by{margin:auto 0 0;text-align:center;font:500 calc(12px*var(--fz))/1.4 var(--f-ui);color:var(--sub)}
+.menu-by a{color:inherit;text-decoration:underline}
 .menu-solo{height:52px;font-size:calc(16px*var(--fz))}
 #btnSolo,#btnDuo,#btnJoin{background:var(--me);color:var(--me-ink)} /* ボタンらしい塗り（HB-056, D-090）。結果の画面の主なボタンと同じ */
 #btnSolo small.en,#btnDuo small.en,#btnJoin small.en{color:inherit;opacity:.85}
@@ -373,7 +376,7 @@ small.en.b{display:block;margin-left:0}
 
 <div class="app">
   <header class="top">
-    <h1>ひらがな分解<small>（仮）</small></h1>
+    <h1>かなかなころころ</h1>
     <button class="link" id="btnHelp" type="button">しくみ<small class="en" lang="en">How it works</small></button>
     <button class="link" id="btnLog" type="button">ログ<small class="en" lang="en">Log</small></button>
     <button class="link" id="btnReset" type="button">やりなおし<small class="en" lang="en">Restart</small></button>
@@ -433,8 +436,11 @@ small.en.b{display:block;margin-left:0}
 
 <div class="menu" id="menu">
   <div class="menu-in">
-    <div class="menu-head"><h2>ひらがな分解（仮）</h2><button class="how langBtn" id="btnLangMenu" data-set="langSetMenu" type="button" aria-haspopup="true" aria-expanded="false"></button></div>
+    <div class="menu-head"><button class="how langBtn" id="btnLangMenu" data-set="langSetMenu" type="button" aria-haspopup="true" aria-expanded="false"></button></div>
     <div class="meanSet langSet" id="langSetMenu" role="group" aria-label="言葉 / Language" hidden></div>
+    <!-- ロゴと副題（HB-096, D-115）。副題の字・並びは編集の仮置き -->
+    <img class="menu-logo" src="img/logo/kanakanakorokoro.png" alt="かなかなころころ">
+    <p class="menu-sub">ひらがなりびるど</p>
     <button class="act menu-solo" id="btnSolo" type="button">▶ ひとりで（CPU）<small class="en" lang="en">Solo vs CPU</small></button>
     <!-- ひとりでの相手の強さを、始める前に選ぶ（HB-014 追加, D-041）。中身は JS で SPEEDS から作る -->
     <div class="solo-pick" id="soloPick" role="group" aria-label="相手の強さ" hidden></div>
@@ -450,6 +456,8 @@ small.en.b{display:block;margin-left:0}
       <button class="link" id="btnLeave" type="button" hidden>退室<small class="en" lang="en">Leave</small></button>
     </div>
     <button class="creditLine" id="btnCreditMenu" type="button">辞書：JMdict（EDRDG）・IPADIC<small class="en" lang="en">Dictionary: JMdict (EDRDG) · IPADIC</small></button>
+    <!-- 名義の一行（HB-096, D-115）。文は編集の仮置き。言葉を切り替えても同じ -->
+    <p class="menu-by">嘘八百万 ・ <a href="https://bsky.app/profile/uso800yorozu.bsky.social" target="_blank" rel="noopener">Bluesky</a></p>
   </div>
 </div>
 
@@ -795,7 +803,7 @@ let LOG=[], t0=0, lastNg='', tried=new Set(), sentRejects=new Set();
 function oppCount(){ return isOnline()?(S.oppL?S.oppL.length:'？'):S.opp.length; } // ふたりででは届いた数（まだ届いていなければ ？）
 /* 勝ち負けが決まったあとの自分の手は残さない（D-054） */
 function lg(who,msg){ if(!S||(who==='me'&&(S.over||S.ending))) return; LOG.push(`${((Date.now()-t0)/1000).toFixed(1)}s ${who==='me'?'自分':'相手'}｜${shown(msg)}　［自分${S.mine.length}・相手${oppCount()}］`); }
-function logText(){ return [`ひらがな分解（仮）ログ ${new Date().toLocaleString('ja-JP')}`,
+function logText(){ return [`かなかなころころ ログ ${new Date().toLocaleString('ja-JP')}`,
   isOnline()
     ? `ふたりで（合言葉の部屋「${NET.pass}」）　今日の字 多め:${TODAY.more.join('')} 少なめ:${TODAY.less.join('')}${RARE_TODAY?' レア:'+RARE_TODAY.letter:''}　一度きり:${once?'あり':'なし'}　辞書:${WORDS.length}語　上限:${CAP}　引く:なし（${FLOOR}こまで1こずつ。0こ→すぐ濁音・1こ→${REFILL_MS/1000}秒後に半濁音・2こ→${REFILL_MS/1000}秒後にふつう）`
     : `ひとりで（CPU）　速さ:${SPEEDS[speed].name}　今日の字 多め:${TODAY.more.join('')} 少なめ:${TODAY.less.join('')}${RARE_TODAY?' レア:'+RARE_TODAY.letter:''}　一度きり:${once?'あり':'なし'}　辞書:${WORDS.length}語　上限:${CAP}　相手の語:${SPEEDS[speed].deep?'辞書全部・2手先まで読む（つよい。D-051）':SPEEDS[speed].smart?'辞書全部（賢い。D-045）':cpuMax()+'字まで'}　引く:なし（${FLOOR}こまで1こずつ。0こ→すぐ濁音・1こ→${REFILL_MS/1000}秒後に半濁音・2こ→${REFILL_MS/1000}秒後にふつう）`].concat(LOG).join('\n'); }
