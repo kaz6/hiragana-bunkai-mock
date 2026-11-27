@@ -264,8 +264,8 @@
 ## R-042 通信対戦の部屋の番号を外から見えなくする（HB-095、D-114 の「まだ 4」の前半。作者 2026-11-27 12:44「おけ」）
 
 - 中身：相手の投げの受け取りを、表 throws の読み取り（postgres_changes）から match のチャンネルの broadcast（event: throw、{word, stars, trail, player}）に替えた。自分の insert が通ったとき（'ok'）だけ送る。先着の決まり（insert の 23505）は今のまま。合言葉の番号（roomKeyOf）は FNV の8桁から SHA-256（crypto.subtle）の先頭32文字（16進）にし、lobby・match の名前と room（「32文字-乱数」）もこれに合わせた
-- 変えなかったもの：表（Supabase）・遊びの決まり・画面の文。表の読み取りを止める・room の形の決まりを32文字に直すのは、マージのあとに相談チャットがやる
+- 変えなかったもの：表（Supabase）・遊びの決まり・画面の文。表の読み取りを止める・room の決まりを直すのは相談チャットがやる。本物の表の room には throws_room_form（8桁の形）のほかに throws_room_check（3〜32字）があり、新しい room は41字（32＋1＋乱数8）なので、両方を直す。写し supabase/hb094_guard_writes.sql には throws_room_check が載っていない
 - 移り変わり：更新前のページを開いたままの人とは、合言葉の番号が変わるので同じ部屋にならない（許す）。マージから相談チャットが表の room の形を直すまでの間は、表への投げが形の決まりで断られ「送れなかった」になる
 - 確かめ：tests/e2e/room.spec.js（番号の形・入室の名前・broadcast で届く・postgres_changes を使わない・insert 'ok' で送り 23505 では送らない）。tests/helpers.js の偽の Supabase に on() の記録と __hbEmit、crypto.subtle（Node の SHA-256 を借りる）を足した
-- 受け取りの形：broadcast は表の決まりを通らないので、受けた側で word を表と同じ形に限り、stars・trail を整える（レビューで、word に HTML を入れると画面に出る穴が見つかったため）。ログの描画（data-w・trail）にエスケープが無いのは前からあり、この PR では直していない（提案）
+- 受け取りの形：broadcast は表の決まりを通らないので、受けた側で word を表と同じ形（16字まで）に限り、stars・trail を整える（レビューで、word に HTML を入れると画面に出る穴が見つかったため）。ログの描画（data-w・trail）にエスケープが無いのは前からあり、この PR では直していない（提案）
 - 作業：HB-095（係）

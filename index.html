@@ -2134,8 +2134,8 @@ async function throwOnline(c){ const ps=selPieces(); S.busy=true; render();
 
 /* 相手が投げた言葉を、自分のカゴの材料として受け取る（ー は棒として届く） */
 function onOpponentThrow(row){ if(!S||S.over||S.ending) return;
-  if(!row||typeof row.word!=='string'||!/^[ぁ-ゖー。∘]{1,40}$/.test(row.word)) return; // broadcast は表の決まり（throws_word_kana）を通らないので、ここで同じ形に限る（HB-095）
-  row={word:row.word,player:row.player,stars:Number.isInteger(row.stars)?Math.max(0,Math.min(9,row.stars)):0,trail:typeof row.trail==='string'?row.trail.replace(/[<>&"'`]/g,'').slice(0,200):''}; // 画面に入る stars・trail も形を整える
+  if(!row||typeof row.word!=='string'||!/^[ぁ-ゖー。∘]{1,16}$/.test(row.word)) return; // broadcast は表の決まり（throws_word_kana）を通らないので、ここで同じ形に限る（HB-095）
+  row={word:row.word,player:row.player,stars:Number.isInteger(row.stars)?Math.max(0,Math.min(9,row.stars)):0,trail:typeof row.trail==='string'?row.trail.replace(/[<>&"'`]/g,'').slice(0,400):''}; // 画面に入る stars・trail も形を整える
   if(row.player===NET.playerId) return; // 自分の投げは投げたときに済んでいる
   S.used.add(row.word); const had=S.mine.map(p=>p.id);
   S.log.push({who:'op',word:row.word,note:'',k:row.stars||0,trail:row.trail||''}); zkRecord(row.word,'op',row.stars||0,row.trail||'');
