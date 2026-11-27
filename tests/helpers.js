@@ -22,13 +22,14 @@ window.__hbSent=[];
     const q={
       select(){ return q; },
       limit(){ return done({data: name==='extra_words' ? (window.__HB_EXTRA||[]).map(w=>({word:w})) : [], error:null}); },
-      insert(row){ window.__hbSent.push({table:name,row}); return done({data:null,error:null}); },
+      insert(row){ window.__hbSent.push({table:name,row}); return done({data:null,error:window.__hbInsertError||null}); }, // __hbInsertError：{code:'23505'} などを入れると、その失敗を返す（HB-095）
     };
     return q;
   }
   // channel：送ったもの（__hbCh）・消した channel の名前（__hbRemoved）を残す。在室は __hbPresence で差し替える（HB-061。ふだんは空）
-  window.__hbCh=[]; window.__hbRemoved=[]; window.__hbPresence={};
-  function channel(name){ const ch={ name, on(){ return ch; }, subscribe(cb){ return ch; }, track(){ return done('ok'); }, send(m){ window.__hbCh.push({ch:name,msg:m}); return done('ok'); }, presenceState(){ return window.__hbPresence; }, unsubscribe(){ return done('ok'); } }; return ch; }
+  window.__hbCh=[]; window.__hbRemoved=[]; window.__hbPresence={}; window.__hbOn=[]; window.__hbHandlers=[]; window.__hbNames=[]; // __hbOn：on() で登録したもの。__hbEmit(channel名, event, payload)：相手から broadcast が届いたことにする（HB-095。postgres_changes は偽物では動かさない）
+  window.__hbEmit=(chName,event,payload)=>window.__hbHandlers.filter(h=>h.ch===chName&&h.type==='broadcast'&&h.event===event).forEach(h=>h.cb({payload}));
+  function channel(name){ window.__hbNames.push(name); const ch={ name, on(type,filter,cb){ window.__hbOn.push({ch:name,type,filter}); window.__hbHandlers.push({ch:name,type,event:filter&&filter.event,cb}); return ch; }, subscribe(cb){ return ch; }, track(){ return done('ok'); }, send(m){ window.__hbCh.push({ch:name,msg:m}); return done('ok'); }, presenceState(){ return window.__hbPresence; }, unsubscribe(){ return done('ok'); } }; return ch; }
   window.supabase={ createClient(){ return { from:table, channel, removeChannel(ch){ window.__hbRemoved.push(ch&&ch.name); return done('ok'); } }; } };
 })();`;
 
@@ -64,8 +65,11 @@ async function openGame(page, opts = {}) {
     blocked.push(url);
     return route.fulfill({ status: 503, body: '' }); // 外へは出さない（abort だとコンソールにエラーが出るので、空の返事にする）
   });
+  // http://hb.test は https ではないので crypto.subtle が無い。本物の Node の SHA-256 を借りる（HB-095。ページの roomKeyOf が使う）
+  if (!page.__hbShaReady) { page.__hbShaReady = true; await page.exposeFunction('__hbSha256', bytes => Array.from(require('crypto').createHash('sha256').update(Buffer.from(bytes)).digest())); } // 同じページで openGame を2度呼ぶテストがある
   await page.addInitScript(({ guide, tutorial, extraWords }) => {
     window.HB_TEST = {};            // index.html の「自動テストの窓」を開ける
+    if (!(window.crypto && window.crypto.subtle)) Object.defineProperty(window.crypto, 'subtle', { configurable: true, value: { digest: async (alg, data) => new Uint8Array(await window.__hbSha256(Array.from(new Uint8Array(data)))).buffer } });
     window.__HB_EXTRA = extraWords;
     try { if (!guide) localStorage.setItem('hb.guide', 'done'); if (!tutorial) localStorage.setItem('hb.tutorial', 'done'); } catch (e) {}
   }, { guide, tutorial, extraWords });

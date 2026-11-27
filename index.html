@@ -1977,7 +1977,7 @@ function loadExtraWords(){
 
 /* ---- 通信対戦（HB-002）----
    同じ合言葉の二人が「入室」（lobby の channel）し、二人そろったら3秒数えて始める。
-   一戦ごとに matchId を作り、その中で投げた言葉だけを表 throws に入れて相手に届ける。
+   一戦ごとに matchId を作り、その中で投げた言葉だけを表 throws に入れ（先着の決め）、相手へは broadcast で届ける。
    カゴ・袋・自動で落ちてくる字は、各自の端末の中だけ。 */
 const ROOM_CAP=2;      // 通信対戦は二人まで
 const COUNTDOWN_SEC=3; // そろってから始めるまでの秒数
@@ -1989,8 +1989,11 @@ loadExtraWords(); // NET を作ったあとで呼ぶ（getClient が NET を使�
 function isOnline(){ return NET.mode==='online'; }
 /* 自分を区別する短い番号（タブごとに変わる） */
 function makePlayerId(){ return Math.random().toString(36).slice(2,10); }
-/* 合言葉を、channel 名や条件式に安全に使える8けたの16進数にする（FNV-1a という単純なハッシュ） */
-function roomKeyOf(pass){ let h=0x811c9dc5; for(const byte of new TextEncoder().encode(pass)){ h^=byte; h=Math.imul(h,0x01000193)>>>0; } return h.toString(16).padStart(8,'0'); }
+/* 合言葉を、channel 名や条件式に安全に使える32文字の16進数にする（SHA-256 の先頭128ビット。HB-095）。表の読み取りを止めたあと、合言葉の番号が総当たりで当てられないように強くした（止めるまでは表から32文字が見える）。
+   crypto.subtle が使えない（https でない）ときは null */
+async function roomKeyOf(pass){ if(!(window.crypto&&crypto.subtle)) return null;
+  const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(pass));
+  return [...new Uint8Array(buf)].slice(0,16).map(b=>b.toString(16).padStart(2,'0')).join(''); }
 /* Supabase の接続を一度だけ作って使い回す。config.js か supabase-js が読めなければ null */
 function getClient(){ if(NET.client) return NET.client; if(!window.supabase||!window.HB_SUPABASE) return null;
   NET.client=window.supabase.createClient(HB_SUPABASE.url,HB_SUPABASE.key); return NET.client; }
@@ -2021,11 +2024,13 @@ function leaveOnline(){ closeNet(); guideHide(); setLobbyText(''); showMenu(); }
 function startSolo(){ closeNet(); hideMenu(); newGame(!tutDone()); } // はじめての「ひとりで」はチュートリアル（HB-059）
 
 /* 合言葉で入室。lobby の channel に入って、相手がいるかは presence（在室）で見る */
-function joinRoom(){ const pass=$('roomInput').value.trim();
+async function joinRoom(){ const pass=$('roomInput').value.trim();
   if(!pass){ setLobbyText('合言葉を入れてください'); return; }
   const client=getClient();
   if(!client){ setLobbyText('通信の準備ができない。ネットにつながっているか確かめてください'); return; }
-  closeNet(); NET.playerId=makePlayerId(); NET.roomKey=roomKeyOf(pass); NET.pass=pass;
+  const key=await roomKeyOf(pass);
+  if(!key){ setLobbyText('通信の準備ができない。ネットにつながっているか確かめてください'); return; }
+  closeNet(); NET.playerId=makePlayerId(); NET.roomKey=key; NET.pass=pass;
   NET.lobby=client.channel(`hb-lobby-${NET.roomKey}`,{config:{presence:{key:NET.playerId}}})
     .on('presence',{event:'sync'},onLobbyPresence)
     .on('broadcast',{event:'start'},({payload})=>onStartMessage(payload))
@@ -2095,11 +2100,11 @@ function againUi(){ const on=isOnline()&&S&&S.over, w=$('resWait');
   w.hidden=!t; w.innerHTML=t?withEn(t,1):'';
   $('btnAgain').disabled=!!(on&&(NET.again.me||NET.partnerGone||NET.cd)); }
 
-/* 対局の channel：相手の投げ（表 throws への追加）と「負けた」を受け取る。
+/* 対局の channel：相手の投げ（broadcast。先着は表 throws への追加が決める）と「負けた」を受け取る。
    二人とも在室（presence）になったら、対局を始められる */
 function openMatchChannel(matchId){ const client=getClient();
   NET.match=client.channel(`hb-match-${matchId}`,{config:{broadcast:{self:false},presence:{key:NET.playerId}}})
-    .on('postgres_changes',{event:'INSERT',schema:'public',table:'throws',filter:`room=eq.${matchId}`},({new:row})=>onOpponentThrow(row))
+    .on('broadcast',{event:'throw'},({payload})=>onOpponentThrow(payload)) // 相手の投げ（HB-095：表の読み取りではなく broadcast で受ける）
     .on('broadcast',{event:'lose'},()=>onOpponentLost())
     .on('broadcast',{event:'basket'},({payload})=>onOppBasket(payload))
     .on('presence',{event:'sync'},onMatchPresence)
@@ -2114,7 +2119,7 @@ function sendLoseToOpponent(){ if(NET.match) NET.match.send({type:'broadcast',ev
 async function insertThrow(c,ps){
   const row={room:NET.matchId,word:c.core,player:NET.playerId,stars:Math.min(comboOf(ps),9),trail:trailOf(ps)};
   const {error}=await getClient().from('throws').insert(row);
-  if(!error) return 'ok';
+  if(!error){ if(NET.match) NET.match.send({type:'broadcast',event:'throw',payload:{word:row.word,stars:row.stars,trail:row.trail,player:row.player}}); return 'ok'; } // 入ったら相手へ（HB-095）
   if(error.code==='23505') return 'dup';
   return 'error'; }
 /* 通信対戦で投げる。入ったことを確かめてから、手元の札を消す（D-013：先着は表が決める） */
@@ -2129,6 +2134,8 @@ async function throwOnline(c){ const ps=selPieces(); S.busy=true; render();
 
 /* 相手が投げた言葉を、自分のカゴの材料として受け取る（ー は棒として届く） */
 function onOpponentThrow(row){ if(!S||S.over||S.ending) return;
+  if(!row||typeof row.word!=='string'||!/^[ぁ-ゖー。∘]{1,16}$/.test(row.word)) return; // broadcast は表の決まり（throws_word_kana）を通らないので、ここで同じ形に限る（HB-095）
+  row={word:row.word,player:row.player,stars:Number.isInteger(row.stars)?Math.max(0,Math.min(9,row.stars)):0,trail:typeof row.trail==='string'?row.trail.replace(/[<>&"'`]/g,'').slice(0,400):''}; // 画面に入る stars・trail も形を整える
   if(row.player===NET.playerId) return; // 自分の投げは投げたときに済んでいる
   S.used.add(row.word); const had=S.mine.map(p=>p.id);
   S.log.push({who:'op',word:row.word,note:'',k:row.stars||0,trail:row.trail||''}); zkRecord(row.word,'op',row.stars||0,row.trail||'');
@@ -2146,7 +2153,7 @@ if(window.HB_TEST&&typeof window.HB_TEST==='object') Object.assign(window.HB_TES
 if(window.HB_TEST&&typeof window.HB_TEST==='object') Object.assign(window.HB_TEST,{SUDDEN,RARE,suddenWhen,suddenChars,suddenCount:()=>sudN,suddenSkip:sec=>{ sudStart-=sec*1000; suddenArm(); },dropOne}); // サドンデス：数・落ちる字の一覧・時刻・始まりを早める（HB-082）
 if(window.HB_TEST&&typeof window.HB_TEST==='object') Object.defineProperty(window.HB_TEST,'CAP',{get:()=>CAP,configurable:true}); // 一戦ごとに変わるので値でなく読む（HB-048）
 if(window.HB_TEST&&typeof window.HB_TEST==='object') Object.assign(window.HB_TEST,{TODOME,FX,NET,onStartMessage,KANA,PARTS,RECIPE,MERGE,MERGE_TURN,TURN,BAG,logText,makeToday,makeRare,RARE_TODAY:()=>RARE_TODAY,seedRng,TODAY:()=>TODAY,HAND,DICT,SPEEDS,key,
-  words:()=>WORDS, S:()=>S, mk,letterOf,checkSel,splitMade,mergeMade,comboOf,cpuOk,tapTile,doSplit,doMerge,doTurn,doThrow,render,newGame,TUT,TUT_SEQ,tutDone,startSolo,cpuAct,cpuThrow,setSpeed,showMeaning,SCENE_OF,exchangeCands,VOTE_TEXT,ALIAS,turnShortcuts,mergeTurnBacks,stepsOf,hintFind,hintPress,HINT:()=>HINT,HINT_TEXT,cpuApply,TURN_NOT_CPU,ATK,ATK_FX,atkKind,atkPickAll,atkAllKinds,atkN,atkVisible,atkCanSplit,OPPFX:()=>OPPFX,onOpponentThrow,onOppBasket,atkThrowOnline,atkNoiseOn,atkReceive,pressAgain,onAgainMessage,onPartnerLeft,onLobbyPresence,againUi,leaveOnline});
+  words:()=>WORDS, S:()=>S, mk,letterOf,checkSel,splitMade,mergeMade,comboOf,cpuOk,tapTile,doSplit,doMerge,doTurn,doThrow,render,newGame,TUT,TUT_SEQ,tutDone,startSolo,cpuAct,cpuThrow,setSpeed,showMeaning,SCENE_OF,exchangeCands,VOTE_TEXT,ALIAS,turnShortcuts,mergeTurnBacks,stepsOf,hintFind,hintPress,HINT:()=>HINT,HINT_TEXT,cpuApply,TURN_NOT_CPU,ATK,ATK_FX,atkKind,atkPickAll,atkAllKinds,atkN,atkVisible,atkCanSplit,OPPFX:()=>OPPFX,onOpponentThrow,openMatchChannel,insertThrow,roomKeyOf,startAsLeader,onOppBasket,atkThrowOnline,atkNoiseOn,atkReceive,pressAgain,onAgainMessage,onPartnerLeft,onLobbyPresence,againUi,leaveOnline});
 
 newGame();
 showMenu();
