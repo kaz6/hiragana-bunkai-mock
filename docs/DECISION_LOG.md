@@ -269,3 +269,13 @@
 - 確かめ：tests/e2e/room.spec.js（番号の形・入室の名前・broadcast で届く・postgres_changes を使わない・insert 'ok' で送り 23505 では送らない）。tests/helpers.js の偽の Supabase に on() の記録と __hbEmit、crypto.subtle（Node の SHA-256 を借りる）を足した
 - 受け取りの形：broadcast は表の決まりを通らないので、受けた側で word を表と同じ形（16字まで）に限り、stars・trail を整える（レビューで、word に HTML を入れると画面に出る穴が見つかったため）。ログの描画（data-w・trail）にエスケープが無いのは前からあり、この PR では直していない（提案）
 - 作業：HB-095（係）
+
+## D-114 の追記：表 throws を読めなくした（作者 2026-11-27 18:14「やります」。HB-095・HB-097）
+
+- 2026-11-27 14:41 相談チャットが本物の表の room の決まりを広げた（migration hb095_room_form_32）：「8文字か32文字の番号-乱数」、49字まで。係は PR #66 を、この決まりのせいで投げが全部断られるのでマージを止めていた。anon で32文字の room が入る・形の違うものは 23514 で断ることを確かめ、14:42 に PR #66 をマージした
+- 2026-11-27 18:15 表 throws の「anyone can read throws」を外し、realtime の publication から throws を外した（migration hb095_close_throws_read。1回目は確認の画面が時間切れになり何も変わらず、作者の「やります」のあとに入れた）
+- 確かめ（anon の役で SQL から）：投げは入る／anon からは throws が0行に見える（自分が入れた行も見えない）。表に残る行は53行で変わらない
+- 8文字の古い形は通したまま：表を読めないので番号は外から見えず、害が無い。7日たてば古い行は守りの決まりで消える
+- 写し：supabase/hb095_room_and_read.sql
+- まだ：2台で同じ合言葉で入り、投げ合いが届くことを人の手で確かめる（作者）
+- 作業：HB-097（相談チャット）
