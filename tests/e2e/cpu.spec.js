@@ -225,3 +225,14 @@ for (const lv of ['ふつう', 'ゆっくり']) {
     expect(r.logs).not.toContain('（トドメ）');
   });
 }
+
+test('CPU が投げるのは意味の出る語だけ（さいのろ・ろうのき のような意味の無い語は投げない）。人はこれまでどおり投げられる（作者 2026-11-28「たのむ」・D-121）', async ({ page }) => {
+  await openGame(page);
+  const r = await page.evaluate(() => { const T = window.HB_TEST, M = Object.assign({}, window.HB_MEANINGS || {}, window.HB_MEANINGS_AUTHOR || {});
+    const bad = T.words().filter(w => T.cpuOk(w) && !M[w]).slice(0, 5);
+    return { bad, sai: T.cpuOk('さいのろ'), rou: T.cpuOk('ろうのき'), dict: T.words().includes('さいのろ'), todome: T.TODOME.length }; });
+  expect(r.bad).toEqual([]);
+  expect(r.sai).toBe(false); expect(r.rou).toBe(false);
+  expect(r.dict).toBe(true);              // 人は投げられる（辞書には残す）
+  expect(r.todome).toBe(12);              // トドメの一言は12語とも意味がある
+});

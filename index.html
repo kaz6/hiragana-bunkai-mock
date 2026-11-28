@@ -682,7 +682,7 @@ let RARE_TODAY=null; // {letter, toMe}。なし＝null
 function makeRare(rng,myIdx){ const r=rng||Math.random; if(!RARE.length) return null;
   const letter=RARE[Math.floor(r()*RARE.length)], side=r()<0.5?0:1; // side：在室の並びの何番目の人の手に入るか（ひとりでは 0＝自分）
   return {letter, toMe:myIdx==null?side===0:side===myIdx}; }
-// 2字の言葉 268語を足した（作者 2026-11-28「全部入れる。ほかの候補もあれば。」、いて（射手）は作者「ゲームでよく使うのでいれる」。HB-100 の次・HB-101。候補は相談チャット。か・と・て・そ・え・お・み・む・ら・り・せ が字になる前に作った表で、これらの字の2字が抜けていた）
+// 2字の言葉 268語を足した。さらに45語（はじかれた並びから拾った35語と、作者が選んだ いせ・のと・すわ・にち・もく・ほめ・すか・ちわ・よた・そち。2026-11-28 15:25「35入れる」。HB-102）（作者 2026-11-28「全部入れる。ほかの候補もあれば。」、いて（射手）は作者「ゲームでよく使うのでいれる」。HB-100 の次・HB-101。候補は相談チャット。か・と・て・そ・え・お・み・む・ら・り・せ が字になる前に作った表で、これらの字の2字が抜けていた）
 const HAND=new Set(`
 はこ はし はち はる はい はく はは はつ よる よこ よい よし よく よめ よち よつ ほし ほこ ほろ ほる ほほ ほう
 にく にし にる こい こし こめ ここ ころ こる こう こつ こく いし いち いろ いぬ いく いる いき いう いい いつ
@@ -754,6 +754,7 @@ const HAND=new Set(`
 せわ ぜに ぜん ぞう どく どこ どて どろ でし でる ごみ ごう がく がけ なか なみ なぞ あと あみ あり いと うそ うみ うで
 うり きみ きり きそ こと こえ さか さら さと しお しか しり すみ たか たて ちえ ちか つり つみ つえ ぬか のみ はら はり
 はと はか ふみ ふえ へそ ほか ほお まど まと まり まえ もと もり
+のろ する だい ばい せつ ぶり つた いそ よせ せじ うさ こり そつ ふり たし じい りつ はう はめ けり せく けう こき りこ りし ちし もさ くす しの いな ごい ろす ろけ にす すと いせ のと すわ にち もく ほめ すか ちわ よた そち
 いて あぜ あだ あて いか うお うか うず うど うね うば えい えら えと えり おさ おじ おち おつ おば おり かす かせ かて がま
 がら がわ きざ くじ くら くり けが けた けら こて こも さお さて すえ すそ すり せこ せと せり たみ たら だて だん ちり
 つか つて つら てい とお とが とど とろ どら なら なり にえ にら ぬた はて ばか ばら ぱん ふか ふと ふで へら べん ほど
@@ -765,7 +766,8 @@ const DICT=new Set(WORDS);
 /* CPU が投げない語（HB-029, D-064）。一覧は cpu-ng.js。比べる形は辞書と同じ（小さい字→大きい字。D-043）。人の側の判定には使わない */
 const bigForm=w=>String(w).normalize('NFC').replace(/[ぁぃぅぇぉっゃゅょゎ]/g,c=>String.fromCharCode(c.charCodeAt(0)+1));
 const CPU_NG=new Set((window.HB_CPU_NG||[]).map(bigForm));
-const cpuOk=w=>!CPU_NG.has(bigForm(w));
+const CPU_MEAN=new Set(Object.keys(Object.assign({},window.HB_MEANINGS||{},window.HB_MEANINGS_AUTHOR||{})).map(bigForm)); // 意味の出る語（JMdict・作者の意味の表）
+const cpuOk=w=>!CPU_NG.has(bigForm(w))&&CPU_MEAN.has(bigForm(w)); // CPU が投げるのは、禁止の一覧に無く、意味の出る語だけ（D-064・D-121。作者 2026-11-28「たのむ」。人はこれまでどおり辞書の語を全部投げられる）
 /* つよい のトドメの一言の語（HB-064, D-096）。一覧は cpu-todome.js。辞書と同じ形に直す。辞書にある語・CPU が投げてよい語だけ使う */
 const TODOME_SRC=window.HB_TODOME, TODOME=[...new Set((Array.isArray(TODOME_SRC)?TODOME_SRC:((TODOME_SRC&&TODOME_SRC['つよい'])||[])).map(bigForm))].filter(w=>DICT.has(w)&&cpuOk(w)); // 相手ごとの一覧（HB-067）。いまは つよい の一覧だけ。前の形（配列）も読める
 const SPECIAL=new Set(['ち∘']); // 部品を含む特別な言葉。作品名『チ。』（作者 2026-11-19）。リストでは ∘ を「。」として見せる
