@@ -4,7 +4,7 @@ const { test, expect } = require('@playwright/test');
 const { openGame, startSolo, expectClean } = require('../helpers');
 
 test.afterEach(async ({}, info) => expectClean(info.ctx));
-const RARE13 = [...'ふとせりかてそんえらむおみ'];
+const RARE13 = [...'ふとせりかてそえらむおみ']; // ん は袋に1枚入ったので外れた（HB-100。名前は前のまま、いまは12字）
 const noOverflow = page => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth);
 
 test.describe('ひとりで', () => {

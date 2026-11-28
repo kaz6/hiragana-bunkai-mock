@@ -317,9 +317,18 @@ test('て＋゛→で、そ＋゛→ぞ。割ると元に戻る（D-076）', asy
   }
 });
 
-test('て・で・そ・ぞ・ん・え は字の一覧（KANA）にあり、袋（BAG）にはない（D-076）', async ({ page }) => {
-  const r = await page.evaluate(() => { const T = window.HB_TEST; return [...'てでそぞんえ'].map(c => [c, T.KANA.has(c), T.BAG.includes(c)]); });
+test('て・で・そ・ぞ・え は字の一覧（KANA）にあり、袋（BAG）にはない（D-076。ん は HB-100 で袋に1枚入った）', async ({ page }) => {
+  const r = await page.evaluate(() => { const T = window.HB_TEST; return [...'てでそぞえ'].map(c => [c, T.KANA.has(c), T.BAG.includes(c)]); });
   for (const [c, k, b] of r) { expect(k, c).toBe(true); expect(b, c).toBe(false); }
+});
+
+test('ん は袋（BAG）に1枚だけ。今日の字の多め・少なめには選ばれず、一戦の袋でもいつも1枚（作者 2026-11-28「山札に、『ん』を一枚入れて欲しい」・HB-100）', async ({ page }) => {
+  const r = await page.evaluate(() => { const T = window.HB_TEST;
+    const days = Array.from({ length: 200 }, (_, i) => T.makeToday(T.seedRng('n-' + i)));
+    return { base: T.BAG.filter(l => l === 'ん').length, kana: T.KANA.has('ん'),
+      bagN: [...new Set(days.map(d => d.bag.filter(l => l === 'ん').length))], picked: days.some(d => d.more.includes('ん') || d.less.includes('ん')) }; });
+  expect(r.base).toBe(1); expect(r.kana).toBe(true);
+  expect(r.bagN).toEqual([1]); expect(r.picked).toBe(false);
 });
 
 // くっつけてできた か は「裏返して90°回した向き」で出る（HB-045, D-079）

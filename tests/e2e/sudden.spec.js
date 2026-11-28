@@ -4,7 +4,7 @@ const { openGame, startSolo, setBasket, expectClean } = require('../helpers');
 
 test.afterEach(async ({}, info) => expectClean(info.ctx));
 
-const RARE13 = [...'ふとせりかてそんえらむおみ'];
+const RARE13 = [...'ふとせりかてそえらむおみ']; // ん は袋に1枚入ったので外れた（HB-100。名前は前のまま、いまは12字）
 const T = fn => (page, ...a) => page.evaluate(fn, ...a);
 
 test.describe('ふつうの一戦', () => {
@@ -30,7 +30,7 @@ test.describe('ふつうの一戦', () => {
     expect((log.match(/｜サドンデス/g) || []).length).toBe(2);              // 始まるたびにログに一行
   });
 
-  test('落ちる字の一覧は13字（KANA にあり、BAG に無く、濁音・半濁音でない字から作られる）', async ({ page }) => {
+  test('落ちる字の一覧は12字（ん は袋に入ったので外れた。HB-100）（KANA にあり、BAG に無く、濁音・半濁音でない字から作られる）', async ({ page }) => {
     const r = await page.evaluate(() => { const T = window.HB_TEST;
       const daku = c => /[゙゚]/.test(c.normalize('NFD'));
       return { rare: [...T.RARE], viaRules: [...T.KANA].filter(l => !T.BAG.includes(l) && !daku(l)) }; });
