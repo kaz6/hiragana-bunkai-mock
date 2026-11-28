@@ -103,3 +103,9 @@ test('2字の言葉を足した（か・と・て・そ・え・お・み・む�
   for (const [h, n] of r.heads) expect(n, h).toBeGreaterThan(0);
   expect(r.has.every(Boolean)).toBe(true);
 });
+
+test('はじかれた並びから拾った2字を足した（する・だい・ばい・のろ・ごい・いせ・のと・すわ など45語。作者 2026-11-28「35入れる」・HB-102）', async ({ page }) => {
+  await openGame(page);
+  const r = await page.evaluate(() => ['する', 'だい', 'ばい', 'のろ', 'ごい', 'いせ', 'のと', 'すわ', 'にち', 'そち'].filter(w => !window.HB_TEST.HAND.has(w)));
+  expect(r).toEqual([]);
+});
