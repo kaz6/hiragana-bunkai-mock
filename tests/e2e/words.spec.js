@@ -93,3 +93,13 @@ test.describe('作者の意味の表（meanings-author.js）', () => {
     expect(r.row).toContain('橋・端・箸');
   });
 });
+
+test('2字の言葉を足した（か・と・て・そ・え・お・み・む・ら・り で始まる語など268語。作者 2026-11-28「全部入れる」・HB-101）', async ({ page }) => {
+  await openGame(page);
+  const r = await page.evaluate(() => { const T = window.HB_TEST;
+    const two = [...T.HAND].filter(w => [...w].length === 2);
+    const heads = [...'かとてそえおみむらり'].map(h => [h, two.filter(w => w[0] === h).length]);
+    return { heads, has: ['かみ', 'とり', 'てら', 'そら', 'ほん', 'えき', 'おに', 'みず', 'むし', 'りす', 'いと', 'うそ', 'わら', 'いて'].map(w => T.HAND.has(w)) }; });
+  for (const [h, n] of r.heads) expect(n, h).toBeGreaterThan(0);
+  expect(r.has.every(Boolean)).toBe(true);
+});

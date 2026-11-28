@@ -53,16 +53,16 @@ test('1手のカゴ（つ・十・さ）：触る札は さ、ボタンは「裏
   expect(await page.evaluate(() => window.HB_TEST.S().sel.length)).toBe(0);
 });
 
-test('2手のカゴ（一・⊂・ろ）：手数2で、1手目の札とボタンを出す', async ({ page }, info) => {
+test('2手のカゴ（一・⊂・ろ）：手数2で、1手目の札とボタンを出す（HB-101 で とろ が入り、一 を回して と にする手が先に出る）', async ({ page }, info) => {
   info.ctx = await openGame(page);
   await startSolo(page);
   await setBasket(page, ['一', '⊂', 'ろ']);
   const plan = await page.evaluate(() => { const p = window.HB_TEST.hintFind(); return p && { hands: p.hands, btn: p.btn, word: p.word, tiles: p.tiles }; });
-  expect(plan).toEqual({ hands: 2, btn: 'flip', word: 'ろう', tiles: [1] });
+  expect(plan).toEqual({ hands: 2, btn: 'turn', word: 'とろ', tiles: [0] });
   await page.click('#btnHint');
   expect((await glowLetters(page)).length).toBe(1); // 札の見た目の字は向きで変わる。1枚だけ光る
   await page.click('#btnHint');
-  expect(await glowBtns(page)).toEqual(['aFlip']);
+  expect(await glowBtns(page)).toEqual(['aRot']);
 });
 
 test('すぐ投げられる言葉があれば、手数の多い言葉より先に出す（つ・十・こ → こつ）', async ({ page }, info) => {
@@ -86,10 +86,10 @@ test('回す・裏返すで札の向きが変わったら消えて1回目に戻�
   expect(await page.evaluate(() => window.HB_TEST.HINT())).toBe(null);
 });
 
-test('字にならない向きの札からも手が出る：つ・へ・ん（回す→裏返す の2手で し）。1手目のあとは2手目', async ({ page }, info) => {
+test('字にならない向きの札からも手が出る：つ・ぜ・ろ（回す→裏返す の2手で し。HB-101 で へん が入ったのでカゴを替えた）。1手目のあとは2手目', async ({ page }, info) => {
   info.ctx = await openGame(page);
   await startSolo(page);
-  await setBasket(page, ['つ', 'へ', 'ん']);
+  await setBasket(page, ['つ', 'ぜ', 'ろ']);
   const p1 = await page.evaluate(() => { const p = window.HB_TEST.hintFind(); return p && { hands: p.hands, btn: p.btn, tiles: p.tiles }; });
   expect(p1).toEqual({ hands: 2, btn: 'turn', tiles: [0] });
   await page.evaluate(() => { const T = window.HB_TEST, S = T.S(); T.tapTile(S.mine[0].id); });
@@ -98,10 +98,10 @@ test('字にならない向きの札からも手が出る：つ・へ・ん（�
   expect(p2).toEqual({ hands: 1, btn: 'flip', tiles: [0] }); // 字にならない札（つ を回した向き）から、裏返して し
 });
 
-test('へ・な・ん：へ を回して ＞ になったあとも続く（＞ を裏返して く）', async ({ page }, info) => {
+test('へ・な・の：へ を回して ＞ になったあとも続く（＞ を裏返して く。HB-101 で なん が入ったのでカゴを替えた）', async ({ page }, info) => {
   info.ctx = await openGame(page);
   await startSolo(page);
-  await setBasket(page, ['へ', 'な', 'ん']);
+  await setBasket(page, ['へ', 'な', 'の']);
   const f = () => page.evaluate(() => { const p = window.HB_TEST.hintFind(); return p && { hands: p.hands, btn: p.btn, tiles: p.tiles }; });
   expect(await f()).toEqual({ hands: 2, btn: 'turn', tiles: [0] });
   await page.evaluate(() => { const T = window.HB_TEST, S = T.S(); T.tapTile(S.mine[0].id); });
